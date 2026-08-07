@@ -152,6 +152,18 @@ final class TemplateRendersTest extends FunctionalTestCase
                 ],
             ],
             'activities' => [['event' => 'work_started', 'crdate' => 1754563200]],
+            'timeline' => [
+                [
+                    'type' => 'activity',
+                    'crdate' => 1754563200,
+                    'event' => 'stage_changed',
+                    'beUser' => 'admin',
+                    'payload' => ['from_state' => 'in_progress', 'to_state' => 'review'],
+                    'historyUid' => 0,
+                    // The comment explaining this very move, anchored to it.
+                    'comments' => [['content' => 'Sent back, images are missing.']],
+                ],
+            ],
             'diffs' => [[
                 'label' => 'Header', 'html' => '<ins>new</ins><del>old</del>',
                 'user' => 'admin', 'datetime' => '2026-08-07 10:00',
@@ -166,11 +178,45 @@ final class TemplateRendersTest extends FunctionalTestCase
         self::assertStringContainsString('Up for grabs', $output);
         // Core's rendered diff markup is passed through, not re-escaped away.
         self::assertStringContainsString('<ins>new</ins>', $output);
-        self::assertStringContainsString('work_started', $output);
+        // The comment must appear nested under the action it explains, not in a
+        // disconnected list the reader has to correlate by timestamp.
+        self::assertStringContainsString('stage_changed', $output);
+        self::assertStringContainsString('Sent back, images are missing.', $output);
+        self::assertStringContainsString('in_progress', $output);
         // Reused content is flagged, because changing it changes other pages.
         self::assertStringContainsString('needs-attention', $output);
         self::assertStringContainsString('reused elsewhere', $output);
-        // Empty comments explain themselves rather than showing nothing.
-        self::assertStringContainsString('No comments yet', $output);
+        // Comments are no longer a separate panel - they live inside the timeline
+        // entry they explain, so there is no standalone "comments" list any more.
+        self::assertStringNotContainsString('No comments yet', $output);
+        // Core's rendered diff is shown, so the empty-state hint must NOT appear.
+        self::assertStringNotContainsString('30 days', $output);
+    }
+
+    #[Test]
+    public function anEmptyChangeListExplainsThatHistoryExpires(): void
+    {
+        $viewFactory = $this->get(ViewFactoryInterface::class);
+        $view = $viewFactory->create(new ViewFactoryData(
+            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
+        ));
+        $view->assignMultiple([
+            'task' => ['uid' => 1, 'state' => 'backlog', 'priority' => 2, 'workspace_uid' => 0, 'subject_pid' => 2],
+            'subject' => ['table' => 'pages', 'uid' => 2, 'title' => 'About us'],
+            'assignee' => null,
+            'editUrl' => '',
+            'members' => [],
+            'activities' => [],
+            'timeline' => [],
+            'diffs' => [],
+            'comments' => [],
+        ]);
+
+        $output = $view->render('ContentFlow/Ticket');
+
+        // TYPO3 drops change history after 30 days by default. Saying so turns a
+        // confusing blank panel into an explained one - "nothing here" must not
+        // be misread as "nothing happened".
+        self::assertStringContainsString('30 days', $output);
     }
 }

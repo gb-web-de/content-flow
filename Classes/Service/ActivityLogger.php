@@ -55,10 +55,12 @@ class ActivityLogger
      *
      * @param array<string, mixed> $payload the essentials, durable
      * @param int $historyUid sys_history row holding the full detail, 0 if none
+     * @return int uid of the written entry
      */
-    public function log(int $taskUid, string $event, int $beUserId, array $payload = [], int $historyUid = 0): void
+    public function log(int $taskUid, string $event, int $beUserId, array $payload = [], int $historyUid = 0): int
     {
-        $this->connectionPool->getConnectionForTable(self::TABLE)->insert(self::TABLE, [
+        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
+        $connection->insert(self::TABLE, [
             'task' => $taskUid,
             'event' => $event,
             'be_user' => $beUserId,
@@ -67,6 +69,9 @@ class ActivityLogger
             'crdate' => $GLOBALS['EXEC_TIME'],
             'tstamp' => $GLOBALS['EXEC_TIME'],
         ]);
+
+        // Returned so a comment can be anchored to the very entry it explains.
+        return (int)$connection->lastInsertId();
     }
 
     /**

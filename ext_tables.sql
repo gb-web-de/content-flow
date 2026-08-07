@@ -129,6 +129,16 @@ CREATE TABLE tx_contentflow_comment (
 
     task int(11) unsigned DEFAULT '0' NOT NULL,
     parent int(11) unsigned DEFAULT '0' NOT NULL,
+
+    # What this comment is about. A comment is rarely free-floating chatter:
+    # most of the time it explains a change ("sent back because ..."), so it is
+    # anchored to the activity entry it belongs to. 0 = a standalone remark.
+    activity int(11) unsigned DEFAULT '0' NOT NULL,
+    # Optional pointer at core's sys_history row, when the comment refers to a
+    # concrete field change. Dangling = detail expired, not an error.
+    history_uid int(11) unsigned DEFAULT '0' NOT NULL,
+
+    be_user int(11) unsigned DEFAULT '0' NOT NULL,
     content text,
     resolved tinyint(1) unsigned DEFAULT '0' NOT NULL,
 
@@ -137,7 +147,8 @@ CREATE TABLE tx_contentflow_comment (
     deleted tinyint(4) unsigned DEFAULT '0' NOT NULL,
 
     PRIMARY KEY (uid),
-    KEY task (task, parent)
+    KEY task (task, parent),
+    KEY activity (activity)
 );
 
 #

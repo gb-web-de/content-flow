@@ -93,18 +93,43 @@
     </section>
 
     <section class="contentflow-ticket-section">
-        <h3>Activity</h3>
+        <h3>History</h3>
         <f:comment>
-            The durable trail. sys_history is garbage-collected after 30 days by
-            default, so the decisions live here instead.
+            One stream, not two lists. A stage comment IS the reason for that stage
+            change, so it is nested under the action it explains instead of forcing
+            the reader to correlate timestamps between separate panels.
+
+            This is also the durable record: sys_history is garbage-collected after
+            30 days by default, so these entries are what survives.
         </f:comment>
-        <f:if condition="{activities}">
+        <f:if condition="{timeline}">
             <f:then>
-                <ol class="contentflow-activity">
-                    <f:for each="{activities}" as="entry">
-                        <li>
-                            <span class="contentflow-activity-event">{entry.event}</span>
-                            <f:format.date format="Y-m-d H:i">{entry.crdate}</f:format.date>
+                <ol class="contentflow-timeline">
+                    <f:for each="{timeline}" as="entry">
+                        <li class="contentflow-timeline-entry is-{entry.type}">
+                            <div class="contentflow-timeline-head">
+                                <f:if condition="{entry.type} == 'activity'">
+                                    <f:then><span class="contentflow-activity-event">{entry.event}</span></f:then>
+                                    <f:else><span class="contentflow-activity-event">comment</span></f:else>
+                                </f:if>
+                                <span class="contentflow-timeline-meta">
+                                    {entry.beUser} · <f:format.date format="Y-m-d H:i">{entry.crdate}</f:format.date>
+                                </span>
+                            </div>
+
+                            <f:if condition="{entry.payload.from_state}">
+                                <div class="contentflow-timeline-transition">
+                                    {entry.payload.from_state} &rarr; {entry.payload.to_state}
+                                </div>
+                            </f:if>
+
+                            <f:if condition="{entry.content}">
+                                <blockquote class="contentflow-timeline-comment">{entry.content}</blockquote>
+                            </f:if>
+
+                            <f:for each="{entry.comments}" as="comment">
+                                <blockquote class="contentflow-timeline-comment">{comment.content}</blockquote>
+                            </f:for>
                         </li>
                     </f:for>
                 </ol>
@@ -139,28 +164,6 @@
                     after 30 days by default, so older detail may have expired.
                 </p>
             </f:else>
-        </f:if>
-    </section>
-
-    <section class="contentflow-ticket-section">
-        <h3>
-            Comments
-            <span class="badge">{comments -> f:count()}</span>
-        </h3>
-        <f:if condition="{comments}">
-            <f:then>
-                <ul class="contentflow-comments">
-                    <f:for each="{comments}" as="comment">
-                        <li>
-                            <div class="contentflow-comment-body">{comment.content}</div>
-                            <div class="contentflow-comment-meta">
-                                <f:format.date format="Y-m-d H:i">{comment.crdate}</f:format.date>
-                            </div>
-                        </li>
-                    </f:for>
-                </ul>
-            </f:then>
-            <f:else><p class="contentflow-empty">No comments yet.</p></f:else>
         </f:if>
     </section>
 

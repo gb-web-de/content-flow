@@ -69,6 +69,7 @@ class WorkspaceIntegrationService
             'warnedCount' => count($warnedMembers),
             'comments' => $comments,
             'activities' => $activities,
+            'timeline' => $this->buildTimeline($activities, $comments),
             'diffs' => $diffs,
         ];
     }
@@ -194,5 +195,88 @@ class WorkspaceIntegrationService
         }
 
         return $decorated;
+    }
+
+    /**
+     * One chronological stream of what happened, with each comment attached to the
+     * action it explains.
+     *
+     * Comments and actions are not separate stories. A stage comment *is* the
+     * reason for that stage change, so showing them in two disconnected lists
+     * forces the reader to correlate timestamps by hand. Anything anchored to an
+     * activity is nested under it; genuinely standalone remarks stay as their own
+     * entries.
+     *
+     * @param list<array<string, mixed>> $activities
+     * @param list<array<string, mixed>> $comments
+     * @return list<array<string, mixed>>
+     */
+    private function buildTimeline(array $activities, array $comments): array
+    {
+        $commentsByActivity = [];
+        $standalone = [];
+        foreach ($comments as $comment) {
+            $anchor = (int)($comment['activity'] ?? 0);
+            if ($anchor > 0) {
+                $commentsByActivity[$anchor][] = $comment;
+            } else {
+                $standalone[] = $comment;
+            }
+        }
+
+        $timeline = [];
+        foreach ($activities as $activity) {
+            $uid = (int)$activity['uid'];
+            $timeline[] = [
+                'type' => 'activity',
+                'crdate' => (int)$activity['crdate'],
+                'event' => (string)$activity['event'],
+                'beUser' => $this->resolveUserName((int)($activity['be_user'] ?? 0)),
+                'payload' => $this->decodePayload($activity['payload'] ?? null),
+                'historyUid' => (int)($activity['history_uid'] ?? 0),
+                'comments' => $commentsByActivity[$uid] ?? [],
+            ];
+        }
+        foreach ($standalone as $comment) {
+            $timeline[] = [
+                'type' => 'comment',
+                'crdate' => (int)$comment['crdate'],
+                'beUser' => $this->resolveUserName((int)($comment['be_user'] ?? 0)),
+                'content' => (string)($comment['content'] ?? ''),
+                'comments' => [],
+            ];
+        }
+
+        usort($timeline, static fn (array $a, array $b): int => $a['crdate'] <=> $b['crdate']);
+
+        return $timeline;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function decodePayload(mixed $payload): array
+    {
+        if (!is_string($payload) || $payload === '') {
+            return [];
+        }
+        $decoded = json_decode($payload, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function resolveUserName(int $beUserId): string
+    {
+        if ($beUserId < 1) {
+            return 'System';
+        }
+        $user = BackendUtility::getRecord('be_users', $beUserId, 'username,realName');
+        if ($user === null) {
+            return 'unknown';
+        }
+
+        return trim((string)($user['realName'] ?? '')) !== ''
+            ? (string)$user['realName']
+            : (string)($user['username'] ?? 'unknown');
     }
 }

@@ -323,12 +323,26 @@ final class TaskAjaxController
             ['uid' => $taskUid]
         );
 
-        // Record comment if provided
+        // The activity entry is written first so the comment can be anchored to it.
+        // A stage comment is not free-floating chatter - it explains *this* move
+        // ("sent back because the images are missing"), and losing that link makes
+        // the trail unreadable later.
+        $activityUid = $this->activityLogger->log($taskUid, ActivityLogger::EVENT_STAGE_CHANGED, $beUserId, [
+            'from_state' => $task['state'],
+            'from_stage' => $task['stage_uid'],
+            'to_state' => $targetState,
+            'to_stage' => $targetStageUid,
+            'recipients' => $recipients,
+        ]);
+
         if ($comment !== '') {
-            $commentConn = $this->connectionPool->getConnectionForTable('tx_contentflow_comment');
-            $commentConn->insert('tx_contentflow_comment', [
+            // Stored once, on the comment, rather than also duplicated into the
+            // activity payload - one text, one place.
+            $this->connectionPool->getConnectionForTable('tx_contentflow_comment')->insert('tx_contentflow_comment', [
                 'task' => $taskUid,
                 'parent' => 0,
+                'activity' => $activityUid,
+                'be_user' => $beUserId,
                 'content' => $comment,
                 'resolved' => 0,
                 'crdate' => $GLOBALS['EXEC_TIME'],
@@ -340,16 +354,6 @@ final class TaskAjaxController
                 [$taskUid]
             );
         }
-
-        // Log stage change activity
-        $this->activityLogger->log($taskUid, ActivityLogger::EVENT_STAGE_CHANGED, $beUserId, [
-            'from_state' => $task['state'],
-            'from_stage' => $task['stage_uid'],
-            'to_state' => $targetState,
-            'to_stage' => $targetStageUid,
-            'comment' => $comment,
-            'recipients' => $recipients,
-        ]);
 
         return new JsonResponse(['success' => true]);
     }

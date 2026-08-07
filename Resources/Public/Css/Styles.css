@@ -500,3 +500,61 @@
 .contentflow-card-title:focus-visible {
     text-decoration: underline;
 }
+
+/* ---- Unified timeline -------------------------------------------------- */
+
+.contentflow-timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 14px;
+    border-left: 2px solid var(--typo3-component-border-color, #ddd);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.contentflow-timeline-entry {
+    position: relative;
+}
+
+.contentflow-timeline-entry::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 5px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--typo3-component-border-color, #bbb);
+}
+
+.contentflow-timeline-entry.is-comment::before {
+    background: var(--typo3-color-info, #0b78d1);
+}
+
+.contentflow-timeline-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.contentflow-timeline-meta {
+    font-size: 11px;
+    opacity: 0.65;
+}
+
+.contentflow-timeline-transition {
+    font-size: 12px;
+    margin-top: 3px;
+    font-family: var(--typo3-font-family-monospace, monospace);
+}
+
+/* The comment sits visually inside the action it explains. */
+.contentflow-timeline-comment {
+    margin: 6px 0 0;
+    padding: 6px 10px;
+    border-left: 3px solid var(--typo3-color-info, #0b78d1);
+    background: var(--typo3-surface-container, #f6f6f6);
+    font-size: 13px;
+}
