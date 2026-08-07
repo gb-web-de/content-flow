@@ -1,11 +1,17 @@
 <html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
 <f:spaceless>
 
-<!-- No <f:layout> and no sections on purpose. The core DocHeader (breadcrumb,
-     page-tree toggle, shortcut button) is configured in
-     ContentFlowController::indexAction() and rendered by ModuleTemplate around
-     this template, so nothing here needs to reproduce it.
-     See ARCHITECTURE.md and web-vision/kanban-workspaces#43. -->
+<f:comment>
+    No layout and no sections on purpose. The core DocHeader (breadcrumb,
+    page-tree toggle, shortcut button) is configured in
+    ContentFlowController::indexAction() and rendered by ModuleTemplate around
+    this template, so nothing here needs to reproduce it.
+    See ARCHITECTURE.md and web-vision/kanban-workspaces#43.
+
+    Note f:comment, not an HTML comment: Fluid parses ViewHelper tags inside
+    HTML comments too, so writing a tag name there in angle brackets opens a
+    real node that is never closed and breaks the template.
+</f:comment>
 
 <f:if condition="{pageSelected} == 0">
     <f:then>
