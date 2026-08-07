@@ -1,9 +1,7 @@
 #
-# Content Flow owns four tables. Base columns (uid, pid, tstamp, crdate, hidden)
-# are added automatically by the TYPO3 schema analyzer from the TCA `ctrl` section
-# and are intentionally not repeated here. `deleted` and `crdate` ARE declared
-# where an index references them, because the analyzer only adds them once TCA
-# exists and the indexes below must be creatable before that.
+# Content Flow owns four tables.
+# Because these tables do not have full TCA definitions, all base columns
+# (uid, pid, tstamp, crdate, deleted) are explicitly declared in this SQL schema.
 #
 
 #
@@ -20,6 +18,9 @@
 # open a card of its own.
 #
 CREATE TABLE tx_contentflow_task (
+    uid int(11) unsigned NOT NULL auto_increment,
+    pid int(11) unsigned DEFAULT '0' NOT NULL,
+
     title varchar(255) DEFAULT '' NOT NULL,
     description text,
 
@@ -53,8 +54,11 @@ CREATE TABLE tx_contentflow_task (
     closed_by int(11) unsigned DEFAULT '0' NOT NULL,
 
     comments int(11) unsigned DEFAULT '0' NOT NULL,
+    tstamp int(11) unsigned DEFAULT '0' NOT NULL,
+    crdate int(11) unsigned DEFAULT '0' NOT NULL,
     deleted tinyint(4) unsigned DEFAULT '0' NOT NULL,
 
+    PRIMARY KEY (uid),
     KEY board_scope (subject_pid, closed, state),
     KEY subject (subject_table, subject_uid, closed),
     KEY assignee (assignee, closed)
@@ -76,6 +80,9 @@ CREATE TABLE tx_contentflow_task (
 # tasks - a record may of course appear in many closed ones over its lifetime.
 #
 CREATE TABLE tx_contentflow_task_item (
+    uid int(11) unsigned NOT NULL auto_increment,
+    pid int(11) unsigned DEFAULT '0' NOT NULL,
+
     task int(11) unsigned DEFAULT '0' NOT NULL,
 
     record_table varchar(255) DEFAULT '' NOT NULL,
@@ -96,8 +103,11 @@ CREATE TABLE tx_contentflow_task_item (
     shared tinyint(1) unsigned DEFAULT '0' NOT NULL,
 
     closed tinyint(1) unsigned DEFAULT '0' NOT NULL,
+    tstamp int(11) unsigned DEFAULT '0' NOT NULL,
+    crdate int(11) unsigned DEFAULT '0' NOT NULL,
     deleted tinyint(4) unsigned DEFAULT '0' NOT NULL,
 
+    PRIMARY KEY (uid),
     UNIQUE KEY one_open_task_per_record (record_table, record_uid, closed, deleted),
     KEY task (task, closed)
 );
@@ -108,11 +118,19 @@ CREATE TABLE tx_contentflow_task_item (
 # concurrently writable without read-modify-write races.
 #
 CREATE TABLE tx_contentflow_comment (
+    uid int(11) unsigned NOT NULL auto_increment,
+    pid int(11) unsigned DEFAULT '0' NOT NULL,
+
     task int(11) unsigned DEFAULT '0' NOT NULL,
     parent int(11) unsigned DEFAULT '0' NOT NULL,
     content text,
     resolved tinyint(1) unsigned DEFAULT '0' NOT NULL,
 
+    tstamp int(11) unsigned DEFAULT '0' NOT NULL,
+    crdate int(11) unsigned DEFAULT '0' NOT NULL,
+    deleted tinyint(4) unsigned DEFAULT '0' NOT NULL,
+
+    PRIMARY KEY (uid),
     KEY task (task, parent)
 );
 
@@ -130,6 +148,9 @@ CREATE TABLE tx_contentflow_comment (
 # See ARCHITECTURE.md, "Where the history lives".
 #
 CREATE TABLE tx_contentflow_activity (
+    uid int(11) unsigned NOT NULL auto_increment,
+    pid int(11) unsigned DEFAULT '0' NOT NULL,
+
     task int(11) unsigned DEFAULT '0' NOT NULL,
     event varchar(40) DEFAULT '' NOT NULL,
     be_user int(11) unsigned DEFAULT '0' NOT NULL,
@@ -137,7 +158,10 @@ CREATE TABLE tx_contentflow_activity (
     history_uid int(11) unsigned DEFAULT '0' NOT NULL,
     # JSON. The essentials that must outlive sys_history: from/to stage, comment.
     payload json DEFAULT NULL,
+    tstamp int(11) unsigned DEFAULT '0' NOT NULL,
     crdate int(11) unsigned DEFAULT '0' NOT NULL,
+    deleted tinyint(4) unsigned DEFAULT '0' NOT NULL,
 
+    PRIMARY KEY (uid),
     KEY task (task, crdate)
 );

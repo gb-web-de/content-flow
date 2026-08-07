@@ -1,43 +1,50 @@
 <html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:spaceless>
 
-<f:layout name="Module" />
+<!-- No <f:layout> and no sections on purpose. The core DocHeader (breadcrumb,
+     page-tree toggle, shortcut button) is configured in
+     ContentFlowController::indexAction() and rendered by ModuleTemplate around
+     this template, so nothing here needs to reproduce it.
+     See ARCHITECTURE.md and web-vision/kanban-workspaces#43. -->
 
-<f:section name="Content">
-    <!-- No custom header here on purpose: the core DocHeader (breadcrumb, page-tree
-         toggle, shortcut) is configured in ContentFlowController::indexAction().
-         See ARCHITECTURE.md and web-vision/kanban-workspaces#43. -->
+<f:if condition="{pageSelected} == 0">
+    <f:then>
+        <div class="callout callout-info">
+            <div class="callout-body">Select a page in the page tree to see its board.</div>
+        </div>
+    </f:then>
+    <f:else>
+        <!-- Screen readers get every board change announced here; see the
+             accessibility commitments in ARCHITECTURE.md. -->
+        <div class="contentflow-announcer" role="status" aria-live="polite" aria-atomic="true"></div>
 
-    <f:if condition="{pageSelected} == 0">
-        <f:then>
-            <div class="callout callout-info">
-                <div class="callout-body">Select a page in the page tree to see its board.</div>
-            </div>
-        </f:then>
-        <f:else>
-            <!-- Screen readers get every board change announced here; see the
-                 accessibility commitments in ARCHITECTURE.md. -->
-            <div class="contentflow-announcer" role="status" aria-live="polite" aria-atomic="true"></div>
+        <div class="contentflow-board">
+            <f:for each="{columns}" as="column">
+                <section class="contentflow-column" aria-labelledby="cf-col-{column.key}">
+                    <h3 class="contentflow-column-title" id="cf-col-{column.key}">
+                        <span>{column.label}</span>
+                        <span class="badge">{column.cards -> f:count()}</span>
+                    </h3>
+                    <ul class="contentflow-column-cards">
+                        <f:for each="{column.cards}" as="card">
+                            <li class="contentflow-card">
+                                <span class="contentflow-card-title">{card.title}</span>
+                                <span class="contentflow-card-meta">
+                                    {card.subject_table}:{card.subject_uid}
+                                    <f:if condition="{card.auto_created}">
+                                        <!-- Nobody planned this; it opened itself when
+                                             someone started editing. -->
+                                        <span class="contentflow-card-badge" title="Created automatically when editing started">auto</span>
+                                    </f:if>
+                                </span>
+                            </li>
+                        </f:for>
+                    </ul>
+                </section>
+            </f:for>
+        </div>
+    </f:else>
+</f:if>
 
-            <div class="contentflow-board">
-                <f:for each="{columns}" as="column">
-                    <section class="contentflow-column" aria-labelledby="cf-col-{column.key}">
-                        <h3 class="contentflow-column-title" id="cf-col-{column.key}">
-                            {column.label}
-                            <span class="badge">{column.cards -> f:count()}</span>
-                        </h3>
-                        <ul class="contentflow-column-cards">
-                            <f:for each="{column.cards}" as="card">
-                                <li class="contentflow-card">
-                                    <span class="contentflow-card-title">{card.title}</span>
-                                    <span class="contentflow-card-meta">{card.subject_table}:{card.subject_uid}</span>
-                                </li>
-                            </f:for>
-                        </ul>
-                    </section>
-                </f:for>
-            </div>
-        </f:else>
-    </f:if>
-</f:section>
-
+</f:spaceless>
 </html>

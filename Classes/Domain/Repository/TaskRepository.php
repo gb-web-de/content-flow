@@ -237,7 +237,7 @@ class TaskRepository
     {
         return array_values(array_filter(
             $this->findMembers($taskUid),
-            static fn(array $member): bool => (int)($member['shared'] ?? 0) === 1
+            static fn (array $member): bool => (int)($member['shared'] ?? 0) === 1
                 || ((int)($member['home_pid'] ?? 0) > 0 && (int)$member['home_pid'] !== $subjectPid),
         ));
     }

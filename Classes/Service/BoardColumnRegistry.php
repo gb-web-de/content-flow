@@ -50,8 +50,8 @@ class BoardColumnRegistry
     public function getColumns(BackendUserAuthentication $backendUser, int $workspaceUid): array
     {
         $columns = [
-            $this->column('backlog', TaskState::BACKLOG, null, true),
-            $this->column('planned', TaskState::PLANNED, null, true),
+            $this->column('backlog', TaskState::BACKLOG, true),
+            $this->column('planned', TaskState::PLANNED, true),
         ];
 
         foreach ($this->getStages($backendUser, $workspaceUid) as $stageUid) {
@@ -67,7 +67,7 @@ class BoardColumnRegistry
 
         // Publishing is an explicit, irreversible action - it is deliberately not a
         // drop target. Editors publish from the card, with a confirmation.
-        $columns[] = $this->column('done', TaskState::DONE, null, false);
+        $columns[] = $this->column('done', TaskState::DONE, false);
 
         return $columns;
     }
@@ -104,9 +104,12 @@ class BoardColumnRegistry
     }
 
     /**
+     * A Content Flow-owned column. These never map to a core stage - that is what
+     * `stageUid => null` means, and it is how the board tells the two apart.
+     *
      * @return array{key: string, label: string, state: string, stageUid: null, acceptsDrop: bool}
      */
-    private function column(string $key, TaskState $state, ?int $stageUid, bool $acceptsDrop): array
+    private function column(string $key, TaskState $state, bool $acceptsDrop): array
     {
         return [
             'key' => $key,
@@ -114,7 +117,7 @@ class BoardColumnRegistry
                 'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:column.' . $key
             ) ?: ucfirst($key),
             'state' => $state->value,
-            'stageUid' => $stageUid,
+            'stageUid' => null,
             'acceptsDrop' => $acceptsDrop,
         ];
     }

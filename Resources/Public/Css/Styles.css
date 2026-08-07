@@ -49,6 +49,16 @@
     opacity: 0.65;
 }
 
+.contentflow-card-badge {
+    display: inline-block;
+    padding: 0 5px;
+    border-radius: 3px;
+    background: var(--typo3-surface-container-high, #e8e8e8);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
 /* Visually hidden, still announced by screen readers. */
 .contentflow-announcer {
     position: absolute;

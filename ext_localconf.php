@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 defined('TYPO3') or die();
 
 // Creates or advances a task when an editor edits a record inside a workspace.
