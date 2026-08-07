@@ -38,6 +38,7 @@ CREATE TABLE tx_contentflow_task (
     closed_by int(11) unsigned DEFAULT '0' NOT NULL,
 
     comments int(11) unsigned DEFAULT '0' NOT NULL,
+    deleted tinyint(4) unsigned DEFAULT '0' NOT NULL,
 
     # One open task per record at a time. Enforced in the database rather than by a
     # read-then-write check, so two concurrent editors cannot both create a task for
@@ -83,6 +84,7 @@ CREATE TABLE tx_contentflow_activity (
     history_uid int(11) unsigned DEFAULT '0' NOT NULL,
     # JSON. The essentials that must outlive sys_history: from/to stage, comment.
     payload json DEFAULT NULL,
+    crdate int(11) unsigned DEFAULT '0' NOT NULL,
 
     KEY task (task, crdate)
 );

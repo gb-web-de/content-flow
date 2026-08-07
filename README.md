@@ -44,17 +44,30 @@ board on its own — that is the point of the extension.
 
 ### About demo content
 
-`typo3/theme-camino` does **not** ship demo content. On a fresh install it creates a site and
-one empty page; the theme provides page/content-element rendering, not a populated page tree.
-So `content_flow` brings its own:
+`typo3/theme-camino` ships a complete demo site in `Initialisation/data.xml` — pages *Camino*,
+*FAQs*, *Packing List*, *Camino Route Comparison*, an imprint/privacy footer and images. TYPO3
+imports it during `typo3 setup` when `TYPO3_SETUP_DISTRIBUTION=theme_camino` is set (see
+[.ddev/config.yaml](.ddev/config.yaml)); this requires `typo3/cms-impexp`, and it is mutually
+exclusive with `--create-site`/`TYPO3_SETUP_CREATE_SITE` — the distribution creates the site
+configuration itself.
+
+What no distribution can provide is a **workspace with custom review stages**, and without
+those the board shows only the two fixed core stages. `content_flow` adds that:
 
 ```bash
-ddev exec .Build/bin/typo3 contentflow:democontent
+ddev contentflow-demo
 ```
 
-That creates a few demo pages plus a workspace with two review stages — the minimum needed for
-the board to show anything. `typo3/cms-styleguide` is also installed if you want bulk TCA test
-records on top (backend module *System → Styleguide*).
+It verifies the Camino content arrived and creates the *Editorial* workspace with the stages
+*Review* and *Approval*. Re-running is safe — existing data is kept, and recreating (which
+deletes the workspace and any versions inside it) only happens after you confirm, or with
+`--force`.
+
+> During `ddev start` the same command runs non-interactively. DDEV hooks have no TTY, so it
+> can only report and keep, never ask — use `ddev contentflow-demo` when you want the prompt.
+
+`typo3/cms-styleguide` is also installed if you want bulk TCA test records on top (backend
+module *System → Styleguide*).
 
 ## Manual setup
 
@@ -62,8 +75,11 @@ records on top (backend module *System → Styleguide*).
 ddev composer install
 ddev exec .Build/bin/typo3 setup --no-interaction --force --server-type=other
 ddev exec .Build/bin/typo3 extension:setup
-ddev exec .Build/bin/typo3 contentflow:democontent
+ddev contentflow-demo
 ```
+
+(The `setup` call picks up database, admin user and `TYPO3_SETUP_DISTRIBUTION` from the
+environment defined in [.ddev/config.yaml](.ddev/config.yaml).)
 
 ## Development
 
