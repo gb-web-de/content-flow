@@ -24,7 +24,7 @@ use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
  * stages an integrator configures never changes the number of queries.
  */
 #[AsController]
-class ContentFlowController extends ActionController
+final class ContentFlowController extends ActionController
 {
     public function __construct(
         protected readonly ModuleTemplateFactory $moduleTemplateFactory,

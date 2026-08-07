@@ -25,7 +25,7 @@ use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
  * answer as "no reuse known", not as proof. Warnings are advisory; nothing is
  * blocked on this.
  */
-class ReferenceInspector
+final class ReferenceInspector
 {
     public function __construct(
         private readonly ConnectionPool $connectionPool,

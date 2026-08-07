@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace GbWeb\ContentFlow\Controller;
 
+use GbWeb\ContentFlow\Domain\Model\TaskPriority;
 use GbWeb\ContentFlow\Domain\Model\TaskState;
+use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use GbWeb\ContentFlow\Service\ActivityLogger;
 use GbWeb\ContentFlow\Service\ReferenceInspector;
@@ -16,7 +18,6 @@ use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
-use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Http\HtmlResponse;
 use TYPO3\CMS\Core\Http\JsonResponse;
@@ -32,11 +33,11 @@ final class TaskAjaxController
 {
     public function __construct(
         private readonly TaskRepository $taskRepository,
+        private readonly CommentRepository $commentRepository,
         private readonly TaskSubjectRegistry $subjectRegistry,
         private readonly TaskMemberSynchronizer $memberSynchronizer,
         private readonly ReferenceInspector $referenceInspector,
         private readonly ActivityLogger $activityLogger,
-        private readonly ConnectionPool $connectionPool,
         private readonly WorkspaceIntegrationService $workspaceService,
         private readonly UriBuilder $uriBuilder,
         private readonly ViewFactoryInterface $viewFactory,
@@ -66,7 +67,7 @@ final class TaskAjaxController
         // Values the wizard collected. Ignoring them would make the wizard a
         // decorative form whose inputs do nothing.
         $title = trim((string)($body['title'] ?? ''));
-        $priority = (int)($body['priority'] ?? 2);
+        $priority = TaskPriority::fromRequest($body['priority'] ?? null);
         // 'open' means deliberately unassigned so someone can take it - a real
         // planning state, not a missing value.
         $assignee = (string)($body['assignee'] ?? 'me') === 'open'
@@ -77,7 +78,7 @@ final class TaskAjaxController
             'title' => $title !== '' ? $title : $this->deriveTitle($table, $uid),
             'subject_pid' => $table === 'pages' ? $uid : (int)(BackendUtility::getRecord($table, $uid, 'pid')['pid'] ?? 0),
             'state' => TaskState::BACKLOG->value,
-            'priority' => max(1, min(3, $priority)),
+            'priority' => $priority->value,
             'assignee' => $assignee,
             // Planned by a human, so no auto_created flag and no wizard nagging.
             'auto_created' => 0,
@@ -228,15 +229,7 @@ final class TaskAjaxController
             );
         }
 
-        $this->connectionPool->getConnectionForTable('tx_contentflow_task')->update(
-            'tx_contentflow_task',
-            [
-                'state' => $targetState,
-                'stage_uid' => $targetStageUid,
-                'tstamp' => $GLOBALS['EXEC_TIME'],
-            ],
-            ['uid' => $taskUid],
-        );
+        $this->taskRepository->moveToColumn($taskUid, $targetState, $targetStageUid);
 
         $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
         $this->activityLogger->log($taskUid, ActivityLogger::EVENT_STAGE_CHANGED, $beUserId, [
@@ -263,15 +256,7 @@ final class TaskAjaxController
             return $this->error('Task not found or closed.');
         }
 
-        $connection = $this->connectionPool->getConnectionForTable('tx_contentflow_task');
-        $connection->update(
-            'tx_contentflow_task',
-            [
-                'assignee' => $beUserId,
-                'tstamp' => $GLOBALS['EXEC_TIME'],
-            ],
-            ['uid' => $taskUid]
-        );
+        $this->taskRepository->assignTo($taskUid, $beUserId);
 
         $this->activityLogger->log($taskUid, ActivityLogger::EVENT_ASSIGNED, $beUserId, [
             'assignee' => $beUserId,
@@ -324,7 +309,9 @@ final class TaskAjaxController
         $taskUid = (int)($body['task'] ?? 0);
         $targetStageUid = (int)($body['stageUid'] ?? 0);
         $comment = trim((string)($body['comment'] ?? ''));
-        $recipients = is_array($body['recipients'] ?? null) ? $body['recipients'] : [];
+        // array_values(): the client sends a list, but json_decode may hand back a
+        // map with gaps, and the type declarations below promise a list.
+        $recipients = is_array($body['recipients'] ?? null) ? array_values($body['recipients']) : [];
 
         $task = $this->taskRepository->findByUid($taskUid);
         if ($task === null || (int)$task['closed'] === 1) {
@@ -341,18 +328,39 @@ final class TaskAjaxController
             return $this->error('Nothing to move: this task has no pending versions.');
         }
 
-        // The move is PROPOSED here and DECIDED by core. EXT:workspaces'
-        // version_setStage is what checks workspaceCannotEditOfflineVersion(),
-        // hasPermissionToUpdate() and workspaceCheckStageForCurrent(), writes
-        // t3ver_stage, records the transition in sys_history and queues the stage
-        // notification mails. Updating our own table directly - which this action
-        // used to do - skipped every one of those.
+        $refusal = $this->askCoreToSetStage($versionsByTable, $targetStageUid, $comment, $recipients);
+        if ($refusal !== null) {
+            // Core refused. Our own state must not drift away from what core did,
+            // so nothing is written on this path.
+            return $this->error($refusal);
+        }
+
+        $this->recordStageChange($task, $targetStageUid, $comment, $recipients, $versionsByTable);
+
+        return new JsonResponse(['success' => true, 'stageUid' => $targetStageUid]);
+    }
+
+    /**
+     * Hand the move to TYPO3 and report back whether it was refused.
+     *
+     * EXT:workspaces' version_setStage() is what checks
+     * workspaceCannotEditOfflineVersion(), hasPermissionToUpdate() and
+     * workspaceCheckStageForCurrent(), writes t3ver_stage, records the transition
+     * in sys_history and queues the stage notification mails. Writing our own table
+     * directly - which this action used to do - skipped every one of those.
+     *
+     * @param array<string, list<int>> $versionsByTable
+     * @param list<mixed> $recipients
+     * @return string|null the refusal reason, or null when core accepted
+     */
+    private function askCoreToSetStage(array $versionsByTable, int $stageUid, string $comment, array $recipients): ?string
+    {
         $cmd = [];
         foreach ($versionsByTable as $table => $versionUids) {
             foreach ($versionUids as $versionUid) {
                 $cmd[$table][$versionUid]['version'] = [
                     'action' => 'setStage',
-                    'stageId' => $targetStageUid,
+                    'stageId' => $stageUid,
                     'comment' => $comment,
                     'notificationAlternativeRecipients' => $recipients,
                 ];
@@ -363,53 +371,46 @@ final class TaskAjaxController
         $dataHandler->start([], $cmd);
         $dataHandler->process_cmdmap();
 
-        if ($dataHandler->errorLog !== []) {
-            // Core refused. Our own state must not drift away from what core did,
-            // so nothing is written on this path.
-            return $this->error(implode(' ', array_map('strval', $dataHandler->errorLog)));
-        }
+        return $dataHandler->errorLog === []
+            ? null
+            : implode(' ', array_map('strval', $dataHandler->errorLog));
+    }
 
+    /**
+     * Mirror what core just decided.
+     *
+     * The task row is a read cache for the board; the activity entry is the durable
+     * record, because sys_history - where core wrote the same transition - is
+     * garbage-collected after 30 days.
+     *
+     * @param array<string, mixed> $task
+     * @param list<mixed> $recipients
+     * @param array<string, list<int>> $versionsByTable
+     */
+    private function recordStageChange(
+        array $task,
+        int $targetStageUid,
+        string $comment,
+        array $recipients,
+        array $versionsByTable,
+    ): void {
+        $taskUid = (int)$task['uid'];
         $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
+        $targetState = TaskState::fromStageId($targetStageUid);
 
-        // Core has decided; now mirror it. The task row is a read cache for the
-        // board, and the activity entry is the durable record - sys_history, where
-        // core just wrote the same transition, is garbage-collected after 30 days.
-        $this->connectionPool->getConnectionForTable('tx_contentflow_task')->update(
-            'tx_contentflow_task',
-            [
-                'state' => TaskState::fromStageId($targetStageUid)->value,
-                'stage_uid' => $targetStageUid,
-                'tstamp' => $GLOBALS['EXEC_TIME'],
-            ],
-            ['uid' => $taskUid],
-        );
+        $this->taskRepository->moveToColumn($taskUid, $targetState->value, $targetStageUid);
 
         $activityUid = $this->activityLogger->log($taskUid, ActivityLogger::EVENT_STAGE_CHANGED, $beUserId, [
             'from_state' => $task['state'],
             'from_stage' => (int)$task['stage_uid'],
-            'to_state' => TaskState::fromStageId($targetStageUid)->value,
+            'to_state' => $targetState->value,
             'to_stage' => $targetStageUid,
             'recipients' => $recipients,
         ], $this->findLatestStageHistoryUid($versionsByTable));
 
         if ($comment !== '') {
-            $this->connectionPool->getConnectionForTable('tx_contentflow_comment')->insert('tx_contentflow_comment', [
-                'task' => $taskUid,
-                'parent' => 0,
-                'activity' => $activityUid,
-                'be_user' => $beUserId,
-                'content' => $comment,
-                'resolved' => 0,
-                'crdate' => $GLOBALS['EXEC_TIME'],
-                'tstamp' => $GLOBALS['EXEC_TIME'],
-            ]);
-            $this->connectionPool->getConnectionForTable('tx_contentflow_task')->executeStatement(
-                'UPDATE tx_contentflow_task SET comments = comments + 1 WHERE uid = ?',
-                [$taskUid],
-            );
+            $this->commentRepository->add($taskUid, $comment, $beUserId, $activityUid);
         }
-
-        return new JsonResponse(['success' => true, 'stageUid' => $targetStageUid]);
     }
 
     /**

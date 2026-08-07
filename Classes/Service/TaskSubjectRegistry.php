@@ -27,7 +27,7 @@ use TYPO3\CMS\Core\Schema\TcaSchemaFactory;
  *   $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['subjectTables'][]
  *       = 'tx_news_domain_model_news';
  */
-class TaskSubjectRegistry
+final class TaskSubjectRegistry
 {
     public function __construct(
         private readonly TcaSchemaFactory $tcaSchemaFactory,

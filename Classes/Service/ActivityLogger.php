@@ -33,7 +33,7 @@ use TYPO3\CMS\Core\DataHandling\History\RecordHistoryStore;
  * and for the common case - one edit that goes straight live - the sys_history row is
  * still there and the pointer alone is enough.
  */
-class ActivityLogger
+final class ActivityLogger
 {
     private const TABLE = 'tx_contentflow_activity';
 

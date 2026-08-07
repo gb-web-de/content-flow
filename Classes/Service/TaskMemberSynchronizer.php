@@ -19,7 +19,7 @@ use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
  * Records already claimed by another open task are skipped, which is exactly what
  * makes an editor's detach permanent: re-syncing cannot take the element back.
  */
-class TaskMemberSynchronizer
+final class TaskMemberSynchronizer
 {
     public function __construct(
         private readonly ConnectionPool $connectionPool,

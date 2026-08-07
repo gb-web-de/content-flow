@@ -17,7 +17,7 @@ use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
  * from a DataHandler hook and a PSR-14 listener, i.e. from inside another write
  * transaction, where an Extbase persistence session would be the wrong tool.
  */
-class TaskRepository
+final class TaskRepository
 {
     public const ORIGIN_SUBJECT = 'subject';
     public const ORIGIN_AUTO = 'auto';
@@ -420,5 +420,39 @@ class TaskRepository
             ->setMaxResults(max(1, $limit))
             ->executeQuery()
             ->fetchAllAssociative();
+    }
+
+    /**
+     * Mirror the column a task now sits in.
+     *
+     * For core stage columns this is only a read cache: TYPO3 has already written
+     * t3ver_stage, and this keeps the board sortable without touching every version.
+     */
+    public function moveToColumn(int $taskUid, string $state, int $stageUid): void
+    {
+        $this->connectionPool->getConnectionForTable(self::TABLE)->update(
+            self::TABLE,
+            [
+                'state' => $state,
+                'stage_uid' => $stageUid,
+                'tstamp' => $GLOBALS['EXEC_TIME'],
+            ],
+            ['uid' => $taskUid],
+        );
+    }
+
+    /**
+     * Give the task an owner. Passing 0 puts it back up for grabs.
+     */
+    public function assignTo(int $taskUid, int $beUserId): void
+    {
+        $this->connectionPool->getConnectionForTable(self::TABLE)->update(
+            self::TABLE,
+            [
+                'assignee' => $beUserId,
+                'tstamp' => $GLOBALS['EXEC_TIME'],
+            ],
+            ['uid' => $taskUid],
+        );
     }
 }

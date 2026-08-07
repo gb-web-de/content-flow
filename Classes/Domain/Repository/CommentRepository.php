@@ -1,0 +1,86 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GbWeb\ContentFlow\Domain\Repository;
+
+use TYPO3\CMS\Core\Database\Connection;
+use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+
+/**
+ * Comments on a task.
+ *
+ * Extracted because the same insert - eight columns, plus the counter update on
+ * the task - was written out by hand in more than one controller action, with the
+ * table names as bare strings. Two copies of a write is one copy too many, and the
+ * controller had no business knowing the column layout.
+ */
+final class CommentRepository
+{
+    private const TABLE = 'tx_contentflow_comment';
+    private const TABLE_TASK = 'tx_contentflow_task';
+
+    public function __construct(
+        private readonly ConnectionPool $connectionPool,
+    ) {
+    }
+
+    /**
+     * Add a comment, optionally anchored to the activity entry it explains.
+     *
+     * `$activityUid` is what turns "somebody wrote something" into "this is why
+     * that move happened" - see ActivityLogger and the ticket view's timeline.
+     */
+    public function add(int $taskUid, string $content, int $beUserId, int $activityUid = 0, int $historyUid = 0): int
+    {
+        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
+        $connection->insert(self::TABLE, [
+            'task' => $taskUid,
+            'parent' => 0,
+            'activity' => $activityUid,
+            'history_uid' => $historyUid,
+            'be_user' => $beUserId,
+            'content' => $content,
+            'resolved' => 0,
+            'crdate' => $GLOBALS['EXEC_TIME'],
+            'tstamp' => $GLOBALS['EXEC_TIME'],
+        ]);
+
+        $this->incrementCounter($taskUid);
+
+        return (int)$connection->lastInsertId();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function findByTask(int $taskUid): array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+
+        return $queryBuilder
+            ->select('*')
+            ->from(self::TABLE)
+            ->where(
+                $queryBuilder->expr()->eq('task', $queryBuilder->createNamedParameter($taskUid, Connection::PARAM_INT)),
+            )
+            ->orderBy('crdate', 'ASC')
+            ->executeQuery()
+            ->fetchAllAssociative();
+    }
+
+    /**
+     * Denormalised count on the task, so the board can show "3 comments" without
+     * joining. Incremented in SQL rather than read-modify-write, which would lose
+     * a comment whenever two editors posted at the same moment.
+     */
+    private function incrementCounter(int $taskUid): void
+    {
+        $this->connectionPool->getConnectionForTable(self::TABLE_TASK)->executeStatement(
+            'UPDATE ' . self::TABLE_TASK . ' SET comments = comments + 1 WHERE uid = ?',
+            [$taskUid],
+        );
+    }
+}

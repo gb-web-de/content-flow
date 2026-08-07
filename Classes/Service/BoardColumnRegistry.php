@@ -29,7 +29,7 @@ use TYPO3\CMS\Workspaces\Service\StagesService;
  * default ones) for free - "before editing" is Backlog/Planned, "after ready" is Done,
  * and everything in between is already freely definable in core.
  */
-class BoardColumnRegistry
+final class BoardColumnRegistry
 {
     public function __construct(
         private readonly WorkspaceStageRepository $workspaceStageRepository,

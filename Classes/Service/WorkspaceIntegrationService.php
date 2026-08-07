@@ -12,7 +12,7 @@ use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Imaging\IconSize;
 use TYPO3\CMS\Workspaces\Service\HistoryService;
 
-class WorkspaceIntegrationService
+final class WorkspaceIntegrationService
 {
     public function __construct(
         private readonly ConnectionPool $connectionPool,
