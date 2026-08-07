@@ -631,4 +631,47 @@ final class TaskAjaxController
 
         return new JsonResponse(['success' => true, 'task' => (int)$task['uid'], 'action' => 'created']);
     }
+
+    /**
+     * Post a comment on a task.
+     *
+     * Standalone remarks only - a comment explaining a stage move is written by
+     * executeStageAction(), anchored to that transition. Here `activity` stays 0,
+     * and the ticket timeline renders it as its own entry.
+     */
+    public function commentAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $taskUid = (int)($body['task'] ?? 0);
+        $content = trim((string)($body['content'] ?? ''));
+
+        if ($content === '') {
+            return $this->error('A comment cannot be empty.');
+        }
+
+        $task = $this->taskRepository->findByUid($taskUid);
+        if ($task === null) {
+            return $this->error('Task not found.');
+        }
+        if ((int)$task['closed'] === 1) {
+            // A closed task is an archive record; letting it grow silently would
+            // make the trail disagree with what was archived.
+            return $this->error('This task is closed and cannot be commented on.');
+        }
+
+        // Commenting is a write on the subject, so it needs the same permission
+        // as any other change to it - never merely "is logged in".
+        $error = $this->assertMayEdit((string)$task['subject_table'], (int)$task['subject_uid']);
+        if ($error !== null) {
+            return $this->error($error);
+        }
+
+        $this->commentRepository->add(
+            $taskUid,
+            $content,
+            (int)($this->getBackendUser()->user['uid'] ?? 0),
+        );
+
+        return new JsonResponse(['success' => true]);
+    }
 }

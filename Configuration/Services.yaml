@@ -8,6 +8,9 @@ services:
     resource: '../Classes/*'
     exclude: '../Classes/Domain/Model/*'
 
+  GbWeb\ContentFlow\Hooks\TaskAutoCreationDataHandlerHook:
+    public: true
+
   GbWeb\ContentFlow\Dashboard\Widget\TaskOverviewWidget:
     tags:
       - name: dashboard.widget

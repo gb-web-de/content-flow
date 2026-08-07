@@ -56,6 +56,23 @@ final class TaskAutoCreationTest extends FunctionalTestCase
     }
 
     /**
+     * A content element created directly on Live, bypassing DataHandler's
+     * versioning - it must not itself trigger task creation, only exist as
+     * something a later workspace edit can pick up.
+     */
+    private function createLiveContentElement(int $pid, string $header): int
+    {
+        $connection = $this->getConnectionPool()->getConnectionForTable('tt_content');
+        $connection->insert('tt_content', [
+            'pid' => $pid,
+            'header' => $header,
+            'CType' => 'text',
+        ]);
+
+        return (int)$connection->lastInsertId();
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function selectAll(string $table): array
@@ -162,5 +179,60 @@ final class TaskAutoCreationTest extends FunctionalTestCase
 
         self::assertContains('task_created', $events);
         self::assertContains('work_started', $events);
+    }
+
+    /**
+     * Reproduces a bug found while auditing the "post-save routing wizard": when
+     * a page already has an open task, editing a content element on that page
+     * stored a pending-wizard choice in the session but never claimed the
+     * element as a member of anything. moveMemberToTask() and
+     * detachIntoOwnTask() are both UPDATE-only, so whichever choice the editor
+     * made in the wizard would silently do nothing - the edit was captured
+     * nowhere.
+     *
+     * The new element is inserted directly via DataHandler AFTER the page task
+     * exists, deliberately outside syncPageMembers()'s reach - exactly the
+     * situation a real editor creates by adding a new element to an
+     * already-in-progress page. Editing an element that existed at task-creation
+     * time would not reproduce the bug, since the aggregation sync already
+     * claims it and the routing branch is never entered.
+     */
+    #[Test]
+    public function editingANewContentElementWhosePageAlreadyHasATaskClaimsItImmediately(): void
+    {
+        // Opens the page task; syncPageMembers() claims uid 10 and 11 right away.
+        $this->editInWorkspace('pages', 2, ['title' => 'About us (revised)']);
+
+        $newContentUid = $this->createLiveContentElement(2, 'A brand new element');
+
+        // First edit ever on this element - genuinely unclaimed until now.
+        $this->editInWorkspace('tt_content', $newContentUid, ['header' => 'edited right after creation']);
+
+        $members = $this->selectAll('tx_contentflow_task_item');
+        $claimed = array_map(
+            static fn (array $row): string => $row['record_table'] . ':' . $row['record_uid'],
+            $members,
+        );
+
+        self::assertContains(
+            'tt_content:' . $newContentUid,
+            $claimed,
+            'the element must be claimed onto the page task even before the routing wizard is answered',
+        );
+        self::assertCount(1, $this->selectAll('tx_contentflow_task'));
+
+        $pending = $GLOBALS['BE_USER']->getSessionData('content_flow_pending_wizard');
+        self::assertIsArray($pending, 'the routing choice must still be offered');
+        self::assertSame($newContentUid, $pending['uid']);
+    }
+
+    #[Test]
+    public function theRoutingChoiceIsOfferedOnlyWhenThePageTaskAlreadyExisted(): void
+    {
+        $this->editInWorkspace('tt_content', 10, ['header' => 'first edit on an untouched page']);
+
+        // Nothing to route yet: this is the FIRST edit on the page, so there is
+        // no existing page task to choose between.
+        self::assertNull($GLOBALS['BE_USER']->getSessionData('content_flow_pending_wizard'));
     }
 }

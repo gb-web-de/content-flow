@@ -41,6 +41,11 @@ return [
         'path' => '/contentflow/task/details',
         'target' => TaskAjaxController::class . '::detailsAction',
     ],
+    // Post a standalone comment on a task.
+    'contentflow_task_comment' => [
+        'path' => '/contentflow/task/comment',
+        'target' => TaskAjaxController::class . '::commentAction',
+    ],
     // Ticket view: the full task rendered as HTML for a modal.
     'contentflow_task_ticket' => [
         'path' => '/contentflow/task/ticket',

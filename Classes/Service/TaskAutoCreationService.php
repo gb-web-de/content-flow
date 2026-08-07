@@ -73,6 +73,54 @@ final class TaskAutoCreationService
         $stageUid = (int)(BackendUtility::getRecord($table, $versionUid, 't3ver_stage')['t3ver_stage'] ?? 0);
         $beUserId = (int)($dataHandler->BE_USER->user['uid'] ?? 0);
 
+        // 1. Check if record is ALREADY a member of an open task (2nd save bypass)
+        $existing = $this->taskRepository->findOpenTaskByMember($table, $liveUid);
+        if ($existing !== null) {
+            if ((int)($existing['workspace_uid'] ?? 0) === 0) {
+                $this->taskRepository->attachWorkspace((int)$existing['uid'], $workspaceUid, $stageUid);
+            }
+            return;
+        }
+
+        // 2. Check if an open task exists for parent page
+        $pageUid = $this->derivePid($table, $liveUid);
+        $pageTask = $this->taskRepository->findOpenBySubject('pages', $pageUid);
+
+        if ($pageTask !== null && $table !== 'pages') {
+            $pageTaskUid = (int)$pageTask['uid'];
+            $homePid = $this->derivePid($table, $liveUid);
+
+            // Claim it onto the page task NOW, not only once the editor answers
+            // the routing prompt. Without this, moveMemberToTask() and
+            // detachIntoOwnTask() in TaskAjaxController::wizardSubmitAction() have
+            // no membership row to act on - both are UPDATE-only, so either wizard
+            // choice would silently do nothing and the edit would never be linked
+            // to any task at all. Claiming here first means "attach to page task"
+            // is already true and merely confirmed, and "split into its own task"
+            // has a real row to re-point.
+            //
+            // This also matches the standing invariant: unplanned work is captured
+            // immediately, and ignoring the routing prompt is a valid answer
+            // because the sensible default already happened.
+            $this->taskRepository->addMemberIfUnclaimed(
+                $pageTaskUid,
+                $table,
+                $liveUid,
+                TaskRepository::ORIGIN_AUTO,
+                $homePid,
+                $this->referenceInspector->isSharedAcrossPages($table, $liveUid, $homePid),
+            );
+
+            // Offer the editor a choice: keep it on the page task, or split it off.
+            $dataHandler->BE_USER->setAndSaveSessionData('content_flow_pending_wizard', [
+                'table' => $table,
+                'uid' => $liveUid,
+                'pageTaskUid' => $pageTaskUid,
+                'pageTaskTitle' => (string)$pageTask['title'],
+            ]);
+            return;
+        }
+
         $task = $this->resolveTask($table, $liveUid, $workspaceUid, $stageUid, $beUserId);
         if ($task === null) {
             return;

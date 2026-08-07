@@ -167,6 +167,30 @@
         </f:if>
     </section>
 
+    <section class="contentflow-ticket-section">
+        <h3>Add a comment</h3>
+        <f:comment>
+            Only shown while the task is open. A closed task is an archive record,
+            and the server refuses comments on it - the UI should not offer what the
+            server will reject.
+        </f:comment>
+        <f:if condition="{task.closed}">
+            <f:then>
+                <p class="contentflow-empty">This task is closed. Its history is kept as it was.</p>
+            </f:then>
+            <f:else>
+                <form class="contentflow-comment-form" data-contentflow-comment-form="{task.uid}">
+                    <label class="form-label" for="cf-comment-{task.uid}">Comment</label>
+                    <textarea id="cf-comment-{task.uid}" class="form-control" rows="3"
+                              placeholder="Explain what you changed, or what still needs doing."></textarea>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <core:icon identifier="actions-message" size="small" /> Post comment
+                    </button>
+                </form>
+            </f:else>
+        </f:if>
+    </section>
+
 </div>
 
 </html>

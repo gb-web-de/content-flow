@@ -68,7 +68,6 @@ final class ContentFlowController extends ActionController
 
         $this->pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css');
         $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/board.js');
-        $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/wizard.js');
         // Core's element browser gives the "+" button a page tree with live search
         // and depth navigation - no bespoke picker needed.
         //

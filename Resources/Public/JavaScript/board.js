@@ -25,6 +25,7 @@ import { registerDragAndDrop } from '@gb-web/content-flow/board/drag-drop.js';
 import { registerAssignButtons } from '@gb-web/content-flow/task/assign.js';
 import { registerTicketButtons } from '@gb-web/content-flow/task/ticket.js';
 import { registerCreateButton } from '@gb-web/content-flow/task/create-wizard.js';
+import { registerCommentForm } from '@gb-web/content-flow/task/comment.js';
 
 class ContentFlowBoard {
   constructor() {
@@ -39,6 +40,8 @@ class ContentFlowBoard {
     // module banner, where there is no board element at all.
     registerCreateButton(this);
     registerTicketButtons(this);
+    // Delegated from the document: the ticket form arrives with the modal.
+    registerCommentForm();
 
     this.board = document.querySelector('.contentflow-board');
     if (this.board === null) {

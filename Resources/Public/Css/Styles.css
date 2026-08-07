@@ -586,3 +586,14 @@
     background: var(--typo3-surface-container, #f6f6f6);
     font-size: 13px;
 }
+
+.contentflow-comment-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.contentflow-comment-form textarea {
+    width: 100%;
+}
