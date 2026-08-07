@@ -57,6 +57,51 @@ task**, as a unique key on the membership table. Detaching moves the membership 
 task; re-syncing the page's task then *cannot* reclaim the element, because the slot is taken.
 The same key is what stops two editors opening the same page from creating two tasks.
 
+## Content that lives somewhere else
+
+A shortcut element pulls content in from another page. An editor working on page A
+changes it — and page B silently changes too. **A board that hides this is a task list;
+a board that shows it is a planning tool.** So every member carries two facts:
+
+- `home_pid` — the page the record actually lives on. When it differs from the task's
+  subject, the editor is working on foreign content.
+- `shared` — other pages reference this record.
+
+Both are surfaced as a warning on the card, and both are advisory: nothing is blocked.
+The editor decides whether the change belongs to **their own** task (they are working on
+page A, so track it there) or gets **its own** task (it is really a change to page B's
+content) — `moveMemberToTask()` and `detachIntoOwnTask()` are the two operations.
+
+`ReferenceInspector` is built on **`sys_refindex`, not on `CType='shortcut'`**. The
+reference index already records every kind of reuse — shortcuts, inline relations, links,
+file references — so this catches reuse a shortcut check would miss, and it keeps working
+when an extension invents its own relation type. The tradeoff: the index is rebuilt by a
+scheduler task and can be stale, so a negative answer means "no reuse known", not proof.
+That is acceptable precisely because the result is a warning rather than a gate.
+
+## The wizard
+
+"Not straight to a new task on direct editing — a wizard: new task, or add to task."
+
+The constraint that shapes this: the hook runs **server-side inside DataHandler, during a
+save**. It cannot open a dialog. And blocking the first keystroke behind a modal would
+contradict the whole premise that editors should barely have to think.
+
+So the wizard is **post-save and non-blocking**:
+
+1. The editor edits. A task is created as before and flagged `auto_created = 1` — the
+   work is captured no matter what happens next, which is the important part.
+2. A backend notification offers the choice: *keep this task*, or *add to an existing
+   task* (with the open tasks in scope offered as targets).
+3. Ignoring it is a valid answer. The sensible default already happened.
+
+This keeps the "unplanned work is never lost" guarantee while still giving the editor the
+say. `auto_created` is what lets the board distinguish "somebody planned this" from "this
+appeared because someone started typing" — and it is what the notification keys off.
+
+> Status: the flag, the merge operation (`moveMemberToTask`) and the detach operation are
+> implemented. The notification UI itself is not yet built.
+
 ## The four moments
 
 **1. Somebody plans work.** A task is created for a subject and lands in Backlog, taking the
@@ -190,8 +235,14 @@ Checked against core sources rather than assumed — worth re-checking on core u
 
 ## Status
 
-Implemented: data model, state machine, column registry, auto-creation hook, publish/close
-listener, read-only board rendering.
+Implemented: data model (subject + members), state machine, column registry, subject registry,
+page aggregation, cross-page/reuse detection, auto-creation hook, publish/close listener,
+read-only board rendering.
 
-Not yet implemented: TCA for the task/comment tables, the Ajax write endpoints, the Lit board
-UI with the accessibility commitments above, and the Dashboard widget.
+Not yet implemented: TCA for the task/comment/item tables, the Ajax write endpoints, the
+post-save wizard notification, the Lit board UI with the accessibility commitments above, and
+the Dashboard widget.
+
+None of it has been executed yet — there is no PHP runtime in the environment this was written
+in, so everything here is verified by reading, not by running. Treat the first `ddev start`
+as the real test.

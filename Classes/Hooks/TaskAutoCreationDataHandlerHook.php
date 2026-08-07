@@ -7,6 +7,7 @@ namespace GbWeb\ContentFlow\Hooks;
 use GbWeb\ContentFlow\Domain\Model\TaskState;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use GbWeb\ContentFlow\Service\ActivityLogger;
+use GbWeb\ContentFlow\Service\ReferenceInspector;
 use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
 use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
 use Symfony\Component\DependencyInjection\Attribute\Autoconfigure;
@@ -38,6 +39,7 @@ final class TaskAutoCreationDataHandlerHook
         private readonly TaskRepository $taskRepository,
         private readonly TaskSubjectRegistry $subjectRegistry,
         private readonly TaskMemberSynchronizer $memberSynchronizer,
+        private readonly ReferenceInspector $referenceInspector,
         private readonly ActivityLogger $activityLogger,
     ) {
     }
@@ -117,13 +119,17 @@ final class TaskAutoCreationDataHandlerHook
         }
 
         $isNew = $this->taskRepository->findOpenBySubject($subject['table'], $subject['uid']) === null;
+        $subjectPid = $this->derivePid($subject['table'], $subject['uid']);
         $task = $this->taskRepository->findOrCreateOpenForSubject($subject['table'], $subject['uid'], [
             'title' => $this->deriveTitle($subject['table'], $subject['uid']),
-            'subject_pid' => $this->derivePid($subject['table'], $subject['uid']),
+            'subject_pid' => $subjectPid,
             'state' => TaskState::IN_PROGRESS->value,
             'workspace_uid' => 0,
             'stage_uid' => $stageUid,
             'assignee' => $beUserId,
+            // Nobody planned this - the editor simply started working. The board
+            // marks it, and the post-save wizard offers to merge it somewhere.
+            'auto_created' => 1,
         ]);
         $taskUid = (int)$task['uid'];
 
@@ -142,7 +148,15 @@ final class TaskAutoCreationDataHandlerHook
         // The edited record may still be unclaimed - a record created after the last
         // sync, or one on a subject that is not a page. Claim it now; if someone else
         // already owns it, leave it with them.
-        $this->taskRepository->addMemberIfUnclaimed($taskUid, $table, $liveUid, TaskRepository::ORIGIN_AUTO);
+        $homePid = $this->derivePid($table, $liveUid);
+        $this->taskRepository->addMemberIfUnclaimed(
+            $taskUid,
+            $table,
+            $liveUid,
+            TaskRepository::ORIGIN_AUTO,
+            $homePid,
+            $this->referenceInspector->isSharedAcrossPages($table, $liveUid, $homePid),
+        );
 
         return $task;
     }

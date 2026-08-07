@@ -159,13 +159,21 @@ class TaskRepository
      * record already belongs to another open task - callers decide whether that is
      * an error or simply "leave it where the editor put it".
      */
-    public function addMember(int $taskUid, string $recordTable, int $recordUid, string $origin): void
-    {
+    public function addMember(
+        int $taskUid,
+        string $recordTable,
+        int $recordUid,
+        string $origin,
+        int $homePid = 0,
+        bool $shared = false,
+    ): void {
         $this->connectionPool->getConnectionForTable(self::TABLE_ITEM)->insert(self::TABLE_ITEM, [
             'task' => $taskUid,
             'record_table' => $recordTable,
             'record_uid' => $recordUid,
             'origin' => $origin,
+            'home_pid' => $homePid,
+            'shared' => $shared ? 1 : 0,
             'closed' => 0,
             'crdate' => $GLOBALS['EXEC_TIME'],
             'tstamp' => $GLOBALS['EXEC_TIME'],
@@ -177,14 +185,61 @@ class TaskRepository
      *
      * @return bool true when this call claimed the record
      */
-    public function addMemberIfUnclaimed(int $taskUid, string $recordTable, int $recordUid, string $origin): bool
-    {
+    public function addMemberIfUnclaimed(
+        int $taskUid,
+        string $recordTable,
+        int $recordUid,
+        string $origin,
+        int $homePid = 0,
+        bool $shared = false,
+    ): bool {
         try {
-            $this->addMember($taskUid, $recordTable, $recordUid, $origin);
+            $this->addMember($taskUid, $recordTable, $recordUid, $origin, $homePid, $shared);
             return true;
         } catch (UniqueConstraintViolationException) {
             return false;
         }
+    }
+
+    /**
+     * Move a record's membership to another existing task.
+     *
+     * The "add to task" half of the wizard, and also how an editor resolves the
+     * cross-page case: content reached through a shortcut can be moved onto the task
+     * of the page they are actually working on, instead of the page it lives on.
+     * `origin` becomes manual so a later resync does not treat it as auto-collected.
+     */
+    public function moveMemberToTask(string $recordTable, int $recordUid, int $targetTaskUid): void
+    {
+        $this->connectionPool->getConnectionForTable(self::TABLE_ITEM)->update(
+            self::TABLE_ITEM,
+            [
+                'task' => $targetTaskUid,
+                'origin' => self::ORIGIN_MANUAL,
+                'tstamp' => $GLOBALS['EXEC_TIME'],
+            ],
+            [
+                'record_table' => $recordTable,
+                'record_uid' => $recordUid,
+                'closed' => 0,
+                'deleted' => 0,
+            ],
+        );
+    }
+
+    /**
+     * Members that need an editor's attention: content living on another page, or
+     * reused elsewhere. Both mean "changing this changes more than this page".
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findWarnedMembers(int $taskUid, int $subjectPid): array
+    {
+        return array_values(array_filter(
+            $this->findMembers($taskUid),
+            static fn(array $member): bool => (int)($member['shared'] ?? 0) === 1
+                || ((int)($member['home_pid'] ?? 0) > 0 && (int)$member['home_pid'] !== $subjectPid),
+        ));
     }
 
     /**

@@ -43,6 +43,11 @@ CREATE TABLE tx_contentflow_task (
     assignee int(11) unsigned DEFAULT '0' NOT NULL,
     due_date int(11) unsigned DEFAULT '0' NOT NULL,
 
+    # 1 when the task opened itself because someone just started editing, rather
+    # than being planned. The board marks these, and the post-save wizard offers to
+    # merge them into an existing task - see ARCHITECTURE.md, "The wizard".
+    auto_created tinyint(1) unsigned DEFAULT '0' NOT NULL,
+
     closed tinyint(1) unsigned DEFAULT '0' NOT NULL,
     closed_at int(11) unsigned DEFAULT '0' NOT NULL,
     closed_by int(11) unsigned DEFAULT '0' NOT NULL,
@@ -80,6 +85,15 @@ CREATE TABLE tx_contentflow_task_item (
     # auto    = pulled in because it sits on the subject page
     # manual  = attached or detached by an editor
     origin varchar(10) DEFAULT 'auto' NOT NULL,
+
+    # The page this record actually lives on. Differs from the task's subject when
+    # an editor changed content that belongs elsewhere - typically reached through
+    # a shortcut element. The board warns about those: touching them changes other
+    # pages too, which is precisely what a planning tool has to make visible.
+    home_pid int(11) unsigned DEFAULT '0' NOT NULL,
+    # 1 when other pages reference this record (shortcut or any other reuse).
+    # Derived from sys_refindex at attach time, see ReferenceInspector.
+    shared tinyint(1) unsigned DEFAULT '0' NOT NULL,
 
     closed tinyint(1) unsigned DEFAULT '0' NOT NULL,
     deleted tinyint(4) unsigned DEFAULT '0' NOT NULL,

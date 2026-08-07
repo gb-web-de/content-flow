@@ -24,6 +24,7 @@ class TaskMemberSynchronizer
     public function __construct(
         private readonly ConnectionPool $connectionPool,
         private readonly TaskSubjectRegistry $subjectRegistry,
+        private readonly ReferenceInspector $referenceInspector,
         private readonly TaskRepository $taskRepository,
     ) {
     }
@@ -46,7 +47,17 @@ class TaskMemberSynchronizer
         $claimed = 0;
         foreach ($this->subjectRegistry->getAggregatableTables() as $table) {
             foreach ($this->findRecordUidsOnPage($table, $pageUid) as $recordUid) {
-                if ($this->taskRepository->addMemberIfUnclaimed($taskUid, $table, $recordUid, TaskRepository::ORIGIN_AUTO)) {
+                // Flag content that other pages reuse, so the board can warn before
+                // an editor changes something that shows up elsewhere too.
+                $shared = $this->referenceInspector->isSharedAcrossPages($table, $recordUid, $pageUid);
+                if ($this->taskRepository->addMemberIfUnclaimed(
+                    $taskUid,
+                    $table,
+                    $recordUid,
+                    TaskRepository::ORIGIN_AUTO,
+                    $pageUid,
+                    $shared,
+                )) {
                     $claimed++;
                 }
             }
