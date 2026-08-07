@@ -41,6 +41,8 @@ class ActivityLogger
     public const EVENT_WORK_STARTED = 'work_started';
     public const EVENT_ASSIGNED = 'assigned';
     public const EVENT_STAGE_CHANGED = 'stage_changed';
+    /** One member went live while others are still pending; the task stays open. */
+    public const EVENT_PUBLISHED = 'published';
     public const EVENT_CLOSED = 'closed';
 
     public function __construct(

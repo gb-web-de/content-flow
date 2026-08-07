@@ -108,10 +108,10 @@ class ContentFlowController extends ActionController
     private function belongsInColumn(array $task, array $column): bool
     {
         if ($column['stageUid'] !== null) {
-            return (int)($task['version_uid'] ?? 0) > 0
+            return (int)($task['workspace_uid'] ?? 0) > 0
                 && (int)($task['stage_uid'] ?? 0) === $column['stageUid'];
         }
-        return (int)($task['version_uid'] ?? 0) === 0
+        return (int)($task['workspace_uid'] ?? 0) === 0
             && (string)($task['state'] ?? '') === $column['state'];
     }
 

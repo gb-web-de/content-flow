@@ -32,16 +32,45 @@ This also answers, natively, what
 (stages *before* and *after* the fixed core ones): "before editing" is Backlog/Planned,
 "after ready" is Done, and everything between is already freely definable in core.
 
+## What a task is about
+
+Every **versionable** record can be tracked — if a table has no workspace support it never
+produces a version, so there is nothing for the workflow to move. Among those, Content Flow
+distinguishes two roles:
+
+- A **subject** is page-like: it stands on its own and gets its own card. `pages`, obviously.
+  But not only: a *news* record is technically a record while behaving like a page, because it
+  has its own detail view. To an editor it *is* a page. Which tables count is configuration
+  (`$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['subjectTables']`), because only the
+  integrator knows their content model.
+- Everything else is **page-bound**: a content element belongs to the page it sits on.
+
+**A task on a page pulls in everything on that page.** One card means "this page and its
+content", not one card per content element — otherwise editing a page with twelve elements
+would bury the board in twelve identical-looking cards.
+
+**But the editor can pull an element out** and give it a task of its own, when one banner or
+one accordion really is a separate piece of work.
+
+That split is enforced with a single rule, no flags: **a record belongs to at most one open
+task**, as a unique key on the membership table. Detaching moves the membership row to the new
+task; re-syncing the page's task then *cannot* reclaim the element, because the slot is taken.
+The same key is what stops two editors opening the same page from creating two tasks.
+
 ## The four moments
 
-**1. Somebody plans work.** A task is created for any record — `pages`, `tt_content`, or
-anything else — and lands in Backlog. Assigning a `be_user` moves it to Planned. Editors may
-assign themselves. No version exists yet, nothing is versioned, nothing is locked.
+**1. Somebody plans work.** A task is created for a subject and lands in Backlog, taking the
+page's content along with it. Assigning a `be_user` moves it to Planned. Editors may assign
+themselves. No version exists yet, nothing is locked.
 
 **2. Somebody edits.** The editor opens the page and types. TYPO3 auto-creates a workspace
 version. `TaskAutoCreationDataHandlerHook` notices and moves the task to In Progress — **or
 creates one on the spot if none existed**, so unplanned work is captured too. The editor is
 never asked to "open a ticket"; there simply is one afterwards.
+
+The hook routes the edit rather than blindly creating: an existing membership wins (so a
+detached element stays with its own task), otherwise the subject is resolved — the record
+itself when page-like, else the page it sits on.
 
 **3. The version walks the stages.** Core does this entirely. Dragging a card is translated
 into a normal core stage transition, so permissions, recipients and stage comments behave
@@ -49,8 +78,9 @@ exactly as they do in the Workspaces module. Content Flow mirrors the resulting
 `t3ver_stage` onto the task as a read cache for sorting; core stays the source of truth.
 
 **4. It goes live.** `CloseTaskAfterPublishListener` closes the task on
-`AfterRecordPublishedEvent`. The record now has no version, so the task's history is frozen
-at that moment (below) and the card leaves the board.
+`AfterRecordPublishedEvent` — but only once **nothing the task covers is still pending**. The
+event fires per record, and a task covers a page and all its content, so closing on the first
+published element would archive a task with half its content still in review.
 
 ## Where the history lives
 
@@ -90,13 +120,15 @@ from `sys_history` on read.
 ## Concurrency
 
 Two editors opening the same page at the same time must not produce two tasks. This is
-enforced by a **unique key** (`record_table, record_uid, closed, deleted`), not by a
-read-then-write check: the loser of the race catches the constraint violation and adopts the
-winner's task. Check-then-insert would let both pass the check (this exact TOCTOU bug exists
-in `kanban-workspaces`' `AssigneeMappingService`, found during the 2026-08-07 review).
+enforced by the **unique key on the membership table**
+(`record_table, record_uid, closed, deleted`), not by a read-then-write check: the loser of
+the race catches the constraint violation, discards its own task and adopts the winner's.
+Check-then-insert would let both pass the check (this exact TOCTOU bug exists in
+`kanban-workspaces`' `AssigneeMappingService`, found during the 2026-08-07 review).
 
 `closed` participates in the key so a record can accumulate many closed tasks over its
-lifetime while only ever having one open.
+lifetime while only ever belonging to one open one. That single key does triple duty: it
+prevents duplicate tasks, makes detaching permanent, and keeps aggregation idempotent.
 
 ## UX and accessibility commitments
 

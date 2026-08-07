@@ -11,7 +11,7 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 
 /**
- * Persistence for tx_contentflow_task.
+ * Persistence for tasks and their members.
  *
  * Deliberately plain Doctrine/QueryBuilder rather than Extbase: tasks are written
  * from a DataHandler hook and a PSR-14 listener, i.e. from inside another write
@@ -19,7 +19,12 @@ use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
  */
 class TaskRepository
 {
+    public const ORIGIN_SUBJECT = 'subject';
+    public const ORIGIN_AUTO = 'auto';
+    public const ORIGIN_MANUAL = 'manual';
+
     private const TABLE = 'tx_contentflow_task';
+    private const TABLE_ITEM = 'tx_contentflow_task_item';
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,
@@ -29,7 +34,7 @@ class TaskRepository
     /**
      * @return array<string, mixed>|null
      */
-    public function findOpenByRecord(string $recordTable, int $recordUid): ?array
+    public function findOpenBySubject(string $subjectTable, int $subjectUid): ?array
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
@@ -38,8 +43,8 @@ class TaskRepository
             ->select('*')
             ->from(self::TABLE)
             ->where(
-                $queryBuilder->expr()->eq('record_table', $queryBuilder->createNamedParameter($recordTable)),
-                $queryBuilder->expr()->eq('record_uid', $queryBuilder->createNamedParameter($recordUid, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('subject_table', $queryBuilder->createNamedParameter($subjectTable)),
+                $queryBuilder->expr()->eq('subject_uid', $queryBuilder->createNamedParameter($subjectUid, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )
             ->setMaxResults(1)
@@ -50,48 +55,99 @@ class TaskRepository
     }
 
     /**
-     * Get the open task for a record, creating it if there is none.
+     * The open task a record currently belongs to, if any.
      *
-     * The uniqueness of "one open task per record" is enforced by the
-     * `open_task_per_record` unique key, not by the preceding SELECT: two editors
-     * opening the same page simultaneously would both see "no task" and both insert.
-     * The loser of that race gets a constraint violation and re-reads the winner's
-     * row instead of creating a duplicate.
+     * This is what makes detaching stick: a record already owned by another open
+     * task is never reclaimed by its page's task.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findOpenTaskByMember(string $recordTable, int $recordUid): ?array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE_ITEM);
+        $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+
+        $taskUid = $queryBuilder
+            ->select('task')
+            ->from(self::TABLE_ITEM)
+            ->where(
+                $queryBuilder->expr()->eq('record_table', $queryBuilder->createNamedParameter($recordTable)),
+                $queryBuilder->expr()->eq('record_uid', $queryBuilder->createNamedParameter($recordUid, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+            )
+            ->setMaxResults(1)
+            ->executeQuery()
+            ->fetchOne();
+
+        return $taskUid ? $this->findByUid((int)$taskUid) : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findByUid(int $taskUid): ?array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+
+        $row = $queryBuilder
+            ->select('*')
+            ->from(self::TABLE)
+            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($taskUid, Connection::PARAM_INT)))
+            ->executeQuery()
+            ->fetchAssociative();
+
+        return $row === false ? null : $row;
+    }
+
+    /**
+     * Get the open task for a subject, creating it if there is none.
+     *
+     * Uniqueness is enforced by the `one_open_task_per_record` unique key on the
+     * item table, not by the preceding SELECT: two editors opening the same page
+     * simultaneously would both see "no task" and both insert. The loser catches
+     * the constraint violation and adopts the winner's task.
      *
      * @param array<string, mixed> $values
      * @return array<string, mixed>
      */
-    public function findOrCreateOpenByRecord(string $recordTable, int $recordUid, array $values): array
+    public function findOrCreateOpenForSubject(string $subjectTable, int $subjectUid, array $values): array
     {
-        $existing = $this->findOpenByRecord($recordTable, $recordUid);
+        $existing = $this->findOpenBySubject($subjectTable, $subjectUid);
         if ($existing !== null) {
             return $existing;
         }
 
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
+        $connection->insert(self::TABLE, array_merge($values, [
+            'subject_table' => $subjectTable,
+            'subject_uid' => $subjectUid,
+            'crdate' => $GLOBALS['EXEC_TIME'],
+            'tstamp' => $GLOBALS['EXEC_TIME'],
+        ]));
+        $taskUid = (int)$connection->lastInsertId();
+
         try {
-            $connection->insert(self::TABLE, array_merge($values, [
-                'record_table' => $recordTable,
-                'record_uid' => $recordUid,
-                'crdate' => $GLOBALS['EXEC_TIME'],
-                'tstamp' => $GLOBALS['EXEC_TIME'],
-            ]));
+            // The subject is a member of its own task. This insert is what actually
+            // claims the record, so it is also what detects a concurrent creation.
+            $this->addMember($taskUid, $subjectTable, $subjectUid, self::ORIGIN_SUBJECT);
         } catch (UniqueConstraintViolationException) {
-            // Lost the race - the other request's task is authoritative.
-            $winner = $this->findOpenByRecord($recordTable, $recordUid);
+            // Someone else got there first - drop our now-orphaned task and use theirs.
+            $connection->delete(self::TABLE, ['uid' => $taskUid]);
+            $winner = $this->findOpenBySubject($subjectTable, $subjectUid);
             if ($winner !== null) {
                 return $winner;
             }
             throw new \RuntimeException(
-                sprintf('Could not resolve open Content Flow task for %s:%d', $recordTable, $recordUid),
+                sprintf('Could not resolve open Content Flow task for %s:%d', $subjectTable, $subjectUid),
                 1754563200,
             );
         }
 
-        $created = $this->findOpenByRecord($recordTable, $recordUid);
+        $created = $this->findByUid($taskUid);
         if ($created === null) {
             throw new \RuntimeException(
-                sprintf('Content Flow task for %s:%d vanished right after insert', $recordTable, $recordUid),
+                sprintf('Content Flow task for %s:%d vanished right after insert', $subjectTable, $subjectUid),
                 1754563201,
             );
         }
@@ -99,18 +155,116 @@ class TaskRepository
     }
 
     /**
-     * Move a task onto a workspace version. Only ever widens state from an
-     * unversioned one - a task already in review is not dragged back to IN_PROGRESS
-     * just because someone touched the record again.
+     * Claim a record for a task. Throws UniqueConstraintViolationException when the
+     * record already belongs to another open task - callers decide whether that is
+     * an error or simply "leave it where the editor put it".
      */
-    public function attachVersion(int $taskUid, int $workspaceUid, int $versionUid, int $stageUid): void
+    public function addMember(int $taskUid, string $recordTable, int $recordUid, string $origin): void
+    {
+        $this->connectionPool->getConnectionForTable(self::TABLE_ITEM)->insert(self::TABLE_ITEM, [
+            'task' => $taskUid,
+            'record_table' => $recordTable,
+            'record_uid' => $recordUid,
+            'origin' => $origin,
+            'closed' => 0,
+            'crdate' => $GLOBALS['EXEC_TIME'],
+            'tstamp' => $GLOBALS['EXEC_TIME'],
+        ]);
+    }
+
+    /**
+     * Attach a record unless it already belongs to an open task.
+     *
+     * @return bool true when this call claimed the record
+     */
+    public function addMemberIfUnclaimed(int $taskUid, string $recordTable, int $recordUid, string $origin): bool
+    {
+        try {
+            $this->addMember($taskUid, $recordTable, $recordUid, $origin);
+            return true;
+        } catch (UniqueConstraintViolationException) {
+            return false;
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function findMembers(int $taskUid): array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE_ITEM);
+        $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+
+        return $queryBuilder
+            ->select('*')
+            ->from(self::TABLE_ITEM)
+            ->where(
+                $queryBuilder->expr()->eq('task', $queryBuilder->createNamedParameter($taskUid, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+            )
+            ->executeQuery()
+            ->fetchAllAssociative();
+    }
+
+    /**
+     * Move a record out of its current task into a new task of its own.
+     *
+     * The editor's escape hatch from aggregation: "this one element is its own piece
+     * of work". Implemented as a membership move, so the page's task can never take
+     * it back - the unique key sees the slot as occupied.
+     *
+     * @param array<string, mixed> $values
+     * @return array<string, mixed> the new task
+     */
+    public function detachIntoOwnTask(string $recordTable, int $recordUid, array $values): array
     {
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
-        $connection->update(
+        $connection->insert(self::TABLE, array_merge($values, [
+            'subject_table' => $recordTable,
+            'subject_uid' => $recordUid,
+            'crdate' => $GLOBALS['EXEC_TIME'],
+            'tstamp' => $GLOBALS['EXEC_TIME'],
+        ]));
+        $taskUid = (int)$connection->lastInsertId();
+
+        // Re-point the existing membership rather than delete-then-insert, so the
+        // record is never momentarily unclaimed and the unique key never trips.
+        $this->connectionPool->getConnectionForTable(self::TABLE_ITEM)->update(
+            self::TABLE_ITEM,
+            [
+                'task' => $taskUid,
+                'origin' => self::ORIGIN_MANUAL,
+                'tstamp' => $GLOBALS['EXEC_TIME'],
+            ],
+            [
+                'record_table' => $recordTable,
+                'record_uid' => $recordUid,
+                'closed' => 0,
+                'deleted' => 0,
+            ],
+        );
+
+        $created = $this->findByUid($taskUid);
+        if ($created === null) {
+            throw new \RuntimeException(
+                sprintf('Detached Content Flow task for %s:%d vanished right after insert', $recordTable, $recordUid),
+                1754563202,
+            );
+        }
+        return $created;
+    }
+
+    /**
+     * Move a task onto a workspace version. Only widens state from an unversioned
+     * one - a task already in review is not dragged back to IN_PROGRESS just
+     * because someone touched one of its members again.
+     */
+    public function attachWorkspace(int $taskUid, int $workspaceUid, int $stageUid): void
+    {
+        $this->connectionPool->getConnectionForTable(self::TABLE)->update(
             self::TABLE,
             [
                 'workspace_uid' => $workspaceUid,
-                'version_uid' => $versionUid,
                 'stage_uid' => $stageUid,
                 'state' => TaskState::fromStageId($stageUid)->value,
                 'tstamp' => $GLOBALS['EXEC_TIME'],
@@ -120,31 +274,32 @@ class TaskRepository
     }
 
     /**
-     * Close a task after its version went live. The version uid is cleared because
-     * the version record no longer exists once published.
+     * Close a task once everything it covers has gone live. Members are closed too,
+     * which releases their slot in the unique key for future work on the same records.
      */
     public function close(int $taskUid, int $beUserId): void
     {
-        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
-        $connection->update(
+        $this->connectionPool->getConnectionForTable(self::TABLE)->update(
             self::TABLE,
             [
                 'state' => TaskState::DONE->value,
                 'closed' => 1,
                 'closed_at' => $GLOBALS['EXEC_TIME'],
                 'closed_by' => $beUserId,
-                'version_uid' => 0,
                 'tstamp' => $GLOBALS['EXEC_TIME'],
             ],
             ['uid' => $taskUid],
         );
+        $this->connectionPool->getConnectionForTable(self::TABLE_ITEM)->update(
+            self::TABLE_ITEM,
+            ['closed' => 1, 'tstamp' => $GLOBALS['EXEC_TIME']],
+            ['task' => $taskUid],
+        );
     }
 
     /**
-     * All open tasks below a page, for the board.
-     *
-     * One query for the whole board - the cards are grouped in PHP rather than by
-     * running a query per column, so adding review stages never adds queries.
+     * All open tasks below a page, for the board. One query - the cards are grouped
+     * in PHP, so adding review stages never adds queries.
      *
      * @return list<array<string, mixed>>
      */
@@ -157,7 +312,7 @@ class TaskRepository
             ->select('*')
             ->from(self::TABLE)
             ->where(
-                $queryBuilder->expr()->eq('record_pid', $queryBuilder->createNamedParameter($pageUid, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('subject_pid', $queryBuilder->createNamedParameter($pageUid, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )
             ->orderBy('tstamp', 'DESC')
