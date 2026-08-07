@@ -30,6 +30,7 @@
         "phpunit/phpunit": "^11.5.55",
         "saschaegerer/phpstan-typo3": "^3.0.1",
         "typo3/cms-fluid-styled-content": "^14.3",
+        "typo3/cms-impexp": "^14.3",
         "typo3/cms-install": "^14.3",
         "typo3/cms-lowlevel": "^14.3",
         "typo3/cms-rte-ckeditor": "^14.3",

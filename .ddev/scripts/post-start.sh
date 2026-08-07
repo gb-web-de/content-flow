@@ -43,18 +43,25 @@ case "${DDEV_WEBSERVER_TYPE:-nginx-fpm}" in
     *)       SERVER_TYPE="other" ;;
 esac
 
-if [ ! -f "${PROJECT_ROOT}/.Build/config/system/settings.php" ]; then
-    info "[2/4] typo3 setup (first run, server-type=${SERVER_TYPE})"
+# Credentials, admin user and TYPO3_SETUP_DISTRIBUTION=theme_camino come from
+# web_environment. The distribution creates site config, pages and content from
+# theme-camino/Initialisation/data.xml, so no --create-site here: SetupCommand
+# rejects both being set at once.
+# Guard on the path TYPO3 actually writes. Despite "app-dir": ".Build", settings.php
+# lands in the project root config/ - checking .Build/config/ would never match and
+# setup would re-run (with --force) on every single `ddev start`.
+if [ ! -f "${PROJECT_ROOT}/config/system/settings.php" ] \
+   && [ ! -f "${PROJECT_ROOT}/.Build/config/system/settings.php" ]; then
+    info "[2/4] typo3 setup + Camino distribution (first run, server-type=${SERVER_TYPE})"
     if ! .Build/bin/typo3 setup \
             --no-interaction \
             --force \
-            --server-type="${SERVER_TYPE}" \
-            --create-site="${DDEV_PRIMARY_URL:-https://content-flow.ddev.site}/"; then
+            --server-type="${SERVER_TYPE}"; then
         error "typo3 setup failed"
         error "  → retry manually: ddev exec .Build/bin/typo3 setup --no-interaction --force"
         exit 1
     fi
-    success "TYPO3 installed"
+    success "TYPO3 installed, Camino demo site imported"
 else
     info "[2/4] TYPO3 already configured, skipping setup"
 fi
@@ -66,11 +73,14 @@ info "[3/4] extension setup + cache flush"
 success "extensions ready"
 
 # --- 4/4 Demo content -----------------------------------------------------
-# The Camino theme does NOT ship demo content - on a fresh install it creates a
-# site and one empty page, nothing else. An empty board is impossible to judge,
-# so content_flow brings its own demo command (pages + workspace + stages).
-info "[4/4] demo content"
-.Build/bin/typo3 contentflow:democontent || warn "demo content step reported warnings"
+# Pages and content come from the Camino distribution imported in step 2. This
+# verifies they arrived and adds the workspace with review stages, which no
+# distribution can provide.
+#
+# There is no TTY here, so the command keeps whatever already exists rather than
+# asking. Use `ddev contentflow-demo` for the interactive path.
+info "[4/4] demo content + workspace"
+.Build/bin/typo3 contentflow:democontent --no-interaction || warn "demo content step reported warnings"
 
 echo "═══════════════════════════════════════"
 success "ready"
@@ -78,4 +88,6 @@ echo ""
 echo -e "  ${BOLD}Backend:${NC} ${DDEV_PRIMARY_URL:-https://content-flow.ddev.site}/typo3/"
 echo -e "  ${BOLD}Login:${NC}   admin / Password.1"
 echo -e "  ${BOLD}Module:${NC}  Web → Content Flow (switch to the 'Editorial' workspace first)"
+echo ""
+echo -e "  ${BOLD}Demo data:${NC} ddev contentflow-demo    (re-check / recreate, asks first)"
 echo ""

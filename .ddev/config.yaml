@@ -29,6 +29,12 @@ web_environment:
   - TYPO3_SETUP_ADMIN_USERNAME=admin
   - TYPO3_SETUP_ADMIN_PASSWORD=Password.1
   - TYPO3_SETUP_ADMIN_EMAIL=admin@example.com
+  - TYPO3_PROJECT_NAME=Content Flow
+  # Imports theme-camino/Initialisation/data.xml - a full demo site (Camino,
+  # FAQs, Packing List, Route Comparison, images). The distribution creates the
+  # site configuration itself, which is why TYPO3_SETUP_CREATE_SITE must NOT be
+  # set: SetupCommand throws if both are given. Needs typo3/cms-impexp.
+  - TYPO3_SETUP_DISTRIBUTION=theme_camino
 
 hooks:
   post-start:
