@@ -51,8 +51,8 @@ CREATE TABLE tx_contentflow_task (
     priority tinyint(4) unsigned DEFAULT '2' NOT NULL,
 
     # 1 when the task opened itself because someone just started editing, rather
-    # than being planned. The board marks these, and the post-save wizard offers to
-    # merge them into an existing task - see ARCHITECTURE.md, "The wizard".
+    # than being planned. The board marks these, and the post-save wizard lets an
+    # editor refine its details or route a page-bound record elsewhere later.
     auto_created tinyint(1) unsigned DEFAULT '0' NOT NULL,
 
     closed tinyint(1) unsigned DEFAULT '0' NOT NULL,

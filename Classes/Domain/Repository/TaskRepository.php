@@ -310,6 +310,27 @@ final class TaskRepository
     }
 
     /**
+     * Update the editable task details an editor can refine after auto-creation.
+     *
+     * The task already exists at this point - the save that triggered it has
+     * happened - so this does not create or move anything, only replaces the
+     * human-facing metadata with what the wizard collected.
+     */
+    public function updateDetails(int $taskUid, string $title, string $description, int $assignee): void
+    {
+        $this->connectionPool->getConnectionForTable(self::TABLE)->update(
+            self::TABLE,
+            [
+                'title' => $title,
+                'description' => $description,
+                'assignee' => $assignee,
+                'tstamp' => $GLOBALS['EXEC_TIME'],
+            ],
+            ['uid' => $taskUid],
+        );
+    }
+
+    /**
      * Move a task onto a workspace version. Only widens state from an unversioned
      * one - a task already in review is not dragged back to IN_PROGRESS just
      * because someone touched one of its members again.

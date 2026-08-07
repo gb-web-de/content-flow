@@ -91,16 +91,17 @@ So the wizard is **post-save and non-blocking**:
 
 1. The editor edits. A task is created as before and flagged `auto_created = 1` — the
    work is captured no matter what happens next, which is the important part.
-2. A backend notification offers the choice: *keep this task*, or *add to an existing
-   task* (with the open tasks in scope offered as targets).
-3. Ignoring it is a valid answer. The sensible default already happened.
+2. If that edit opened a brand-new task, a backend `MultiStepWizard` asks only for the
+   human details core cannot infer: a required title, plus optional description and
+   assignee.
+3. If the edit hit a page-bound record whose page already has an open task, the wizard
+   instead asks for the routing decision: *add this record to the existing page task* or
+   *give it its own task*.
+4. Ignoring it is a valid answer. The sensible default already happened on the server.
 
 This keeps the "unplanned work is never lost" guarantee while still giving the editor the
 say. `auto_created` is what lets the board distinguish "somebody planned this" from "this
-appeared because someone started typing" — and it is what the notification keys off.
-
-> Status: the flag, the merge operation (`moveMemberToTask`) and the detach operation are
-> implemented. The notification UI itself is not yet built.
+appeared because someone started typing" even after the follow-up wizard refined the task.
 
 ## The four moments
 
@@ -409,7 +410,8 @@ Audited against the code on 2026-08-07, not written from memory.
   selection, live-region announcements.
 - "+ New task": core element browser for the page, then core `MultiStepWizard` for
   title / priority / assignment.
-- Post-save routing wizard, reachable from anywhere in the backend via
+- Post-save task wizard (details for new auto-tasks, routing for page-bound records),
+  reachable from anywhere in the backend via
   `AfterBackendPageRenderEvent` (the same mechanism EXT:workspaces uses for
   `workspace-state.js`) - not the dead `includeInModules` config key an earlier
   version relied on, which nothing in core reads.

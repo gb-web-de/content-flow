@@ -73,6 +73,26 @@ final class TaskAutoCreationTest extends FunctionalTestCase
     }
 
     /**
+     * @param array<string, mixed> $overrides
+     */
+    private function createOpenTask(array $overrides = []): int
+    {
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
+        $connection->insert('tx_contentflow_task', array_merge([
+            'title' => 'About us',
+            'subject_table' => 'pages',
+            'subject_uid' => 2,
+            'subject_pid' => 2,
+            'state' => 'planned',
+            'workspace_uid' => 0,
+            'assignee' => 1,
+            'closed' => 0,
+        ], $overrides));
+
+        return (int)$connection->lastInsertId();
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function selectAll(string $table): array
@@ -93,6 +113,19 @@ final class TaskAutoCreationTest extends FunctionalTestCase
         self::assertSame(2, (int)$tasks[0]['subject_uid']);
         // Nobody planned this - it opened itself.
         self::assertSame(1, (int)$tasks[0]['auto_created']);
+    }
+
+    #[Test]
+    public function editingAPageInAWorkspaceQueuesTheDetailsWizardForTheAutoCreatedTask(): void
+    {
+        $this->editInWorkspace('pages', 2, ['title' => 'About us (revised)']);
+
+        $pending = $GLOBALS['BE_USER']->getSessionData('content_flow_pending_wizard');
+        self::assertIsArray($pending);
+        self::assertSame('configure_auto_task', $pending['mode']);
+        self::assertSame('pages', $pending['subjectTable']);
+        self::assertSame(2, $pending['subjectUid']);
+        self::assertSame('About us', $pending['defaultTitle']);
     }
 
     #[Test]
@@ -146,6 +179,19 @@ final class TaskAutoCreationTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function editingAContentElementOnAPlannedPageTaskMovesThatTaskIntoTheWorkspaceFlow(): void
+    {
+        $taskUid = $this->createOpenTask();
+
+        $this->editInWorkspace('tt_content', 10, ['header' => 'Intro text (revised)']);
+
+        $task = $this->selectAll('tx_contentflow_task')[0];
+        self::assertSame($taskUid, (int)$task['uid']);
+        self::assertSame('in_progress', $task['state']);
+        self::assertSame(1, (int)$task['workspace_uid']);
+    }
+
+    #[Test]
     public function aRecordBelongsToAtMostOneOpenTask(): void
     {
         $this->editInWorkspace('pages', 2, ['title' => 'About us (revised)']);
@@ -168,6 +214,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
         $tasks = $this->selectAll('tx_contentflow_task');
         self::assertSame('in_progress', $tasks[0]['state']);
         self::assertSame(1, (int)$tasks[0]['workspace_uid']);
+        self::assertSame(0, (int)$tasks[0]['stage_uid'], 'stage 0 is the workspace edit stage, not Live');
     }
 
     #[Test]
@@ -223,16 +270,21 @@ final class TaskAutoCreationTest extends FunctionalTestCase
 
         $pending = $GLOBALS['BE_USER']->getSessionData('content_flow_pending_wizard');
         self::assertIsArray($pending, 'the routing choice must still be offered');
+        self::assertSame('route_member', $pending['mode']);
         self::assertSame($newContentUid, $pending['uid']);
     }
 
     #[Test]
-    public function theRoutingChoiceIsOfferedOnlyWhenThePageTaskAlreadyExisted(): void
+    public function theFirstEditOnAnUntouchedPageQueuesTheTaskDetailsWizard(): void
     {
         $this->editInWorkspace('tt_content', 10, ['header' => 'first edit on an untouched page']);
 
-        // Nothing to route yet: this is the FIRST edit on the page, so there is
-        // no existing page task to choose between.
-        self::assertNull($GLOBALS['BE_USER']->getSessionData('content_flow_pending_wizard'));
+        $pending = $GLOBALS['BE_USER']->getSessionData('content_flow_pending_wizard');
+        self::assertIsArray($pending);
+        self::assertSame('configure_auto_task', $pending['mode']);
+        self::assertSame('tt_content', $pending['table']);
+        self::assertSame(10, $pending['uid']);
+        self::assertSame('pages', $pending['subjectTable']);
+        self::assertSame(2, $pending['subjectUid']);
     }
 }

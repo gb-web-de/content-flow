@@ -73,15 +73,15 @@ final class TaskAjaxController
         // Values the wizard collected. Ignoring them would make the wizard a
         // decorative form whose inputs do nothing.
         $title = trim((string)($body['title'] ?? ''));
+        $description = trim((string)($body['description'] ?? ''));
         $priority = TaskPriority::fromRequest($body['priority'] ?? null);
         // 'open' means deliberately unassigned so someone can take it - a real
         // planning state, not a missing value.
-        $assignee = (string)($body['assignee'] ?? 'me') === 'open'
-            ? 0
-            : (int)($this->getBackendUser()->user['uid'] ?? 0);
+        $assignee = $this->resolveRequestedAssignee($body['assignee'] ?? 'me');
 
         $task = $this->taskRepository->findOrCreateOpenForSubject($table, $uid, [
             'title' => $title !== '' ? $title : $this->deriveTitle($table, $uid),
+            'description' => $description,
             'subject_pid' => $table === 'pages' ? $uid : (int)(BackendUtility::getRecord($table, $uid, 'pid')['pid'] ?? 0),
             'state' => TaskState::BACKLOG->value,
             'priority' => $priority->value,
@@ -573,6 +573,18 @@ final class TaskAjaxController
     }
 
     /**
+     * 'open' means deliberately unassigned so someone can take the task later;
+     * everything else collapses to the current editor because the wizard does not
+     * offer arbitrary user picking yet.
+     */
+    private function resolveRequestedAssignee(mixed $rawAssignee): int
+    {
+        return (string)$rawAssignee === 'open'
+            ? 0
+            : (int)($this->getBackendUser()->user['uid'] ?? 0);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function getBody(ServerRequestInterface $request): array
@@ -727,17 +739,20 @@ final class TaskAjaxController
     public function wizardSubmitAction(ServerRequestInterface $request): ResponseInterface
     {
         $body = $this->getBody($request);
-        $actionType = (string)($body['actionType'] ?? 'attach_to_page_task');
+        $actionType = (string)($body['actionType'] ?? 'configure_auto_task');
         $table = (string)($body['table'] ?? '');
         $uid = (int)($body['uid'] ?? 0);
-        $pageTaskUid = (int)($body['pageTaskUid'] ?? 0);
 
         $error = $this->assertMayEdit($table, $uid);
         if ($error !== null) {
             return $this->error($error);
         }
 
+        $title = trim((string)($body['title'] ?? ''));
+        $description = trim((string)($body['description'] ?? ''));
+        $assignee = $this->resolveRequestedAssignee($body['assignee'] ?? 'me');
         if ($actionType === 'attach_to_page_task') {
+            $pageTaskUid = (int)($body['pageTaskUid'] ?? 0);
             if ($pageTaskUid < 1) {
                 return $this->reject(
                     'missing-page-task-id',
@@ -749,8 +764,33 @@ final class TaskAjaxController
             return new JsonResponse(['success' => true, 'action' => 'attached']);
         }
 
-        // Otherwise create new task
-        $title = trim((string)($body['title'] ?? ''));
+        if ($actionType === 'configure_auto_task') {
+            if ($title === '') {
+                return $this->reject(
+                    'task-title-required',
+                    'A title is required to keep this task.',
+                    ['table' => $table, 'uid' => $uid],
+                );
+            }
+            $taskUid = (int)($body['taskUid'] ?? 0);
+            $task = $this->findOpenTaskOrError($taskUid, 'update it');
+            if ($task instanceof ResponseInterface) {
+                return $task;
+            }
+
+            $this->taskRepository->updateDetails($taskUid, $title, $description, $assignee);
+
+            return new JsonResponse(['success' => true, 'task' => $taskUid, 'action' => 'configured']);
+        }
+
+        if ($actionType !== 'create_new_task') {
+            return $this->reject(
+                'unknown-wizard-action',
+                sprintf('The wizard action "%s" is not supported.', $actionType),
+                ['actionType' => $actionType, 'table' => $table, 'uid' => $uid],
+            );
+        }
+
         if ($title === '') {
             return $this->reject(
                 'task-title-required',
@@ -767,10 +807,11 @@ final class TaskAjaxController
 
         $task = $this->taskRepository->detachIntoOwnTask($table, $uid, [
             'title' => $title,
+            'description' => $description,
             'subject_pid' => $this->derivePid($table, $uid),
             'state' => $targetState,
             'workspace_uid' => $workspaceUid,
-            'assignee' => $beUserId,
+            'assignee' => $assignee,
             'auto_created' => 0,
         ]);
 

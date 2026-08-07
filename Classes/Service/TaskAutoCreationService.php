@@ -26,8 +26,9 @@ use TYPO3\CMS\Core\Schema\TcaSchemaFactory;
  * the trigger can be swapped without touching the logic. See the adapter in
  * Hooks/ for why the trigger is still a DataHandler hook.
  *
- * The editor never sees this happen - that is the point. Opening a page and typing
- * is the whole interaction; the board updates itself.
+ * The capture itself stays invisible and non-blocking - the save already succeeded
+ * before any follow-up wizard appears. Editors type first; Content Flow asks for
+ * details or routing afterwards only when the task needs a human decision.
  */
 final class TaskAutoCreationService
 {
@@ -86,9 +87,19 @@ final class TaskAutoCreationService
         $pageUid = $this->derivePid($table, $liveUid);
         $pageTask = $this->taskRepository->findOpenBySubject('pages', $pageUid);
 
-        if ($pageTask !== null && $table !== 'pages') {
+        if ($pageTask !== null && !$this->subjectRegistry->isSubject($table)) {
             $pageTaskUid = (int)$pageTask['uid'];
             $homePid = $this->derivePid($table, $liveUid);
+
+            if ((int)($pageTask['workspace_uid'] ?? 0) === 0) {
+                $this->taskRepository->attachWorkspace($pageTaskUid, $workspaceUid, $stageUid);
+                $this->activityLogger->log(
+                    $pageTaskUid,
+                    ActivityLogger::EVENT_WORK_STARTED,
+                    $beUserId,
+                    ['table' => $table, 'recordUid' => $liveUid, 'stageUid' => $stageUid],
+                );
+            }
 
             // Claim it onto the page task NOW, not only once the editor answers
             // the routing prompt. Without this, moveMemberToTask() and
@@ -112,21 +123,26 @@ final class TaskAutoCreationService
             );
 
             // Offer the editor a choice: keep it on the page task, or split it off.
-            $dataHandler->BE_USER->setAndSaveSessionData('content_flow_pending_wizard', [
+            $this->storePendingWizard($dataHandler, [
+                'mode' => 'route_member',
                 'table' => $table,
                 'uid' => $liveUid,
+                'recordTitle' => $this->deriveTitle($table, $liveUid),
                 'pageTaskUid' => $pageTaskUid,
                 'pageTaskTitle' => (string)$pageTask['title'],
+                'defaultTitle' => $this->deriveTitle($table, $liveUid),
             ]);
             return;
         }
 
-        $task = $this->resolveTask($table, $liveUid, $workspaceUid, $stageUid, $beUserId);
-        if ($task === null) {
+        $resolvedTask = $this->resolveTask($table, $liveUid, $workspaceUid, $stageUid, $beUserId);
+        if ($resolvedTask === null) {
             return;
         }
 
+        $task = $resolvedTask['task'];
         $taskUid = (int)$task['uid'];
+        $workStartedNow = false;
         if ((int)($task['workspace_uid'] ?? 0) === 0) {
             // Backlog/Planned -> In Progress, now that real work exists.
             $this->taskRepository->attachWorkspace($taskUid, $workspaceUid, $stageUid);
@@ -136,6 +152,30 @@ final class TaskAutoCreationService
                 $beUserId,
                 ['table' => $table, 'recordUid' => $liveUid, 'stageUid' => $stageUid],
             );
+            $workStartedNow = true;
+        }
+
+        if ($resolvedTask['createdNow'] && !$workStartedNow) {
+            $this->activityLogger->log(
+                $taskUid,
+                ActivityLogger::EVENT_WORK_STARTED,
+                $beUserId,
+                ['table' => $table, 'recordUid' => $liveUid, 'stageUid' => $stageUid],
+            );
+        }
+
+        if ($resolvedTask['createdNow']) {
+            $this->storePendingWizard($dataHandler, [
+                'mode' => 'configure_auto_task',
+                'taskUid' => $taskUid,
+                'table' => $table,
+                'uid' => $liveUid,
+                'editedTitle' => $this->deriveTitle($table, $liveUid),
+                'subjectTable' => (string)$task['subject_table'],
+                'subjectUid' => (int)$task['subject_uid'],
+                'subjectTitle' => $this->deriveTitle((string)$task['subject_table'], (int)$task['subject_uid']),
+                'defaultTitle' => (string)$task['title'],
+            ]);
         }
     }
 
@@ -191,7 +231,7 @@ final class TaskAutoCreationService
     /**
      * Find the task this edit belongs to, creating it if the work was unplanned.
      *
-     * @return array<string, mixed>|null
+     * @return array{task: array<string, mixed>, createdNow: bool}|null
      */
     private function resolveTask(string $table, int $liveUid, int $workspaceUid, int $stageUid, int $beUserId): ?array
     {
@@ -200,7 +240,7 @@ final class TaskAutoCreationService
         // page's task the next time someone edits it.
         $existing = $this->taskRepository->findOpenTaskByMember($table, $liveUid);
         if ($existing !== null) {
-            return $existing;
+            return ['task' => $existing, 'createdNow' => false];
         }
 
         $subject = $this->subjectRegistry->resolveSubjectFor($table, $liveUid);
@@ -213,12 +253,12 @@ final class TaskAutoCreationService
         $task = $this->taskRepository->findOrCreateOpenForSubject($subject['table'], $subject['uid'], [
             'title' => $this->deriveTitle($subject['table'], $subject['uid']),
             'subject_pid' => $subjectPid,
-            'state' => TaskState::IN_PROGRESS->value,
-            'workspace_uid' => 0,
+            'state' => TaskState::fromStageId($stageUid)->value,
+            'workspace_uid' => $workspaceUid,
             'stage_uid' => $stageUid,
             'assignee' => $beUserId,
             // Nobody planned this - the editor simply started working. The board
-            // marks it, and the post-save wizard offers to merge it somewhere.
+            // marks it, and the post-save wizard lets the editor refine it.
             'auto_created' => 1,
         ]);
         $taskUid = (int)$task['uid'];
@@ -248,7 +288,7 @@ final class TaskAutoCreationService
             $this->referenceInspector->isSharedAcrossPages($table, $liveUid, $homePid),
         );
 
-        return $task;
+        return ['task' => $task, 'createdNow' => $isNew];
     }
 
     /**
@@ -288,5 +328,17 @@ final class TaskAutoCreationService
             return $uid;
         }
         return (int)(BackendUtility::getRecord($table, $uid, 'pid')['pid'] ?? 0);
+    }
+
+    /**
+     * One save results in at most one follow-up wizard. The task itself has
+     * already been captured server-side, so this payload is purely "what should
+     * the browser ask next?" data.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function storePendingWizard(DataHandler $dataHandler, array $payload): void
+    {
+        $dataHandler->BE_USER->setAndSaveSessionData('content_flow_pending_wizard', $payload);
     }
 }
