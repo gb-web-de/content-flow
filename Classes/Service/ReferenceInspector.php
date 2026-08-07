@@ -61,6 +61,80 @@ class ReferenceInspector
     }
 
     /**
+     * Batch version: which of these records are reused on other pages?
+     *
+     * Synchronising a page means asking this about every element on it. Done one at
+     * a time that is one refindex query per element, plus one pid lookup per
+     * referencing table per element - a page with twenty elements would fire dozens
+     * of round-trips. Here it is two phases regardless of how many records are
+     * passed in: one refindex query, then one pid query per distinct referencing
+     * table.
+     *
+     * @param list<int> $uids
+     * @return array<int, bool> uid => reused elsewhere
+     */
+    public function findSharedFlags(string $table, array $uids, int $homePid): array
+    {
+        $flags = array_fill_keys($uids, false);
+        if ($uids === []) {
+            return $flags;
+        }
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_refindex');
+        $queryBuilder->getRestrictions()->removeAll();
+
+        $rows = $queryBuilder
+            ->select('tablename', 'recuid', 'ref_uid')
+            ->from('sys_refindex')
+            ->where(
+                $queryBuilder->expr()->eq('ref_table', $queryBuilder->createNamedParameter($table)),
+                $queryBuilder->expr()->in(
+                    'ref_uid',
+                    $queryBuilder->createNamedParameter($uids, Connection::PARAM_INT_ARRAY),
+                ),
+                $queryBuilder->expr()->gt('recuid', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+            )
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        if ($rows === []) {
+            return $flags;
+        }
+
+        // Collect the referencing records per table once, so the pid lookup below
+        // runs per table rather than per referenced record.
+        $referencingUidsByTable = [];
+        foreach ($rows as $row) {
+            $referencingTable = (string)$row['tablename'];
+            $referencingUid = (int)$row['recuid'];
+            $referencingUidsByTable[$referencingTable][$referencingUid] = $referencingUid;
+        }
+
+        $pidByTableAndUid = [];
+        foreach ($referencingUidsByTable as $referencingTable => $referencingUids) {
+            $pidByTableAndUid[$referencingTable] = $this->resolvePidMap(
+                $referencingTable,
+                array_values($referencingUids),
+            );
+        }
+
+        foreach ($rows as $row) {
+            $referencedUid = (int)$row['ref_uid'];
+            $referencingTable = (string)$row['tablename'];
+            $referencingUid = (int)$row['recuid'];
+            if ($referencingTable === $table && $referencingUid === $referencedUid) {
+                continue;
+            }
+            $pid = $pidByTableAndUid[$referencingTable][$referencingUid] ?? 0;
+            if ($pid > 0 && $pid !== $homePid) {
+                $flags[$referencedUid] = true;
+            }
+        }
+
+        return $flags;
+    }
+
+    /**
      * @return array<string, list<int>> referencing table => uids
      */
     private function findReferencingRecords(string $table, int $uid): array
@@ -90,7 +164,48 @@ class ReferenceInspector
             $grouped[$referencingTable][$referencingUid] = $referencingUid;
         }
 
-        return array_map(static fn(array $uids): array => array_values($uids), $grouped);
+        return array_map(static fn (array $uids): array => array_values($uids), $grouped);
+    }
+
+    /**
+     * @param list<int> $recordUids
+     * @return array<int, int> uid => pid
+     */
+    private function resolvePidMap(string $table, array $recordUids): array
+    {
+        if ($recordUids === []) {
+            return [];
+        }
+        if ($table === 'pages') {
+            // A page referencing something is itself the page.
+            return array_combine($recordUids, $recordUids);
+        }
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+        $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+
+        try {
+            $rows = $queryBuilder
+                ->select('uid', 'pid')
+                ->from($table)
+                ->where(
+                    $queryBuilder->expr()->in(
+                        'uid',
+                        $queryBuilder->createNamedParameter($recordUids, Connection::PARAM_INT_ARRAY),
+                    ),
+                )
+                ->executeQuery()
+                ->fetchAllAssociative();
+        } catch (\Doctrine\DBAL\Exception) {
+            // Stale refindex pointing at a table that no longer exists.
+            return [];
+        }
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int)$row['uid']] = (int)$row['pid'];
+        }
+        return $map;
     }
 
     /**
@@ -130,6 +245,6 @@ class ReferenceInspector
             return [];
         }
 
-        return array_map(static fn(array $row): int => (int)$row['pid'], $rows);
+        return array_map(static fn (array $row): int => (int)$row['pid'], $rows);
     }
 }

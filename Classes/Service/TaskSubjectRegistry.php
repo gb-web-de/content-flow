@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GbWeb\ContentFlow\Service;
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\Schema\Capability\TcaSchemaCapability;
 use TYPO3\CMS\Core\Schema\TcaSchemaFactory;
 
 /**
@@ -44,7 +45,7 @@ class TaskSubjectRegistry
         $configured = $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['subjectTables'] ?? [];
         $tables = array_values(array_unique(array_merge(['pages'], array_filter((array)$configured, 'is_string'))));
 
-        return array_values(array_filter($tables, fn(string $table): bool => $this->isTrackable($table)));
+        return array_values(array_filter($tables, fn (string $table): bool => $this->isTrackable($table)));
     }
 
     public function isSubject(string $table): bool
@@ -81,7 +82,15 @@ class TaskSubjectRegistry
             if (in_array($table, $subjects, true)) {
                 continue;
             }
-            if (!$this->tcaSchemaFactory->get($table)->isWorkspaceAware()) {
+            $schema = $this->tcaSchemaFactory->get($table);
+            if (!$schema->isWorkspaceAware()) {
+                continue;
+            }
+            // Skip tables hidden from the UI (TCA ctrl hideTable). These are
+            // sub-records an editor never manages on their own - sys_file_reference
+            // being the obvious one: a page with five images would otherwise add
+            // five "work items" nobody thinks of as work.
+            if ($schema->hasCapability(TcaSchemaCapability::HideInUi)) {
                 continue;
             }
             $tables[] = $table;

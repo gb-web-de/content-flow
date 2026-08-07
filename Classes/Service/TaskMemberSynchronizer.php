@@ -46,17 +46,24 @@ class TaskMemberSynchronizer
 
         $claimed = 0;
         foreach ($this->subjectRegistry->getAggregatableTables() as $table) {
-            foreach ($this->findRecordUidsOnPage($table, $pageUid) as $recordUid) {
-                // Flag content that other pages reuse, so the board can warn before
-                // an editor changes something that shows up elsewhere too.
-                $shared = $this->referenceInspector->isSharedAcrossPages($table, $recordUid, $pageUid);
+            $recordUids = $this->findRecordUidsOnPage($table, $pageUid);
+            if ($recordUids === []) {
+                continue;
+            }
+
+            // Resolve reuse for the whole table at once. Asking per record would
+            // fire a refindex query per element - dozens of round-trips on a page
+            // with a normal amount of content.
+            $sharedFlags = $this->referenceInspector->findSharedFlags($table, $recordUids, $pageUid);
+
+            foreach ($recordUids as $recordUid) {
                 if ($this->taskRepository->addMemberIfUnclaimed(
                     $taskUid,
                     $table,
                     $recordUid,
                     TaskRepository::ORIGIN_AUTO,
                     $pageUid,
-                    $shared,
+                    $sharedFlags[$recordUid] ?? false,
                 )) {
                     $claimed++;
                 }
@@ -140,6 +147,6 @@ class TaskMemberSynchronizer
             return [];
         }
 
-        return array_map(static fn(array $row): int => (int)$row['uid'], $rows);
+        return array_map(static fn (array $row): int => (int)$row['uid'], $rows);
     }
 }
