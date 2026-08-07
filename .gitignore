@@ -2,6 +2,11 @@
 .cache/
 .php-cs-fixer.cache
 var/
+
+# Generated instance state. Despite "app-dir": ".Build" in composer.json, TYPO3
+# writes config/ and var/ to the project root - config/system/settings.php holds
+# the instance encryptionKey and must never be committed.
+config/
 Tests/Functional/*/typo3temp/
 .ddev/db_snapshots/
 .ddev/.dbimageBuild/
