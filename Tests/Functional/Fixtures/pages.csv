@@ -1,0 +1,11 @@
+"pages",,,,,
+,"uid","pid","title","doktype","deleted"
+,1,0,"Home",1,0
+,2,1,"About us",1,0
+"tt_content",,,,,
+,"uid","pid","header","CType","deleted"
+,10,2,"Intro text","text",0
+,11,2,"Second element","text",0
+"sys_workspace",,,,,
+,"uid","pid","title","deleted",
+,1,0,"Editorial",0,

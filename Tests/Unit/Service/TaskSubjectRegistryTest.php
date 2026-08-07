@@ -18,7 +18,7 @@ final class TaskSubjectRegistryTest extends UnitTestCase
     {
         $factory = $this->createMock(TcaSchemaFactory::class);
         $factory->method('has')->willReturnCallback(
-            static fn(string $table): bool => in_array($table, $workspaceAwareTables, true),
+            static fn (string $table): bool => in_array($table, $workspaceAwareTables, true),
         );
         $factory->method('get')->willReturnCallback(
             function (string $table) use ($workspaceAwareTables): TcaSchema {
