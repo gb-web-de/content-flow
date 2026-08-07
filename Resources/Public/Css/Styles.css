@@ -77,3 +77,21 @@
         transition: none !important;
     }
 }
+
+.contentflow-toolbar {
+    padding: 12px 16px 0;
+}
+
+.contentflow-card {
+    cursor: pointer;
+}
+
+.contentflow-card:focus-visible {
+    outline: 2px solid var(--typo3-focus-color, #0b78d1);
+    outline-offset: 2px;
+}
+
+.contentflow-card.is-selected {
+    border-color: var(--typo3-focus-color, #0b78d1);
+    box-shadow: inset 3px 0 0 var(--typo3-focus-color, #0b78d1);
+}

@@ -1,4 +1,6 @@
-<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+      data-namespace-typo3-fluid="true">
 <f:spaceless>
 
 <f:comment>
@@ -24,6 +26,13 @@
              accessibility commitments in ARCHITECTURE.md. -->
         <div class="contentflow-announcer" role="status" aria-live="polite" aria-atomic="true"></div>
 
+        <div class="contentflow-toolbar">
+            <button type="button" class="btn btn-default" data-contentflow-action="create-task">
+                <core:icon identifier="actions-plus" size="small" />
+                <f:translate key="button.createTask" extensionName="ContentFlow" default="New task" />
+            </button>
+        </div>
+
         <div class="contentflow-board">
             <f:for each="{columns}" as="column">
                 <section class="contentflow-column" aria-labelledby="cf-col-{column.key}">
@@ -31,9 +40,15 @@
                         <span>{column.label}</span>
                         <span class="badge">{column.cards -> f:count()}</span>
                     </h3>
-                    <ul class="contentflow-column-cards">
+                    <ul class="contentflow-column-cards" role="listbox" aria-multiselectable="true">
                         <f:for each="{column.cards}" as="card">
-                            <li class="contentflow-card">
+                            <li class="contentflow-card"
+                                tabindex="0"
+                                role="option"
+                                aria-selected="false"
+                                data-contentflow-task="{card.uid}"
+                                data-contentflow-record="{card.subject_table}:{card.subject_uid}"
+                                data-contentflow-title="{card.title}">
                                 <span class="contentflow-card-title">{card.title}</span>
                                 <span class="contentflow-card-meta">
                                     {card.subject_table}:{card.subject_uid}

@@ -175,6 +175,63 @@ Check-then-insert would let both pass the check (this exact TOCTOU bug exists in
 lifetime while only ever belonging to one open one. That single key does triple duty: it
 prevents duplicate tasks, makes detaching permanent, and keeps aggregation idempotent.
 
+## What the two reference extensions do, and what we take from it
+
+Studied to decide scope, not to depend on.
+
+**kanban-workspaces — backend module.** Columns are workspace stages; cards are workspace
+records. A card shows: record type icon, title, UID, page name, last-modified date, language
+flag, assignee avatars, comment and attachment counts, due date/schedule badges, and an
+"integrity" warning line. Drag-and-drop routes a drop through
+`sendToSpecificStageWindow/Execute` — i.e. the drop *proposes* a stage transition and core's
+send-to-stage form (recipients, comment) confirms it. It has **no dashboard**.
+
+**xima content-planner — status everywhere.** Its reach comes from being present where
+editors already are, not from one module: a **context menu item provider** puts status and
+assignee on right-click in the page tree and record lists, plus badges in the page tree, and
+four **dashboard widgets** (status overview, content status, updates, comments).
+
+**What that means for Content Flow.** The card content list above is essentially a
+requirements list — we have title and subject, and still owe: type icon, assignee, comment
+count, due date, language, and the cross-page warning. The two lessons worth copying are
+kanban-workspaces' *drop proposes, core confirms* (never write a stage directly) and xima's
+*meet editors where they are* (context menu on the page tree, so a task can be planned without
+opening the board at all).
+
+## Core APIs first
+
+Everything TYPO3 already solves is delegated. Verified present in v14.3:
+
+| Need | Core module — no custom code |
+|---|---|
+| Pick a page for the "+" button (tree, **live search**, depth) | `wizard_element_browser` route + `@typo3/backend/tree/page-browser.js` |
+| Multi-step "new task" flow | `@typo3/backend/multi-step-wizard.js` (`addSlide`, `lockNextStep`, `addFinalProcessingSlide`) |
+| Select records → run an action ("select to task") | `@typo3/backend/multi-record-selection.js` + `multi-record-selection-action.js` |
+| Right-click a page → plan a task | `TYPO3\CMS\Backend\ContextMenu\ItemProviders\AbstractProvider` (the xima pattern) |
+| Dialogs, confirmations | `@typo3/backend/modal.js`, `@typo3/backend/severity.js` |
+| Feedback | `@typo3/backend/notification.js` |
+| Icons | `@typo3/backend/icons.js`, `<core:icon>` |
+| Record writes | `@typo3/backend/ajax-data-handler.js` / DataHandler |
+| Content drag-and-drop reference | `@typo3/backend/layout-module/drag-drop.js` |
+| CSRF + session on write endpoints | backend ajax routes (`Configuration/Backend/AjaxRoutes.php`) |
+
+Custom code is limited to what core has no opinion about: the board's own column-to-column
+drag-and-drop, and the extension's ajax endpoints.
+
+## Select to task, split from task
+
+Two operations on the same invariant — *a record belongs to at most one open task*:
+
+- **Select to task** (`contentflow_task_attach`): the selected records are moved onto a task.
+  Already-claimed records are *moved*, not duplicated.
+- **Split from task** (`contentflow_task_detach`): one record is pulled out into a task of its
+  own. Confirmed first, and never a side effect of a drag — see below.
+
+Both endpoints re-derive permissions server-side: the workspace comes from the backend user
+(never the request), the table must be trackable, and `doesUserHaveAccess()` +
+`recordEditAccessInternals()` are checked on the concrete record. A client-supplied workspace
+id was a real IDOR in the reviewed `AssignAjaxController`.
+
 ## UX and accessibility commitments
 
 "Editors should barely have to think" is a design constraint, not a nice-to-have. Concretely,
@@ -239,9 +296,14 @@ Implemented: data model (subject + members), state machine, column registry, sub
 page aggregation, cross-page/reuse detection, auto-creation hook, publish/close listener,
 read-only board rendering.
 
-Not yet implemented: TCA for the task/comment/item tables, the Ajax write endpoints, the
-post-save wizard notification, the Lit board UI with the accessibility commitments above, and
-the Dashboard widget.
+Also implemented: the three ajax write endpoints (create / attach / detach) with server-side
+permission checks, and a board JS module built on core's Modal, Notification, AjaxRequest and
+element browser, with keyboard-operable card selection.
+
+Not yet implemented: TCA for the task/comment/item tables; column-to-column drag-and-drop;
+the context-menu item provider for planning a task from the page tree; the post-save wizard
+notification; the richer card content listed above (type icon, assignee, comments, due date,
+language, cross-page warning); and the Dashboard widgets.
 
 None of it has been executed yet — there is no PHP runtime in the environment this was written
 in, so everything here is verified by reading, not by running. Treat the first `ddev start`

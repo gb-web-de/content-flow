@@ -8,6 +8,7 @@ use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use GbWeb\ContentFlow\Service\BoardColumnRegistry;
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Backend\Attribute\AsController;
+use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
@@ -30,6 +31,7 @@ class ContentFlowController extends ActionController
         protected readonly PageRenderer $pageRenderer,
         protected readonly BoardColumnRegistry $boardColumnRegistry,
         protected readonly TaskRepository $taskRepository,
+        protected readonly UriBuilder $backendUriBuilder,
     ) {
     }
 
@@ -65,6 +67,14 @@ class ContentFlowController extends ActionController
         ]);
 
         $this->pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css');
+        $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/board.js');
+        // Core's element browser gives the "+" button a page tree with live search
+        // and depth navigation - no bespoke picker needed.
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'pageBrowserUrl',
+            (string)$this->backendUriBuilder->buildUriFromRoute('wizard_element_browser', ['mode' => 'db', 'bparams' => '||pages|||']),
+        );
 
         return $moduleTemplate->renderResponse('ContentFlow/Index');
     }
