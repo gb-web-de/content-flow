@@ -4,18 +4,32 @@ docroot: .Build/Web
 php_version: "8.3"
 webserver_type: nginx-fpm
 xdebug_enabled: false
-additional_hostnames: []
-additional_fqdns: []
 database:
   type: mariadb
   version: "10.11"
-use_dns_when_possible: true
 composer_version: "2"
-web_environment: []
-corepack_enable: false
+nodejs_version: "22"
+use_dns_when_possible: true
+
+# Surface hook failures instead of swallowing them. Without this a failed
+# composer install leaves a half-built instance and `ddev start` still reports
+# success - which is exactly how "setup does not work" looks from the outside.
+fail_on_hook_fail: true
+
+# `typo3 setup` reads these; passing them as env is more robust than a long
+# flag list, and it is how the TYPO3 core "tryout" scaffold does it.
+web_environment:
+  - TYPO3_CONTEXT=Development
+  - TYPO3_DB_DRIVER=mysqli
+  - TYPO3_DB_HOST=db
+  - TYPO3_DB_PORT=3306
+  - TYPO3_DB_DBNAME=db
+  - TYPO3_DB_USERNAME=db
+  - TYPO3_DB_PASSWORD=db
+  - TYPO3_SETUP_ADMIN_USERNAME=admin
+  - TYPO3_SETUP_ADMIN_PASSWORD=Password.1
+  - TYPO3_SETUP_ADMIN_EMAIL=admin@example.com
 
 hooks:
   post-start:
-    - exec: composer install --no-interaction
-    - exec: composer typo3:setup
-    - exec: composer typo3:demo-content
+    - exec: bash /var/www/html/.ddev/scripts/post-start.sh

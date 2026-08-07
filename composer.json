@@ -16,12 +16,12 @@
     },
     "require": {
         "php": "~8.2.0 || ~8.3.0 || ~8.4.0 || ~8.5.0",
-        "typo3/cms-backend": "~14.3.0@dev",
-        "typo3/cms-core": "~14.3.0@dev",
-        "typo3/cms-dashboard": "~14.3.0@dev",
-        "typo3/cms-extbase": "~14.3.0@dev",
-        "typo3/cms-fluid": "~14.3.0@dev",
-        "typo3/cms-workspaces": "~14.3.0@dev"
+        "typo3/cms-backend": "^14.3",
+        "typo3/cms-core": "^14.3",
+        "typo3/cms-dashboard": "^14.3",
+        "typo3/cms-extbase": "^14.3",
+        "typo3/cms-fluid": "^14.3",
+        "typo3/cms-workspaces": "^14.3"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.95.1",
@@ -29,12 +29,15 @@
         "phpstan/phpstan-phpunit": "^2.0.16",
         "phpunit/phpunit": "^11.5.55",
         "saschaegerer/phpstan-typo3": "^3.0.1",
-        "typo3/cms-fluid-styled-content": "~14.3.0@dev",
-        "typo3/cms-install": "~14.3.0@dev",
-        "typo3/cms-rte-ckeditor": "~14.3.0@dev",
-        "typo3/cms-setup": "~14.3.0@dev",
+        "typo3/cms-fluid-styled-content": "^14.3",
+        "typo3/cms-install": "^14.3",
+        "typo3/cms-lowlevel": "^14.3",
+        "typo3/cms-rte-ckeditor": "^14.3",
+        "typo3/cms-scheduler": "^14.3",
+        "typo3/cms-setup": "^14.3",
+        "typo3/cms-styleguide": "^14.0",
         "typo3/testing-framework": "^9.5",
-        "typo3/theme-camino": "~14.3.0@dev"
+        "typo3/theme-camino": "^14.3"
     },
     "autoload": {
         "psr-4": {
@@ -64,16 +67,8 @@
             "typo3/cms-composer-installers": true
         }
     },
-    "minimum-stability": "dev",
-    "prefer-stable": true,
+    "minimum-stability": "stable",
     "scripts": {
-        "typo3:setup": [
-            ".Build/bin/typo3 setup --driver=mysqli --host=db --dbname=db --username=db --password=db --admin-username=admin --admin-user-password=AdminPassword123! --admin-email=admin@email.com --project-name='Content Flow' --server-type=other --create-site=https://content-flow.ddev.site/ --force --no-interaction"
-        ],
-        "typo3:demo-content": [
-            ".Build/bin/typo3 extension:setup --extension=theme_camino",
-            ".Build/bin/typo3 extension:setup --extension=content_flow"
-        ],
         "cs:check": "${PHP_BINARY} .Build/bin/php-cs-fixer fix --config Build/php-cs-fixer/php-cs-rules.php --diff --dry-run",
         "cs:fix": "${PHP_BINARY} .Build/bin/php-cs-fixer fix --config Build/php-cs-fixer/php-cs-rules.php",
         "phpstan": "${PHP_BINARY} .Build/bin/phpstan analyse -c Build/phpstan/phpstan.neon --no-progress",
