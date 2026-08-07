@@ -63,17 +63,25 @@ CREATE TABLE tx_contentflow_comment (
 );
 
 #
-# Append-only audit trail for Content Flow's own events (created, assigned, moved,
-# published, closed). Field-level diffs are NOT copied here - those live in
-# sys_history and are read from there while the version exists. On publish the
-# version is gone, so a compact summary is snapshotted into `payload` at that
-# moment; see ARCHITECTURE.md, "Where the history lives".
+# Append-only editorial record: what was decided, by whom, when.
+#
+# This is the DURABLE store. sys_history is not: EXT:scheduler garbage-collects it
+# after 30 days by default, so an archived task would otherwise lose its trail.
+# Core does keep the trail across publishing (it migrates sys_history.recuid from
+# the version uid to the live uid), so the problem is age, not publishing.
+#
+# Field-level before/after values are NOT copied. `history_uid` points at core's
+# sys_history row holding that detail, for as long as it exists - a dangling
+# pointer means "detail expired", not an error.
+# See ARCHITECTURE.md, "Where the history lives".
 #
 CREATE TABLE tx_contentflow_activity (
     task int(11) unsigned DEFAULT '0' NOT NULL,
     event varchar(40) DEFAULT '' NOT NULL,
     be_user int(11) unsigned DEFAULT '0' NOT NULL,
-    # JSON. Event-specific detail, plus the publish-time sys_history snapshot.
+    # sys_history row with the full detail, 0 if core wrote none.
+    history_uid int(11) unsigned DEFAULT '0' NOT NULL,
+    # JSON. The essentials that must outlive sys_history: from/to stage, comment.
     payload json DEFAULT NULL,
 
     KEY task (task, crdate)

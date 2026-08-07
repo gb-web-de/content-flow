@@ -13,14 +13,15 @@ use TYPO3\CMS\Workspaces\Event\AfterRecordPublishedEvent;
 /**
  * "It goes live, the task is closed."
  *
- * Two things about this event that the implementation depends on:
+ * `getRecordId()` is the *live* uid, in both core publish paths (the swap path in
+ * EXT:workspaces DataHandlerHook::publishVersion, and publishNewRecord). That matches
+ * how a task stores `record_uid`, so no version->live resolution is needed.
  *
- * 1. `getRecordId()` is the *live* uid, in both core publish paths (the swap path in
- *    EXT:workspaces DataHandlerHook::publishVersion and publishNewRecord). That
- *    matches how a task stores `record_uid`, so no version->live resolution is needed.
- * 2. It is dispatched while the version record still exists (core discards it later),
- *    which is the only window in which the version's sys_history rows can still be
- *    snapshotted. Doing this any later would lose the trail - see ActivityLogger.
+ * Nothing is snapshotted here. Core migrates the version's sys_history rows onto the
+ * live uid a few lines after dispatching this event (RecordHistoryStore::publishRecord
+ * -> migrateWorkspaceHistory), so the trail survives publishing on its own and copying
+ * it would be pure duplication. What Content Flow keeps durably is written when each
+ * decision is made, not here - see ActivityLogger.
  */
 final class CloseTaskAfterPublishListener
 {
@@ -40,16 +41,15 @@ final class CloseTaskAfterPublishListener
         }
 
         $taskUid = (int)$task['uid'];
-        $versionUid = (int)($task['version_uid'] ?? 0);
         $beUserId = (int)($this->getBackendUser()?->user['uid'] ?? 0);
-
-        if ($versionUid > 0) {
-            $this->activityLogger->snapshotHistory($taskUid, $event->getTable(), $versionUid, $beUserId);
-        }
 
         $this->taskRepository->close($taskUid, $beUserId);
         $this->activityLogger->log($taskUid, ActivityLogger::EVENT_CLOSED, $beUserId, [
             'workspaceId' => $event->getWorkspaceId(),
+            // Kept so the archived task can still find its trail: after publishing,
+            // core has re-pointed the version's sys_history rows at this live uid.
+            'liveUid' => $event->getRecordId(),
+            'table' => $event->getTable(),
         ]);
     }
 
