@@ -17,9 +17,11 @@ use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Http\HtmlResponse;
 use TYPO3\CMS\Core\Http\JsonResponse;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\View\ViewFactoryData;
 use TYPO3\CMS\Core\View\ViewFactoryInterface;
 
@@ -199,21 +201,36 @@ final class TaskAjaxController
             return $this->error($error);
         }
 
-        $connection = $this->connectionPool->getConnectionForTable('tx_contentflow_task');
-        $connection->update(
+        // A drop onto a core stage column is a workspace stage transition and must
+        // go through core - permissions, sys_history and stage notifications all
+        // live there. Only Content Flow's own columns (Backlog / Planned), which
+        // exist precisely because core has no state for "not versioned yet", are
+        // written directly.
+        $state = TaskState::tryFrom($targetState);
+        if ($state !== null && $state->hasVersion()) {
+            return $this->executeStageAction($request);
+        }
+
+        if ((int)$task['workspace_uid'] > 0) {
+            return $this->error(
+                'This task already has a workspace version, so it cannot be moved back to a planning column.'
+            );
+        }
+
+        $this->connectionPool->getConnectionForTable('tx_contentflow_task')->update(
             'tx_contentflow_task',
             [
                 'state' => $targetState,
                 'stage_uid' => $targetStageUid,
                 'tstamp' => $GLOBALS['EXEC_TIME'],
             ],
-            ['uid' => $taskUid]
+            ['uid' => $taskUid],
         );
 
         $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
         $this->activityLogger->log($taskUid, ActivityLogger::EVENT_STAGE_CHANGED, $beUserId, [
             'from_state' => $task['state'],
-            'from_stage' => $task['stage_uid'],
+            'from_stage' => (int)$task['stage_uid'],
             'to_state' => $targetState,
             'to_stage' => $targetStageUid,
         ]);
@@ -294,7 +311,6 @@ final class TaskAjaxController
     {
         $body = $this->getBody($request);
         $taskUid = (int)($body['task'] ?? 0);
-        $targetState = (string)($body['state'] ?? 'backlog');
         $targetStageUid = (int)($body['stageUid'] ?? 0);
         $comment = trim((string)($body['comment'] ?? ''));
         $recipients = is_array($body['recipients'] ?? null) ? $body['recipients'] : [];
@@ -304,40 +320,68 @@ final class TaskAjaxController
             return $this->error('Task not found or closed.');
         }
 
-        $error = $this->assertMayEdit((string)$task['subject_table'], (int)$task['subject_uid']);
-        if ($error !== null) {
-            return $this->error($error);
+        $workspaceUid = (int)$task['workspace_uid'];
+        if ($workspaceUid < 1) {
+            return $this->error('This task has no workspace version yet, so it cannot change stage.');
+        }
+
+        $versionsByTable = $this->memberSynchronizer->findPendingVersionsByTable($taskUid, $workspaceUid);
+        if ($versionsByTable === []) {
+            return $this->error('Nothing to move: this task has no pending versions.');
+        }
+
+        // The move is PROPOSED here and DECIDED by core. EXT:workspaces'
+        // version_setStage is what checks workspaceCannotEditOfflineVersion(),
+        // hasPermissionToUpdate() and workspaceCheckStageForCurrent(), writes
+        // t3ver_stage, records the transition in sys_history and queues the stage
+        // notification mails. Updating our own table directly - which this action
+        // used to do - skipped every one of those.
+        $cmd = [];
+        foreach ($versionsByTable as $table => $versionUids) {
+            foreach ($versionUids as $versionUid) {
+                $cmd[$table][$versionUid]['version'] = [
+                    'action' => 'setStage',
+                    'stageId' => $targetStageUid,
+                    'comment' => $comment,
+                    'notificationAlternativeRecipients' => $recipients,
+                ];
+            }
+        }
+
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([], $cmd);
+        $dataHandler->process_cmdmap();
+
+        if ($dataHandler->errorLog !== []) {
+            // Core refused. Our own state must not drift away from what core did,
+            // so nothing is written on this path.
+            return $this->error(implode(' ', array_map('strval', $dataHandler->errorLog)));
         }
 
         $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
 
-        // Update task state/stage
-        $connection = $this->connectionPool->getConnectionForTable('tx_contentflow_task');
-        $connection->update(
+        // Core has decided; now mirror it. The task row is a read cache for the
+        // board, and the activity entry is the durable record - sys_history, where
+        // core just wrote the same transition, is garbage-collected after 30 days.
+        $this->connectionPool->getConnectionForTable('tx_contentflow_task')->update(
             'tx_contentflow_task',
             [
-                'state' => $targetState,
+                'state' => TaskState::fromStageId($targetStageUid)->value,
                 'stage_uid' => $targetStageUid,
                 'tstamp' => $GLOBALS['EXEC_TIME'],
             ],
-            ['uid' => $taskUid]
+            ['uid' => $taskUid],
         );
 
-        // The activity entry is written first so the comment can be anchored to it.
-        // A stage comment is not free-floating chatter - it explains *this* move
-        // ("sent back because the images are missing"), and losing that link makes
-        // the trail unreadable later.
         $activityUid = $this->activityLogger->log($taskUid, ActivityLogger::EVENT_STAGE_CHANGED, $beUserId, [
             'from_state' => $task['state'],
-            'from_stage' => $task['stage_uid'],
-            'to_state' => $targetState,
+            'from_stage' => (int)$task['stage_uid'],
+            'to_state' => TaskState::fromStageId($targetStageUid)->value,
             'to_stage' => $targetStageUid,
             'recipients' => $recipients,
-        ]);
+        ], $this->findLatestStageHistoryUid($versionsByTable));
 
         if ($comment !== '') {
-            // Stored once, on the comment, rather than also duplicated into the
-            // activity payload - one text, one place.
             $this->connectionPool->getConnectionForTable('tx_contentflow_comment')->insert('tx_contentflow_comment', [
                 'task' => $taskUid,
                 'parent' => 0,
@@ -348,14 +392,33 @@ final class TaskAjaxController
                 'crdate' => $GLOBALS['EXEC_TIME'],
                 'tstamp' => $GLOBALS['EXEC_TIME'],
             ]);
-
-            $connection->executeStatement(
+            $this->connectionPool->getConnectionForTable('tx_contentflow_task')->executeStatement(
                 'UPDATE tx_contentflow_task SET comments = comments + 1 WHERE uid = ?',
-                [$taskUid]
+                [$taskUid],
             );
         }
 
-        return new JsonResponse(['success' => true]);
+        return new JsonResponse(['success' => true, 'stageUid' => $targetStageUid]);
+    }
+
+    /**
+     * The sys_history row core just wrote for this transition, so the activity
+     * entry can point at core's full detail for as long as it exists.
+     *
+     * @param array<string, list<int>> $versionsByTable
+     */
+    private function findLatestStageHistoryUid(array $versionsByTable): int
+    {
+        foreach ($versionsByTable as $table => $versionUids) {
+            foreach ($versionUids as $versionUid) {
+                $changes = $this->activityLogger->findStageChanges($table, $versionUid);
+                if ($changes !== []) {
+                    return (int)$changes[0]['uid'];
+                }
+            }
+        }
+
+        return 0;
     }
 
     /**

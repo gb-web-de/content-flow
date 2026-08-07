@@ -149,4 +149,34 @@ class TaskMemberSynchronizer
 
         return array_map(static fn (array $row): int => (int)$row['uid'], $rows);
     }
+
+    /**
+     * The workspace versions this task covers, grouped by table.
+     *
+     * A stage change applies to the versions, not to the live records - core's
+     * setStage command operates on the offline version - so the board has to
+     * resolve them before it can hand the move to DataHandler.
+     *
+     * @return array<string, list<int>> table => version uids
+     */
+    public function findPendingVersionsByTable(int $taskUid, int $workspaceUid): array
+    {
+        if ($workspaceUid < 1) {
+            return [];
+        }
+
+        $versions = [];
+        foreach ($this->taskRepository->findMembers($taskUid) as $member) {
+            $table = (string)$member['record_table'];
+            if (!$this->subjectRegistry->isTrackable($table)) {
+                continue;
+            }
+            $versionUid = $this->findVersionUid($table, (int)$member['record_uid'], $workspaceUid);
+            if ($versionUid > 0) {
+                $versions[$table][] = $versionUid;
+            }
+        }
+
+        return $versions;
+    }
 }

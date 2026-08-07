@@ -218,6 +218,34 @@ Everything TYPO3 already solves is delegated. Verified present in v14.3:
 Custom code is limited to what core has no opinion about: the board's own column-to-column
 drag-and-drop, and the extension's ajax endpoints.
 
+## Stage changes go through core
+
+A drop onto a review column **proposes** a move; TYPO3 **decides** it. The board
+never writes `t3ver_stage` itself.
+
+Concretely, `executeStageAction` resolves the task's pending versions and hands them
+to `DataHandler` as a `version` / `setStage` command. EXT:workspaces'
+`version_setStage()` then does what we must not reimplement:
+
+- `workspaceCannotEditOfflineVersion()` and `hasPermissionToUpdate()` on the page,
+- **`workspaceCheckStageForCurrent()`** - whether this user may move *out of* the
+  current stage at all,
+- writes `t3ver_stage`,
+- records the transition, its comment and its recipients in `sys_history`,
+- queues the stage notification mails.
+
+If `DataHandler::$errorLog` is non-empty, nothing of ours is written: our state must
+not drift away from what core actually did. Only afterwards is the task row updated
+(a read cache for the board) and the activity entry written (the durable record, since
+`sys_history` is garbage-collected after 30 days).
+
+An earlier version of this action simply `UPDATE`d our own table. It skipped every
+check, every notification and core's entire history - and looked like it worked.
+
+The distinction that makes this workable: Backlog, Planned and Done are **Content
+Flow's own** states, which exist precisely because core has no notion of "not
+versioned yet". Those are written directly. Everything between them belongs to core.
+
 ## Select to task, split from task
 
 Two operations on the same invariant — *a record belongs to at most one open task*:
