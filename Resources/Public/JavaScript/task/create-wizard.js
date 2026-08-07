@@ -1,6 +1,6 @@
 /*
- * The "+" flow: pick a page with core's element browser, then collect the task
- * details on top of TYPO3's supported MultiStepWizard.
+ * The "+" flow: pick a record with core's element browser, then collect the
+ * task details on top of TYPO3's supported MultiStepWizard.
  */
 import AjaxRequest from '@typo3/core/ajax/ajax-request.js'
 import Notification from '@typo3/backend/notification.js'
@@ -9,6 +9,8 @@ import MultiStepWizard from '@typo3/backend/multi-step-wizard.js'
 import { SeverityEnum } from '@typo3/backend/enum/severity.js'
 
 import { buildTaskDetailsForm } from '@gb-web/content-flow/task/task-details-form.js'
+
+const ELEMENT_BROWSER_FIELD_REFERENCE_PREFIX = 'contentflow-create-target'
 
 function updateTitleRequirement(wizard, titleInput) {
   if (titleInput.value.trim() === '') {
@@ -48,9 +50,61 @@ function addPriorityField(container, settings) {
   container.append(field)
 }
 
-function openTaskWizard(board, pageUid, pageTitle) {
-  MultiStepWizard.set('pageUid', pageUid)
-  MultiStepWizard.set('title', pageTitle)
+function getAllowedCreateTables() {
+  const configuredTables = TYPO3.settings.ContentFlow?.createTargetTables
+  if (!Array.isArray(configuredTables) || configuredTables.length === 0) {
+    return ['pages']
+  }
+
+  const tables = configuredTables
+    .map((table) => String(table).trim())
+    .filter((table) => table !== '')
+
+  return tables.length > 0 ? [...new Set(tables)] : ['pages']
+}
+
+function parseSelectedRecord(value) {
+  const match = String(value).match(/^(.*)_(\d+)$/)
+  if (!match) {
+    return null
+  }
+
+  const uid = parseInt(match[2], 10)
+  if (!Number.isInteger(uid) || uid < 1) {
+    return null
+  }
+
+  return {
+    table: match[1],
+    uid,
+  }
+}
+
+function formatRecordLabel(table, uid) {
+  return `${table}:${uid}`
+}
+
+function openNewTaskWizard(board, table, uid, recordTitle) {
+  if (!MultiStepWizard) {
+    createTask(table, uid, { title: recordTitle })
+      .then((result) => {
+        if (result.success !== true) {
+          Notification.error('Content Flow', result.message || 'Could not create the task.')
+          return
+        }
+        board.announce('Created task ' + recordTitle)
+        Notification.success('Content Flow', 'Task created.')
+        window.location.reload()
+      })
+      .catch(() => {
+        Notification.error('Content Flow', 'Could not reach the server.')
+      })
+    return
+  }
+
+  MultiStepWizard.set('table', table)
+  MultiStepWizard.set('uid', uid)
+  MultiStepWizard.set('title', recordTitle)
   MultiStepWizard.set('description', '')
   MultiStepWizard.set('assignee', 'me')
   MultiStepWizard.set('priority', 2)
@@ -64,7 +118,7 @@ function openTaskWizard(board, pageUid, pageTitle) {
     (slide, settings) => {
       const wrapper = document.createElement('div')
       const fields = buildTaskDetailsForm(settings, {
-        title: pageTitle,
+        title: recordTitle,
         description: '',
         assignee: 'me',
       })
@@ -90,7 +144,7 @@ function openTaskWizard(board, pageUid, pageTitle) {
     }
 
     try {
-      const result = await createTask('pages', settings.pageUid, {
+      const result = await createTask(settings.table, settings.uid, {
         title,
         description: String(settings.description || '').trim(),
         priority: settings.priority,
@@ -116,18 +170,28 @@ function openTaskWizard(board, pageUid, pageTitle) {
   MultiStepWizard.show()
 }
 
-function openPagePicker(board) {
+function openRecordPicker(board) {
   const baseUrl = TYPO3.settings.ContentFlow?.elementBrowserUrl
   if (!baseUrl) {
     Notification.error('Content Flow', 'Element browser is not configured.')
     return
   }
 
-  // The same parameters core's FormEngine.openPopupWindow() builds.
-  const params = new URLSearchParams({ mode: 'db', allowedTypes: 'pages', useEvents: '1' })
+  const currentPageId = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
+  const allowedTypes = getAllowedCreateTables()
+  const params = new URLSearchParams({
+    mode: 'db',
+    allowedTypes: allowedTypes.join(','),
+    fieldReference: `${ELEMENT_BROWSER_FIELD_REFERENCE_PREFIX}-${Date.now()}`,
+    useEvents: '1',
+  })
+  if (currentPageId > 0) {
+    params.set('expandPage', String(currentPageId))
+  }
+
   const modal = Modal.advanced({
     type: Modal.types.iframe,
-    title: 'Select a page',
+    title: 'Select a page, content element or record',
     content: baseUrl + (baseUrl.includes('?') ? '&' : '?') + params.toString(),
     size: Modal.sizes.large,
     severity: SeverityEnum.notice,
@@ -139,17 +203,27 @@ function openPagePicker(board) {
       return
     }
 
-    const uid = parseInt(String(value).split('_').pop(), 10)
-    modal.hideModal()
-    if (Number.isInteger(uid) && uid > 0) {
-      openTaskWizard(board, uid, label || ('Page ' + uid))
+    const record = parseSelectedRecord(value)
+    if (record === null) {
+      Notification.error('Content Flow', 'The selected record could not be identified.')
+      return
     }
+
+    modal.hideModal()
+    openNewTaskWizard(board, record.table, record.uid, label || formatRecordLabel(record.table, record.uid))
   })
 }
 
 export async function createTask(table, uid, details = {}) {
-  const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_task_create)
-    .post({ table, uid, ...details })
+  const url = TYPO3.settings.ajaxUrls.contentflow_task_create
+  if (!url) {
+    return {
+      success: false,
+      message: 'Task creation is not configured.',
+    }
+  }
+
+  const response = await new AjaxRequest(url).post({ table, uid, ...details })
   return await response.resolve()
 }
 
@@ -160,11 +234,16 @@ export function registerCreateButton(board) {
 
       const bannerPageId = parseInt(button.dataset.contentflowPage || '0', 10)
       if (bannerPageId > 0) {
-        openTaskWizard(board, bannerPageId, button.dataset.contentflowPageTitle || ('Page ' + bannerPageId))
+        openNewTaskWizard(
+          board,
+          'pages',
+          bannerPageId,
+          button.dataset.contentflowPageTitle || ('Page ' + bannerPageId),
+        )
         return
       }
 
-      openPagePicker(board)
+      openRecordPicker(board)
     })
   })
 }
