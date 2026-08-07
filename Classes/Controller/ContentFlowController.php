@@ -6,6 +6,7 @@ namespace GbWeb\ContentFlow\Controller;
 
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use GbWeb\ContentFlow\Service\BoardColumnRegistry;
+use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Backend\Attribute\AsController;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
@@ -31,6 +32,7 @@ final class ContentFlowController extends ActionController
         protected readonly PageRenderer $pageRenderer,
         protected readonly BoardColumnRegistry $boardColumnRegistry,
         protected readonly TaskRepository $taskRepository,
+        protected readonly TaskSubjectRegistry $subjectRegistry,
         protected readonly UriBuilder $backendUriBuilder,
     ) {
     }
@@ -85,8 +87,35 @@ final class ContentFlowController extends ActionController
             'currentUserId',
             (int)($backendUser->user['uid'] ?? 0),
         );
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'createTargetTables',
+            $this->getCreateTargetTables(),
+        );
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'currentPageId',
+            $pageUid,
+        );
 
         return $moduleTemplate->renderResponse('ContentFlow/Index');
+    }
+
+    /**
+     * Records the explicit "+" flow may promote into their own task.
+     *
+     * Page-like tables are obvious candidates. Page-bound content and custom
+     * records are included too: they auto-join their page's task by default, but
+     * an editor can still choose them deliberately and give them a dedicated card.
+     *
+     * @return list<string>
+     */
+    private function getCreateTargetTables(): array
+    {
+        return array_values(array_unique(array_merge(
+            $this->subjectRegistry->getSubjectTables(),
+            $this->subjectRegistry->getAggregatableTables(),
+        )));
     }
 
     /**

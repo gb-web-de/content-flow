@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GbWeb\ContentFlow\EventListener;
 
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
 use TYPO3\CMS\Backend\Controller\Event\ModifyPageLayoutContentEvent;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
@@ -32,6 +33,7 @@ final class PageModuleEventListener
         private readonly ViewFactoryInterface $viewFactory,
         private readonly UriBuilder $uriBuilder,
         private readonly PageRenderer $pageRenderer,
+        private readonly TaskSubjectRegistry $subjectRegistry,
     ) {
     }
 
@@ -44,9 +46,26 @@ final class PageModuleEventListener
         }
 
         $task = $this->taskRepository->findOpenBySubject('pages', $pageUid);
+        $pageRecord = BackendUtility::getRecord('pages', $pageUid) ?? [];
+        $pageTitle = $pageRecord !== [] ? BackendUtility::getRecordTitle('pages', $pageRecord) : '';
 
         $this->pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css');
         $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/board.js');
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'elementBrowserUrl',
+            (string)$this->uriBuilder->buildUriFromRoute('wizard_element_browser'),
+        );
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'createTargetTables',
+            $this->getCreateTargetTables(),
+        );
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'currentPageId',
+            $pageUid,
+        );
 
         $view = $this->viewFactory->create(new ViewFactoryData(
             templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
@@ -56,12 +75,24 @@ final class PageModuleEventListener
         ));
         $view->assignMultiple([
             'pageUid' => $pageUid,
+            'pageTitle' => $pageTitle,
             'task' => $task,
             'assigneeName' => $this->resolveAssigneeName($task),
             'boardUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_contentflow', ['id' => $pageUid]),
         ]);
 
         $event->addHeaderContent($view->render('PageModule/Banner'));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function getCreateTargetTables(): array
+    {
+        return array_values(array_unique(array_merge(
+            $this->subjectRegistry->getSubjectTables(),
+            $this->subjectRegistry->getAggregatableTables(),
+        )));
     }
 
     /**

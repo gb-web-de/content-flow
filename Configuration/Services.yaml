@@ -8,6 +8,17 @@ services:
     resource: '../Classes/*'
     exclude: '../Classes/Domain/Model/*'
 
+  # Listed explicitly so constructor changes in these entry-point classes are
+  # reflected in TYPO3's compiled container as soon as Services.yaml changes.
+  GbWeb\ContentFlow\Controller\ContentFlowController:
+    public: true
+
+  GbWeb\ContentFlow\Controller\TaskAjaxController:
+    public: true
+
+  GbWeb\ContentFlow\EventListener\PageModuleEventListener:
+    public: true
+
   GbWeb\ContentFlow\Hooks\TaskAutoCreationDataHandlerHook:
     public: true
 

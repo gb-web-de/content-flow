@@ -76,6 +76,9 @@ final class TemplateRendersTest extends FunctionalTestCase
                             'title' => 'About us',
                             'subject_table' => 'pages',
                             'subject_uid' => 2,
+                            'state' => 'review',
+                            'stage_uid' => 1,
+                            'workspace_uid' => 1,
                             'auto_created' => 1,
                         ],
                     ],
@@ -88,6 +91,9 @@ final class TemplateRendersTest extends FunctionalTestCase
         self::assertStringContainsString('pages:2', $output);
         // The badge that marks a task nobody planned.
         self::assertStringContainsString('contentflow-badge-auto', $output);
+        self::assertStringContainsString('data-contentflow-state="review"', $output);
+        self::assertStringContainsString('data-contentflow-stage="1"', $output);
+        self::assertStringContainsString('data-contentflow-workspace="1"', $output);
         // The live region every board change is announced through.
         self::assertStringContainsString('aria-live="polite"', $output);
     }
@@ -121,6 +127,28 @@ final class TemplateRendersTest extends FunctionalTestCase
         // the container renders unconditionally, so a looser substring check passed
         // for the wrong reason.
         self::assertStringNotContainsString('contentflow-badge-auto', $output);
+    }
+
+    #[Test]
+    public function thePageModuleBannerUsesTheCurrentPageForTaskCreation(): void
+    {
+        $viewFactory = $this->get(ViewFactoryInterface::class);
+        $view = $viewFactory->create(new ViewFactoryData(
+            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
+        ));
+        $view->assignMultiple([
+            'pageUid' => 2,
+            'pageTitle' => 'About us',
+            'task' => null,
+            'assigneeName' => '',
+            'boardUrl' => '/typo3/module/web/ContentFlow?id=2',
+        ]);
+
+        $output = $view->render('PageModule/Banner');
+
+        self::assertStringContainsString('data-contentflow-page="2"', $output);
+        self::assertStringContainsString('data-contentflow-page-title="About us"', $output);
+        self::assertStringContainsString('Plan task for this page', $output);
     }
 
     #[Test]

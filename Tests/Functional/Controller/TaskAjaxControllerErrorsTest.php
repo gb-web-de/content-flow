@@ -87,6 +87,9 @@ final class TaskAjaxControllerErrorsTest extends FunctionalTestCase
                 $activityLogger,
                 $this->get(\TYPO3\CMS\Workspaces\Service\HistoryService::class),
                 $this->get(\TYPO3\CMS\Core\Imaging\IconFactory::class),
+                $this->get(\TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceStageRepository::class),
+                $this->get(\TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceRepository::class),
+                $this->get(\TYPO3\CMS\Workspaces\Service\StagesService::class),
             ),
             $this->get(UriBuilder::class),
             $this->get(ViewFactoryInterface::class),
@@ -124,13 +127,33 @@ final class TaskAjaxControllerErrorsTest extends FunctionalTestCase
     }
 
     #[Test]
-    public function creatingATaskForAContentElementIsRejectedByName(): void
+    public function creatingATaskForAContentElementCreatesADedicatedTask(): void
     {
-        // tt_content cannot carry a task of its own - only page-like tables can.
-        $response = $this->subject()->createAction($this->jsonRequest(['table' => 'tt_content', 'uid' => 10]));
+        $response = $this->subject()->createAction($this->jsonRequest([
+            'table' => 'tt_content',
+            'uid' => 10,
+            'title' => 'Intro text task',
+            'priority' => 1,
+            'assignee' => 'open',
+        ]));
         $payload = $this->decode($response);
 
-        self::assertSame('subject-not-page-like', $payload['code']);
+        self::assertSame(200, $response->getStatusCode());
+        self::assertTrue($payload['success']);
+        self::assertSame(0, $payload['claimed']);
+
+        $task = $this->get(TaskRepository::class)->findByUid((int)$payload['task']);
+        self::assertNotNull($task);
+        self::assertSame('tt_content', $task['subject_table']);
+        self::assertSame(10, (int)$task['subject_uid']);
+        self::assertSame(2, (int)$task['subject_pid']);
+        self::assertSame('Intro text task', $task['title']);
+        self::assertSame(1, (int)$task['priority']);
+        self::assertSame(0, (int)$task['assignee']);
+
+        $memberTask = $this->get(TaskRepository::class)->findOpenTaskByMember('tt_content', 10);
+        self::assertNotNull($memberTask);
+        self::assertSame((int)$task['uid'], (int)$memberTask['uid']);
     }
 
     #[Test]
