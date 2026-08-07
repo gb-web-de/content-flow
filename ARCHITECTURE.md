@@ -1,114 +1,143 @@
-# Content Flow — Architecture & Merge Concept
+# Content Flow — Architecture
 
-Content Flow is not a rewrite of either source project. It is a thin **presentation and
-workflow-glue layer** that puts one Kanban board UI in front of two data sources that were
-never meant to compete with each other:
+Content Flow is a **standalone** TYPO3 v14 extension. It depends on TYPO3 core only
+(`typo3/cms-workspaces`), and deliberately **not** on
+`web-vision/kanban-workspaces` or `xima/xima-typo3-content-planner`. Those two were
+studied as prior art; neither is installed, and none of their tables are read or written.
 
-| | [web-vision/kanban-workspaces](https://github.com/web-vision/kanban-workspaces) | [xima/xima-typo3-content-planner](https://github.com/xima-media/xima-typo3-content-planner) |
+## The idea in one paragraph
+
+TYPO3 workspaces already contain a complete approval engine: stages, permissions,
+notifications, diffs, publishing. What they lack is a **before** and an **after** — there is
+no way to say "this page needs work" until somebody actually edits it, and no trace left once
+it goes live. Content Flow adds a **task** on either side of the version's lifetime, and gets
+out of the way in the middle. Editors do not learn a workflow; the workflow follows them.
+
+```
+    ┌── Content Flow ──┐   ┌────── TYPO3 core workspace stages ──────┐   ┌ Content Flow ┐
+    │                  │   │                                        │   │              │
+    │ Backlog  Planned │   │ In Progress   Review 1..n   Ready       │   │ Done         │
+    │                  │   │                                        │   │              │
+    └──────────────────┘   └────────────────────────────────────────┘   └──────────────┘
+      no version yet         a workspace version exists (t3ver_stage)      published,
+                                                                          version gone
+```
+
+The middle section is read from `sys_workspace_stage`. An integrator defines review steps
+where TYPO3 already expects them (Workspace record → Stages) and the board picks them up —
+Content Flow has no stage configuration of its own to keep in sync.
+
+This also answers, natively, what
+[kanban-workspaces#31](https://github.com/web-vision/kanban-workspaces/issues/31) asked for
+(stages *before* and *after* the fixed core ones): "before editing" is Backlog/Planned,
+"after ready" is Done, and everything between is already freely definable in core.
+
+## The four moments
+
+**1. Somebody plans work.** A task is created for any record — `pages`, `tt_content`, or
+anything else — and lands in Backlog. Assigning a `be_user` moves it to Planned. Editors may
+assign themselves. No version exists yet, nothing is versioned, nothing is locked.
+
+**2. Somebody edits.** The editor opens the page and types. TYPO3 auto-creates a workspace
+version. `TaskAutoCreationDataHandlerHook` notices and moves the task to In Progress — **or
+creates one on the spot if none existed**, so unplanned work is captured too. The editor is
+never asked to "open a ticket"; there simply is one afterwards.
+
+**3. The version walks the stages.** Core does this entirely. Dragging a card is translated
+into a normal core stage transition, so permissions, recipients and stage comments behave
+exactly as they do in the Workspaces module. Content Flow mirrors the resulting
+`t3ver_stage` onto the task as a read cache for sorting; core stays the source of truth.
+
+**4. It goes live.** `CloseTaskAfterPublishListener` closes the task on
+`AfterRecordPublishedEvent`. The record now has no version, so the task's history is frozen
+at that moment (below) and the card leaves the board.
+
+## Where the history lives
+
+You asked whether to store changes as JSON on the task, or lean on `sys_history`. Both, but
+for different things — a single store gets one of the two cases wrong:
+
+| | Stored where | Why |
 |---|---|---|
-| Operates on | **versioned** records in a TYPO3 **Workspace** | **live** pages/records, no versioning needed |
-| Column source | `sys_workspace_stage` (workspace stages) | `tx_ximatypo3contentplanner_domain_model_status` |
-| Strength | drag-and-drop stage transitions, diff/preview, "send to stage" | status badges everywhere (page tree, record list, dashboard), assignees, threaded comments |
-| Gap | no concept of editorial status outside of workspaces | no Kanban board, no drag-and-drop |
+| **Comments** | own table `tx_contentflow_comment` | must be queryable (@mentions, "unresolved" filters, dashboards) and concurrently writable. A JSON blob on the task means read-modify-write races and no indexes. |
+| **Field-level changes** (while the version lives) | **not stored** — read from `sys_history` | TYPO3 already records who changed which field, from what to what. Copying that into JSON creates a second, drifting truth. |
+| **Workflow events** (created, assigned, moved, published, closed) | own table `tx_contentflow_activity`, append-only | these are Content Flow's own facts; core knows nothing about them. |
+| **The diff, after publishing** | snapshot into `tx_contentflow_activity.payload` | ⚠️ this is the catch that decides the design. |
 
-Editors rarely work exclusively in one of these worlds. Small changes get a status directly on
-Live (`xima_typo3_content_planner`); larger campaigns/migrations go through a Workspace with
-approval stages (`kanban-workspaces`). **Content Flow renders both as the same board component,
-switching data source based on context.**
+The catch: once a version is published, core discards the version record. Every `sys_history`
+row that pointed at that version uid stops resolving — **the trail would break at exactly the
+moment the task closes and becomes an archive record.** So `AfterRecordPublishedEvent`, which
+fires while the version still exists, is used to snapshot a compact summary (which fields
+changed, by whom, when — not full before/after payloads, which would grow without bound) into
+the activity row. Live detail while working, permanent summary afterwards.
 
-## Mode switch
+## Concurrency
 
-`Classes/Service/BoardModeResolver.php` is the whole trick:
+Two editors opening the same page at the same time must not produce two tasks. This is
+enforced by a **unique key** (`record_table, record_uid, closed, deleted`), not by a
+read-then-write check: the loser of the race catches the constraint violation and adopts the
+winner's task. Check-then-insert would let both pass the check (this exact TOCTOU bug exists
+in `kanban-workspaces`' `AssigneeMappingService`, found during the 2026-08-07 review).
 
-```
-Live workspace (workspace = 0)      -> MODE_STATUS  -> xima's status field on `pages`
-Non-Live workspace (workspace != 0) -> MODE_STAGE    -> core `sys_workspace_stage`
-```
+`closed` participates in the key so a record can accumulate many closed tasks over its
+lifetime while only ever having one open.
 
-The board component doesn't know which mode it's in beyond the column/card shape it's handed —
-same as kanban-workspaces' `board.js` already doesn't care whether a "stage" was a default TYPO3
-stage or a custom one.
+## UX and accessibility commitments
 
-## Ownership boundary (do not duplicate persistence)
+"Editors should barely have to think" is a design constraint, not a nice-to-have. Concretely,
+binding for every board feature:
 
-Content Flow **reads** and, in later milestones, **writes through** to the two extensions' own
-APIs. It never introduces a competing status/assignee/comment table or a competing stage table:
+- **Nothing is drag-only.** Every card move is reachable from the keyboard and from a menu on
+  the card. Drag-and-drop is an accelerator, never the only path. (This is the single most
+  common Kanban accessibility failure.)
+- **The board announces itself.** Moves, assignments and errors go through an ARIA live
+  region, so a screen-reader user hears "Moved *About us* to Review" rather than silence.
+- **Status is never colour alone** — always icon *and* label. Required for WCAG 1.4.1, and it
+  also survives greyscale printing and colour-blind editors.
+- **Focus is never lost.** After a move, focus follows the card. Modals trap focus and return
+  it to the trigger on close.
+- **`prefers-reduced-motion` is respected** for all card transitions.
+- **Publishing is not a drop target.** Going live is irreversible, so it is an explicit action
+  with a confirmation, never something an editor can do by dropping a card slightly off target.
+- Target: **WCAG 2.2 AA**, verified with keyboard-only and screen-reader passes before any
+  release.
 
-- Status/assignee/comments: owned by `xima_typo3_content_planner`
-  (`tx_ximatypo3contentplanner_domain_model_status`, the `tx_ximatypo3contentplanner_status` /
-  `_assignee` / `_comments` fields added to `pages`, and `tx_ximatypo3contentplanner_comment`).
-  Content Flow only reads these in M1 (`StatusBoardRepository`); M3 writes through
-  `DataHandler`, the same way `xima_typo3_content_planner`'s own edit forms do.
-- Stages: owned by TYPO3 core (`typo3/cms-workspaces`), exactly as in `kanban-workspaces`.
+## Carried over from the kanban-workspaces review (2026-08-07)
 
-This means upgrading either dependency doesn't force a Content Flow migration, and Content Flow
-extensions its dependencies rather than forking them.
+Baked in from the start rather than fixed later:
 
-## Milestones
+- Unique constraints instead of check-then-insert (see Concurrency).
+- One query per board, cards grouped in PHP — adding review stages never adds queries. The
+  reviewed code had an N+1 in `AssigneeEnrichmentListener` (up to 4 queries × N cards).
+- All `QueryBuilder` input parameter-bound; restrictions applied explicitly.
+- When the board gains inline JSON config, encode with
+  `JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP` — the reviewed code had a
+  stored-XSS path via `json_encode()` into an inline `<script>` block.
+- Every Ajax endpoint validates the target record and the user's rights on it server-side,
+  and never trusts a client-supplied workspace id — the reviewed `AssignAjaxController` did.
+- DocHeader configured properly, so the page-tree toggle keeps working
+  ([kanban-workspaces#43](https://github.com/web-vision/kanban-workspaces/issues/43)).
 
-**M1 — done in this scaffold.** Composer+DDEV dev environment, backend module skeleton, DocHeader
-wired correctly from the start (see "Lessons carried over" below), read-only status board for
-Live pages via `StatusBoardRepository`. Stage mode is resolved but renders a placeholder.
+## Verified core API assumptions
 
-**M2 — port the Lit board.** Bring over `kanban-workspaces`' `Resources/Public/JavaScript`
-Lit components (`board.js`, `column.js`, `card.js`, `filter-sidebar.js`, `preview-modal.js`) and
-its TypeScript/SCSS build (`Build/Sources/TypeScript`, `Build/Sources/Sass`, see
-`kanban-workspaces` PR #39/#40). Swap `data/WorkspaceApi.js` for a small adapter interface with
-two implementations:
-  - `StageApi.js` — thin wrapper around the existing `WorkspaceApi.js` (stage transitions via
-    `sendToSpecificStageExecute`, unchanged from kanban-workspaces).
-  - `StatusApi.js` — new; PATCHes `tx_ximatypo3contentplanner_status` via an Ajax route that goes
-    through `DataHandler` (`TCEmain`), the same write path xima's own inline edit forms use, so
-    permission checks, workspace placeholders and hooks all still apply.
+Checked against core sources rather than assumed — worth re-checking on core updates:
 
-**M3 — collaboration layer.** `kanban-workspaces` issue #38 (interactive/auditable checklists,
-PR #46) and issue #32 (@mentions + Jira-style preview, PR #48) both landed as **card-preview UI
-features** in `kanban-workspaces`, not as new persistence — reuse that UI, but point the
-@mention resolver and comment submission at `xima_typo3_content_planner`'s own
-`tx_ximatypo3contentplanner_comment` table (via its Ajax endpoints) instead of introducing a
-third comment table. Checklists (per stage × card) stay kanban-workspaces-owned, since xima has
-no equivalent concept.
+- `AfterRecordPublishedEvent::getRecordId()` is the **live** uid in both publish paths
+  (`DataHandlerHook::publishVersion` swap path and `publishNewRecord`), and the event fires
+  **while the version record still exists**. Both matter — see "Where the history lives".
+- Core dispatches **no** event for "a workspace version was created". Version creation must
+  be observed via a DataHandler hook; `DataHandler::getAutoVersionId()` is public API and is
+  how the hook learns which version an update was redirected into.
+- `WorkspaceRepository::findByUid()` **throws** `\RuntimeException` when the workspace is
+  missing — it does not return `null`.
+- `StagesService::STAGE_EDIT_ID` = 0, `STAGE_PUBLISH_ID` = -10,
+  `STAGE_PUBLISH_EXECUTE_ID` = -20. The last is a core implementation detail and is never
+  shown as a column.
 
-**M4 — flexible columns.** `kanban-workspaces` issue #31 (fully custom/reorderable stage sets,
-no work started upstream) becomes a Content Flow-native feature for stage mode: an
-`ext_conf`/TCA-driven stage set per workspace. Status mode already has this for free — xima's
-`tx_ximatypo3contentplanner_domain_model_status.sorting` is already freely orderable/insertable,
-no core change needed.
+## Status
 
-**M5 — dashboard.** Surface a compact board summary as a TYPO3 Dashboard widget, using
-`typo3/cms-dashboard` the same way `xima_typo3_content_planner` already does for its own widgets
-— gives Content Flow a "my open cards across all pages" view outside the board module.
+Implemented: data model, state machine, column registry, auto-creation hook, publish/close
+listener, read-only board rendering.
 
-## Lessons carried over from the kanban-workspaces review (2026-08-07)
-
-Baked into this scaffold from day one instead of being fixed later:
-
-- **DocHeader configured properly** (`ContentFlowController::indexAction`, title/breadcrumb/
-  shortcut) — `kanban-workspaces` v1 replaced the module header outright and broke page-tree
-  navigation ([issue #43](https://github.com/web-vision/kanban-workspaces/issues/43)).
-- **Parameterized `QueryBuilder` everywhere**, restrictions applied explicitly
-  (`StatusBoardRepository`) — the review found unvalidated client input reaching persistence in
-  `AssignAjaxController`.
-- When M2 adds inline JSON config to the page (`window.ContentFlowConfig = ...`), encode with
-  `JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP` — the review found a stored-XSS
-  path via `json_encode()` without hex flags in `kanban-workspaces`' inline script block.
-- Batch queries for grid enrichment (avoid the N+1 pattern the review found in
-  `AssigneeEnrichmentListener`) — `StatusBoardRepository::getCardsGroupedByStatus` already
-  fetches all cards for a page in one query instead of one query per card.
-- Any future assignment/mapping table gets a real unique constraint
-  (`workspace_id, table_name, record_uid` or equivalent) with `INSERT ... ON DUPLICATE KEY
-  UPDATE`, not update-then-conditional-insert — the review found a TOCTOU duplicate-row bug in
-  `AssigneeMappingService`.
-
-## Dev environment
-
-```bash
-cd /home/gordon/Projekte/content-flow
-ddev start
-```
-
-`ddev start` runs `composer install`, `composer typo3:setup` (installs TYPO3 v14, creates the
-site) and `composer typo3:demo-content` (enables `typo3/theme-camino` for ready-made demo pages,
-`xima_typo3_content_planner`, and `content_flow` itself) via post-start hooks — one command to a
-working editorial board with real content to test against. See `README.md` for manual steps and
-troubleshooting.
+Not yet implemented: TCA for the task/comment tables, the Ajax write endpoints, the Lit board
+UI with the accessibility commitments above, and the Dashboard widget.

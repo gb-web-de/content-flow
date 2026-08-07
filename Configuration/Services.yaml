@@ -6,3 +6,4 @@ services:
 
   GbWeb\ContentFlow\:
     resource: '../Classes/*'
+    exclude: '../Classes/Domain/Model/*'

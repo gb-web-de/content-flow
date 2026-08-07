@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace GbWeb\ContentFlow\Controller;
 
-use GbWeb\ContentFlow\Domain\Repository\StatusBoardRepository;
-use GbWeb\ContentFlow\Service\BoardModeResolver;
+use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\ContentFlow\Service\BoardColumnRegistry;
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Backend\Attribute\AsController;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
@@ -16,16 +16,11 @@ use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 
 /**
- * Backend module controller for Content Flow.
+ * The Content Flow board.
  *
- * Renders one board UI backed by two possible data sources, decided by
- * BoardModeResolver: xima_typo3_content_planner statuses on Live, TYPO3
- * workspace stages once a non-Live workspace is active. See ARCHITECTURE.md.
- *
- * The DocHeader (title/breadcrumb/shortcut) is wired up directly here, unlike
- * kanban-workspaces' first version, which shipped a template that replaced the
- * core module header outright and broke page-tree navigation
- * (web-vision/kanban-workspaces#43) - avoid repeating that mistake.
+ * Renders one column set (see BoardColumnRegistry) and distributes the page's open
+ * tasks into it. Cards are grouped in PHP from a single query - the number of review
+ * stages an integrator configures never changes the number of queries.
  */
 #[AsController]
 class ContentFlowController extends ActionController
@@ -33,8 +28,8 @@ class ContentFlowController extends ActionController
     public function __construct(
         protected readonly ModuleTemplateFactory $moduleTemplateFactory,
         protected readonly PageRenderer $pageRenderer,
-        protected readonly BoardModeResolver $boardModeResolver,
-        protected readonly StatusBoardRepository $statusBoardRepository,
+        protected readonly BoardColumnRegistry $boardColumnRegistry,
+        protected readonly TaskRepository $taskRepository,
     ) {
     }
 
@@ -43,6 +38,8 @@ class ContentFlowController extends ActionController
         $moduleTemplate = $this->moduleTemplateFactory->create($this->request);
         $backendUser = $this->getBackendUser();
         $pageUid = (int)($this->request->getQueryParams()['id'] ?? 0);
+        $workspaceUid = (int)$backendUser->workspace;
+
         $pageRecord = $pageUid > 0 ? (BackendUtility::getRecord('pages', $pageUid) ?? []) : [];
         $pageTitle = $pageRecord !== [] ? BackendUtility::getRecordTitle('pages', $pageRecord) : '';
 
@@ -60,16 +57,11 @@ class ContentFlowController extends ActionController
             ['id' => $pageUid],
         );
 
-        $mode = $this->boardModeResolver->resolve($backendUser);
-        $columns = $mode === BoardModeResolver::MODE_STATUS
-            ? $this->buildStatusColumns($pageUid)
-            : [];
-
         $moduleTemplate->assignMultiple([
-            'mode' => $mode,
             'pageUid' => $pageUid,
             'pageSelected' => $pageUid > 0,
-            'columns' => $columns,
+            'workspaceUid' => $workspaceUid,
+            'columns' => $this->buildBoard($backendUser, $workspaceUid, $pageUid),
         ]);
 
         $this->pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css');
@@ -78,25 +70,45 @@ class ContentFlowController extends ActionController
     }
 
     /**
-     * @return list<array{id: int, title: string, icon: string, color: string, cards: list<array<string, mixed>>}>
+     * @return list<array<string, mixed>>
      */
-    private function buildStatusColumns(int $pageUid): array
+    private function buildBoard(BackendUserAuthentication $backendUser, int $workspaceUid, int $pageUid): array
     {
+        $columns = $this->boardColumnRegistry->getColumns($backendUser, $workspaceUid);
         if ($pageUid < 1) {
-            return [];
+            return $columns;
         }
-        $cardsByStatus = $this->statusBoardRepository->getCardsGroupedByStatus($pageUid);
-        $columns = [];
-        foreach ($this->statusBoardRepository->getStatusColumns() as $statusColumn) {
-            $columns[] = [
-                'id' => $statusColumn['id'],
-                'title' => $statusColumn['title'],
-                'icon' => $statusColumn['icon'],
-                'color' => $statusColumn['color'],
-                'cards' => $cardsByStatus[$statusColumn['id']] ?? [],
-            ];
+
+        $tasks = $this->taskRepository->findOpenForBoard($pageUid);
+
+        foreach ($columns as &$column) {
+            $column['cards'] = [];
+            foreach ($tasks as $task) {
+                if ($this->belongsInColumn($task, $column)) {
+                    $column['cards'][] = $task;
+                }
+            }
         }
+        unset($column);
+
         return $columns;
+    }
+
+    /**
+     * A versioned task belongs to the column of its concrete stage; an unversioned
+     * task belongs to the column of its state.
+     *
+     * @param array<string, mixed> $task
+     * @param array<string, mixed> $column
+     */
+    private function belongsInColumn(array $task, array $column): bool
+    {
+        if ($column['stageUid'] !== null) {
+            return (int)($task['version_uid'] ?? 0) > 0
+                && (int)($task['stage_uid'] ?? 0) === $column['stageUid'];
+        }
+        return (int)($task['version_uid'] ?? 0) === 0
+            && (string)($task['state'] ?? '') === $column['state'];
     }
 
     protected function getBackendUser(): BackendUserAuthentication

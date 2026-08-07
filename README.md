@@ -1,14 +1,22 @@
 # TYPO3 Extension `Content Flow`
 
-Editorial Kanban board for TYPO3 v14 that unifies:
+An editorial task board for TYPO3 v14. It puts a **backlog in front of TYPO3 workspaces** and
+an **archive behind them**, and lets the workspace do the approval work in between.
 
-- **[xima/xima-typo3-content-planner](https://github.com/xima-media/xima-typo3-content-planner)**
-  page statuses (for everyday Live editing), and
-- **[web-vision/kanban-workspaces](https://github.com/web-vision/kanban-workspaces)**-style
-  workspace stages (for approval workflows / migrations),
+Depends on TYPO3 core only — no third-party extensions.
 
-behind one board UI. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full merge concept and
-milestone plan — this scaffold currently ships milestone 1 (status-mode board, read-only).
+```
+ Backlog   Planned  │  In Progress   Review…   Ready  │  Done
+ ─────────────────  │  ─────────────────────────────  │  ────────
+    Content Flow    │   TYPO3 core workspace stages   │  Content Flow
+```
+
+**Tasks open themselves.** An editor who just opens a page and starts typing gets a workspace
+version from TYPO3 and a task from Content Flow, without asking for either. When the version
+goes live, the task closes with its history frozen into it.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the data model, the history-storage decision and the
+accessibility commitments.
 
 ## Requirements
 
@@ -18,20 +26,20 @@ milestone plan — this scaffold currently ships milestone 1 (status-mode board,
 ## Getting started
 
 ```bash
-git clone <this-repo> content-flow
-cd content-flow
 ddev start
 ```
 
-`ddev start` triggers `composer install`, installs TYPO3 v14 (`composer typo3:setup`) and enables
-the demo theme + both editorial extensions (`composer typo3:demo-content`) automatically via
-`.ddev/config.yaml` post-start hooks. Once it finishes:
+That runs `composer install`, installs TYPO3 v14 and enables `typo3/theme-camino` (for demo
+content to test against) plus `content_flow`, via post-start hooks. Then:
 
 - Frontend: https://content-flow.ddev.site/
 - Backend: https://content-flow.ddev.site/typo3/ (`admin` / `AdminPassword123!`)
-- Module: **Web → Content Flow**, on any page with an `xima_typo3_content_planner` status set.
+- Module: **Web → Content Flow**
 
-## Manual setup (if you skip the DDEV hooks)
+To see the workflow: create a workspace (with a review stage or two), switch into it, edit a
+page, and watch the card appear on the board.
+
+## Manual setup
 
 ```bash
 ddev composer install
@@ -48,6 +56,12 @@ ddev composer phpstan       # level 8
 ddev composer test:unit
 ddev composer test:functional
 ```
+
+## Status
+
+Early. Data model, state machine, auto-creation and publish/close are implemented; the board
+renders read-only. TCA, Ajax write endpoints and the interactive board UI are still open — see
+the end of [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Compatibility
 
