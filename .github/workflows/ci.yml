@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  cgl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+      - run: composer install --no-progress --no-interaction
+      - run: composer cs:check
+      - run: composer phpstan
+
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+      - run: composer install --no-progress --no-interaction
+      - run: composer test:unit
+      - run: composer test:functional
+        env:
+          typo3DatabaseDriver: mysqli
+          typo3DatabaseHost: 127.0.0.1
+          typo3DatabaseUsername: root
+          typo3DatabasePassword: root
+          typo3DatabaseName: test
