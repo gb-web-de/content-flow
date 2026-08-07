@@ -1,0 +1,11 @@
+.Build/
+.cache/
+.php-cs-fixer.cache
+var/
+Tests/Functional/*/typo3temp/
+.ddev/db_snapshots/
+.ddev/.dbimageBuild/
+.ddev/.webimageBuild/
+.ddev/.sshimageBuild/
+.idea/
+.DS_Store

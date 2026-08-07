@@ -1,0 +1,49 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+    <!-- No custom header section here on purpose: the core DocHeader (breadcrumb,
+         page-tree toggle, shortcut button) is configured in
+         ContentFlowController::indexAction() and rendered by ModuleTemplate itself.
+         See ARCHITECTURE.md and web-vision/kanban-workspaces#43. -->
+
+    <f:if condition="{pageSelected} == 0">
+        <f:then>
+            <div class="callout callout-info">
+                <div class="callout-body">Select a page in the page tree to see its board.</div>
+            </div>
+        </f:then>
+        <f:else>
+            <f:if condition="{mode} == 'stage'">
+                <f:then>
+                    <div class="callout callout-info">
+                        <div class="callout-body">
+                            You are in a non-Live workspace. Workspace-stage board mode is planned
+                            (reusing web-vision/kanban-workspaces' board) but not implemented yet -
+                            see ARCHITECTURE.md, milestone 2.
+                        </div>
+                    </div>
+                </f:then>
+                <f:else>
+                    <div class="contentflow-board">
+                        <f:for each="{columns}" as="column">
+                            <div class="contentflow-column" style="border-top-color: {column.color};">
+                                <h3 class="contentflow-column-title">
+                                    {column.title} <span class="badge">{column.cards -> f:count()}</span>
+                                </h3>
+                                <div class="contentflow-column-cards">
+                                    <f:for each="{column.cards}" as="card">
+                                        <div class="contentflow-card">{card.title}</div>
+                                    </f:for>
+                                </div>
+                            </div>
+                        </f:for>
+                    </div>
+                </f:else>
+            </f:if>
+        </f:else>
+    </f:if>
+</f:section>
+
+</html>

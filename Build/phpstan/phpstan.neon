@@ -1,0 +1,14 @@
+includes:
+  - ../../.Build/vendor/saschaegerer/phpstan-typo3/extension.neon
+  - ../../.Build/vendor/phpstan/phpstan-phpunit/extension.neon
+
+parameters:
+  tmpDir: ../../.cache/phpstan
+
+  level: 8
+
+  paths:
+    - ../../Classes/
+
+  excludePaths:
+    - ../../.Build/*

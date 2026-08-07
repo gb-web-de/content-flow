@@ -1,0 +1,34 @@
+.contentflow-board {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    overflow-x: auto;
+}
+
+.contentflow-column {
+    flex: 0 0 280px;
+    background: var(--typo3-component-bg, #f8f8f8);
+    border-top: 4px solid #999;
+    border-radius: 4px;
+    padding: 8px;
+}
+
+.contentflow-column-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 4px 8px 12px;
+}
+
+.contentflow-column-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.contentflow-card {
+    background: var(--typo3-component-content-bg, #fff);
+    border: 1px solid var(--typo3-component-border-color, #ddd);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 13px;
+}
