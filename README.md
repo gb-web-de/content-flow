@@ -29,22 +29,40 @@ accessibility commitments.
 ddev start
 ```
 
-That runs `composer install`, installs TYPO3 v14 and enables `typo3/theme-camino` (for demo
-content to test against) plus `content_flow`, via post-start hooks. Then:
+[`.ddev/scripts/post-start.sh`](.ddev/scripts/post-start.sh) then runs `composer install`,
+installs TYPO3 v14 (once — it is guarded, not re-run on every start), sets up the extensions,
+and creates demo content. It aborts loudly on failure rather than leaving a half-built
+instance behind.
 
 - Frontend: https://content-flow.ddev.site/
-- Backend: https://content-flow.ddev.site/typo3/ (`admin` / `AdminPassword123!`)
+- Backend: https://content-flow.ddev.site/typo3/ (`admin` / `Password.1`)
 - Module: **Web → Content Flow**
 
-To see the workflow: create a workspace (with a review stage or two), switch into it, edit a
-page, and watch the card appear on the board.
+**To see the workflow:** switch into the *Editorial* workspace (created by the demo step, with
+two review stages), open one of the demo pages, and change something. A card appears on the
+board on its own — that is the point of the extension.
+
+### About demo content
+
+`typo3/theme-camino` does **not** ship demo content. On a fresh install it creates a site and
+one empty page; the theme provides page/content-element rendering, not a populated page tree.
+So `content_flow` brings its own:
+
+```bash
+ddev exec .Build/bin/typo3 contentflow:democontent
+```
+
+That creates a few demo pages plus a workspace with two review stages — the minimum needed for
+the board to show anything. `typo3/cms-styleguide` is also installed if you want bulk TCA test
+records on top (backend module *System → Styleguide*).
 
 ## Manual setup
 
 ```bash
 ddev composer install
-ddev composer typo3:setup
-ddev composer typo3:demo-content
+ddev exec .Build/bin/typo3 setup --no-interaction --force --server-type=other
+ddev exec .Build/bin/typo3 extension:setup
+ddev exec .Build/bin/typo3 contentflow:democontent
 ```
 
 ## Development

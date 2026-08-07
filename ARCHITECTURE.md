@@ -54,22 +54,38 @@ at that moment (below) and the card leaves the board.
 
 ## Where the history lives
 
-You asked whether to store changes as JSON on the task, or lean on `sys_history`. Both, but
-for different things — a single store gets one of the two cases wrong:
+An earlier draft of this document claimed the trail breaks when a version is published, and
+snapshotted a copy of `sys_history` at publish time to compensate. **That was wrong on both
+counts**, and the corrected reasoning is what the code now does:
+
+- **Publishing does not lose anything.** `RecordHistoryStore::publishRecord()` calls
+  `migrateWorkspaceHistory()`, which rewrites `sys_history.recuid` from the version uid to the
+  live uid. Every entry survives and stays reachable from the live record — including the
+  `ACTION_STAGECHANGE` rows that carry each stage comment and its recipients.
+- **Nothing deletes those rows at publish time either.** Nothing in core does.
+- **What actually loses them is age.** EXT:scheduler registers `sys_history` in the table
+  garbage collection task with an `expirePeriod` of **30 days** by default. A task archived
+  today has no trail left in a month or two.
+
+So the real question was never "duplicate or not" — it is that `sys_history` is a *volatile
+operational log*, while a closed task is an *archive record*. Writing the decision down is
+therefore not a second truth; it is the only durable one:
 
 | | Stored where | Why |
 |---|---|---|
 | **Comments** | own table `tx_contentflow_comment` | must be queryable (@mentions, "unresolved" filters, dashboards) and concurrently writable. A JSON blob on the task means read-modify-write races and no indexes. |
-| **Field-level changes** (while the version lives) | **not stored** — read from `sys_history` | TYPO3 already records who changed which field, from what to what. Copying that into JSON creates a second, drifting truth. |
-| **Workflow events** (created, assigned, moved, published, closed) | own table `tx_contentflow_activity`, append-only | these are Content Flow's own facts; core knows nothing about them. |
-| **The diff, after publishing** | snapshot into `tx_contentflow_activity.payload` | ⚠️ this is the catch that decides the design. |
+| **Decisions** (assigned, moved from stage X to Y, with comment) | own table `tx_contentflow_activity`, append-only, written **when it happens** | these must outlive the 30-day GC. Kept small: who, when, from/to, comment. |
+| **Field-level before/after values** | **not copied** — `activity.history_uid` points at the `sys_history` row | bulky, and for the common case (one edit, straight to live) the row is still there. |
 
-The catch: once a version is published, core discards the version record. Every `sys_history`
-row that pointed at that version uid stops resolving — **the trail would break at exactly the
-moment the task closes and becomes an archive record.** So `AfterRecordPublishedEvent`, which
-fires while the version still exists, is used to snapshot a compact summary (which fields
-changed, by whom, when — not full before/after payloads, which would grow without bound) into
-the activity row. Live detail while working, permanent summary afterwards.
+The pointer is the part that makes both halves work, and it is exactly the right granularity:
+where the `sys_history` row still exists you get the full field-level detail for free; once the
+GC has taken it, the decision itself is still on record. **A dangling `history_uid` means
+"detail expired", never an error** — readers must degrade, not fail.
+
+Because decisions are logged as they happen rather than reconstructed at the end, they also
+carry the correct user and timestamp. Transitions performed outside the board (in the
+Workspaces module) are not observed live; `ActivityLogger::findStageChanges()` reconciles those
+from `sys_history` on read.
 
 ## Concurrency
 
@@ -123,8 +139,14 @@ Baked in from the start rather than fixed later:
 Checked against core sources rather than assumed — worth re-checking on core updates:
 
 - `AfterRecordPublishedEvent::getRecordId()` is the **live** uid in both publish paths
-  (`DataHandlerHook::publishVersion` swap path and `publishNewRecord`), and the event fires
-  **while the version record still exists**. Both matter — see "Where the history lives".
+  (`DataHandlerHook::publishVersion` swap path and `publishNewRecord`).
+- `RecordHistoryStore::publishRecord()` → `migrateWorkspaceHistory()` re-points the version's
+  `sys_history` rows at the live uid, so the trail survives publishing without help. Note this
+  runs *after* `AfterRecordPublishedEvent` is dispatched — an earlier design snapshotted
+  history in that listener and was therefore both redundant and racing core.
+- `sys_history` is garbage-collected after **30 days** by default
+  (EXT:scheduler `TableGarbageCollectionTask`). This, not publishing, is what an archive has
+  to survive.
 - Core dispatches **no** event for "a workspace version was created". Version creation must
   be observed via a DataHandler hook; `DataHandler::getAutoVersionId()` is public API and is
   how the hook learns which version an update was redirected into.
