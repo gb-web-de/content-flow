@@ -79,19 +79,23 @@ class ContentFlowController extends ActionController
             return $columns;
         }
 
+        // One query for the whole board; the cards are then handed to the column they
+        // belong to. Building a new array (rather than mutating $columns in place)
+        // keeps this a plain read - $column is a copy on every pass.
         $tasks = $this->taskRepository->findOpenForBoard($pageUid);
 
-        foreach ($columns as &$column) {
+        $board = [];
+        foreach ($columns as $column) {
             $column['cards'] = [];
             foreach ($tasks as $task) {
                 if ($this->belongsInColumn($task, $column)) {
                     $column['cards'][] = $task;
                 }
             }
+            $board[] = $column;
         }
-        unset($column);
 
-        return $columns;
+        return $board;
     }
 
     /**
