@@ -51,4 +51,13 @@ return [
         'path' => '/contentflow/task/execute-stage',
         'target' => TaskAjaxController::class . '::executeStageAction',
     ],
+    // Post-Save Task Routing Wizard session check and submission.
+    'contentflow_task_wizard_pending' => [
+        'path' => '/contentflow/task/wizard-pending',
+        'target' => TaskAjaxController::class . '::getPendingWizardAction',
+    ],
+    'contentflow_task_wizard_submit' => [
+        'path' => '/contentflow/task/wizard-submit',
+        'target' => TaskAjaxController::class . '::wizardSubmitAction',
+    ],
 ];

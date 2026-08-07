@@ -63,11 +63,22 @@ final class TaskAjaxController
             return $this->error(sprintf('"%s" cannot carry a task of its own.', $table));
         }
 
+        // Values the wizard collected. Ignoring them would make the wizard a
+        // decorative form whose inputs do nothing.
+        $title = trim((string)($body['title'] ?? ''));
+        $priority = (int)($body['priority'] ?? 2);
+        // 'open' means deliberately unassigned so someone can take it - a real
+        // planning state, not a missing value.
+        $assignee = (string)($body['assignee'] ?? 'me') === 'open'
+            ? 0
+            : (int)($this->getBackendUser()->user['uid'] ?? 0);
+
         $task = $this->taskRepository->findOrCreateOpenForSubject($table, $uid, [
-            'title' => $this->deriveTitle($table, $uid),
+            'title' => $title !== '' ? $title : $this->deriveTitle($table, $uid),
             'subject_pid' => $table === 'pages' ? $uid : (int)(BackendUtility::getRecord($table, $uid, 'pid')['pid'] ?? 0),
             'state' => TaskState::BACKLOG->value,
-            'assignee' => (int)($this->getBackendUser()->user['uid'] ?? 0),
+            'priority' => max(1, min(3, $priority)),
+            'assignee' => $assignee,
             // Planned by a human, so no auto_created flag and no wizard nagging.
             'auto_created' => 0,
         ]);
@@ -488,6 +499,20 @@ final class TaskAjaxController
     private function getBody(ServerRequestInterface $request): array
     {
         $parsed = $request->getParsedBody();
+        if (is_array($parsed) && $parsed !== []) {
+            return $parsed;
+        }
+
+        $raw = (string)$request->getBody();
+        if ($raw !== '') {
+            try {
+                $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+                if (is_array($decoded)) {
+                    return $decoded;
+                }
+            } catch (\Throwable) {
+            }
+        }
 
         return is_array($parsed) ? $parsed : [];
     }
@@ -535,5 +560,74 @@ final class TaskAjaxController
         ]);
 
         return new HtmlResponse($view->render('ContentFlow/Ticket'));
+    }
+
+    /**
+     * Check if there is a pending post-save wizard payload stored in user session.
+     */
+    public function getPendingWizardAction(): ResponseInterface
+    {
+        $backendUser = $this->getBackendUser();
+        $pending = $backendUser->getSessionData('content_flow_pending_wizard');
+        if (is_array($pending)) {
+            $backendUser->setAndSaveSessionData('content_flow_pending_wizard', null);
+            return new JsonResponse(['success' => true, 'pending' => $pending]);
+        }
+        return new JsonResponse(['success' => true, 'pending' => null]);
+    }
+
+    /**
+     * Submit choice from the Post-Save Task Routing Wizard.
+     */
+    public function wizardSubmitAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $actionType = (string)($body['actionType'] ?? 'attach_to_page_task');
+        $table = (string)($body['table'] ?? '');
+        $uid = (int)($body['uid'] ?? 0);
+        $pageTaskUid = (int)($body['pageTaskUid'] ?? 0);
+
+        $error = $this->assertMayEdit($table, $uid);
+        if ($error !== null) {
+            return $this->error($error);
+        }
+
+        if ($actionType === 'attach_to_page_task') {
+            if ($pageTaskUid < 1) {
+                return $this->error('Missing page task ID.');
+            }
+            $this->taskRepository->moveMemberToTask($table, $uid, $pageTaskUid);
+            return new JsonResponse(['success' => true, 'action' => 'attached']);
+        }
+
+        // Otherwise create new task
+        $title = trim((string)($body['title'] ?? ''));
+        if ($title === '') {
+            return $this->error('Task title is required.');
+        }
+
+        $stageChoice = (string)($body['stageChoice'] ?? 'in_progress');
+        $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
+        $workspaceUid = (int)($this->getBackendUser()->workspace);
+
+        $targetState = $stageChoice === 'review' ? TaskState::REVIEW->value : TaskState::IN_PROGRESS->value;
+
+        $task = $this->taskRepository->detachIntoOwnTask($table, $uid, [
+            'title' => $title,
+            'subject_pid' => $this->derivePid($table, $uid),
+            'state' => $targetState,
+            'workspace_uid' => $workspaceUid,
+            'assignee' => $beUserId,
+            'auto_created' => 0,
+        ]);
+
+        $this->activityLogger->log((int)$task['uid'], ActivityLogger::EVENT_TASK_CREATED, $beUserId, [
+            'subjectTable' => $table,
+            'subjectUid' => $uid,
+            'stageChoice' => $stageChoice,
+            'wizard' => true,
+        ]);
+
+        return new JsonResponse(['success' => true, 'task' => (int)$task['uid'], 'action' => 'created']);
     }
 }

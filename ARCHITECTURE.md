@@ -320,19 +320,52 @@ Checked against core sources rather than assumed — worth re-checking on core u
 
 ## Status
 
-Implemented: data model (subject + members), state machine, column registry, subject registry,
-page aggregation, cross-page/reuse detection, auto-creation hook, publish/close listener,
-read-only board rendering.
+Audited against the code on 2026-08-07, not written from memory.
 
-Also implemented: the three ajax write endpoints (create / attach / detach) with server-side
-permission checks, and a board JS module built on core's Modal, Notification, AjaxRequest and
-element browser, with keyboard-operable card selection.
+**Implemented and covered by tests**
 
-Not yet implemented: TCA for the task/comment/item tables; column-to-column drag-and-drop;
-the context-menu item provider for planning a task from the page tree; the post-save wizard
-notification; the richer card content listed above (type icon, assignee, comments, due date,
-language, cross-page warning); and the Dashboard widgets.
+- Data model: subject + members, with the single unique key that prevents duplicate
+  tasks, makes detaching permanent and keeps aggregation idempotent.
+- State machine, column registry (core stages + Content Flow's own columns), subject
+  registry (configurable page-like tables), page aggregation, cross-page/reuse
+  detection via `sys_refindex`.
+- Auto-creation on edit (`TaskAutoCreationDataHandlerHook`) and publish/close
+  (`CloseTaskAfterPublishListener`), including "close only when nothing is pending".
+- **Stage changes routed through core** (`version` / `setStage` on DataHandler), with
+  tests asserting on core's side effects: `t3ver_stage`, the `sys_history` entry with
+  its comment, and core refusing a stage change on a live record.
+- Ticket view: covered records with per-record icons, cross-page warnings, one merged
+  timeline with comments anchored to the action they explain, and core-rendered diffs.
+- Board: cards, filters, column drag-and-drop, assign-to-me, keyboard-operable
+  selection, live-region announcements.
+- "+ New task": core element browser for the page, then core `MultiStepWizard` for
+  title / priority / assignment.
+- Three Dashboard widgets on v14's `WidgetRendererInterface`.
+- Page module banner via `ModifyPageLayoutContentEvent`.
+- Ajax endpoints: create, attach, detach, move-stage, execute-stage, assign-me,
+  details, ticket, wizard-pending, wizard-submit - each re-deriving permissions
+  server-side.
 
-None of it has been executed yet — there is no PHP runtime in the environment this was written
-in, so everything here is verified by reading, not by running. Treat the first `ddev start`
-as the real test.
+**Not implemented**
+
+- **TCA for `tx_contentflow_task` / `_task_item` / `_comment` / `_activity`.** Only
+  `Configuration/TCA/Overrides` exists. The tables are therefore not editable in the
+  backend, and every base column is declared by hand in `ext_tables.sql` because the
+  schema analyzer has no TCA to derive them from.
+- **Context-menu item provider** for planning a task by right-clicking the page tree.
+  Listed under "meet editors where they are" as a lesson taken from the xima
+  content-planner - the lesson is recorded, the code is not written.
+- **Writing comments from the ticket view.** Comments render, and stage comments are
+  captured, but there is no comment form; the ticket is read-only apart from the
+  actions in its header.
+- **Notification/@mention system**, dashboard notification feed, and the Visual Editor.
+- **Automated coverage for the JavaScript.** The PHP side is tested; the board modules
+  are only syntax-checked.
+
+**Verification**
+
+Unlike an earlier version of this document, this is no longer "verified by reading":
+`ddev` runs the instance, and the suite (PHPUnit functional + unit, PHPStan level 8,
+php-cs-fixer) runs green against it. Several bugs listed in this document were found
+only by executing - notably the auto-creation hook silently doing nothing, and a
+template that could not be parsed while every test stayed green.

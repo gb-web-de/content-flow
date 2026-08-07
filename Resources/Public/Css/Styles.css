@@ -13,6 +13,10 @@
     --contentflow-card-hover-shadow: 0 6px 16px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
     --contentflow-accent: var(--typo3-color-primary, #0078d4);
     --contentflow-drag-over-bg: var(--typo3-state-info-bg, #e3f2fd);
+    --contentflow-typo3-green: #68a614;
+    --contentflow-typo3-green-bg: rgba(104, 166, 20, 0.12);
+    --contentflow-typo3-red: #d9534f;
+    --contentflow-typo3-red-bg: rgba(217, 83, 79, 0.12);
 }
 
 .contentflow-toolbar {
@@ -20,6 +24,22 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.contentflow-filters {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.contentflow-filters .input-group {
+    width: 260px;
+}
+
+.contentflow-filters select {
+    min-width: 140px;
 }
 
 .contentflow-board {
@@ -103,16 +123,24 @@
     box-shadow: inset 4px 0 0 var(--contentflow-accent), var(--contentflow-card-hover-shadow);
 }
 
-/* Drag & Drop States */
+/* Drag & Drop States: Valid (TYPO3 Green) vs Invalid (Red) */
 .contentflow-card.is-dragged {
     opacity: 0.4;
     transform: scale(0.97);
 }
 
-.contentflow-column.is-drop-target {
-    background-color: var(--contentflow-drag-over-bg);
-    border-color: var(--contentflow-accent);
-    border-style: dashed;
+.contentflow-column.is-drop-target-valid {
+    background-color: var(--contentflow-typo3-green-bg) !important;
+    border-color: var(--contentflow-typo3-green) !important;
+    border-style: solid !important;
+    box-shadow: 0 0 12px rgba(104, 166, 20, 0.35) !important;
+}
+
+.contentflow-column.is-drop-target-invalid {
+    background-color: var(--contentflow-typo3-red-bg) !important;
+    border-color: var(--contentflow-typo3-red) !important;
+    border-style: dashed !important;
+    cursor: not-allowed !important;
 }
 
 .contentflow-card-header {

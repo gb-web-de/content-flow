@@ -27,10 +27,35 @@
         <div class="contentflow-announcer" role="status" aria-live="polite" aria-atomic="true"></div>
 
         <div class="contentflow-toolbar">
-            <button type="button" class="btn btn-default" data-contentflow-action="create-task">
-                <core:icon identifier="actions-plus" size="small" />
-                <f:translate key="button.createTask" extensionName="ContentFlow" default="New task" />
-            </button>
+            <div class="contentflow-toolbar-actions">
+                <button type="button" class="btn btn-primary" data-contentflow-action="create-task">
+                    <core:icon identifier="actions-plus" size="small" />
+                    <f:translate key="button.createTask" extensionName="ContentFlow" default="New task" />
+                </button>
+            </div>
+
+            <div class="contentflow-filters">
+                <div class="input-group">
+                    <span class="input-group-addon"><core:icon identifier="actions-search" size="small" /></span>
+                    <input type="search" id="cf-search-input" class="form-control" placeholder="Search tasks by title, record UID...">
+                </div>
+
+                <select id="cf-filter-assignee" class="form-select form-control">
+                    <option value="all">All Assignees</option>
+                    <option value="me">Assigned to Me</option>
+                    <option value="unassigned">Unassigned</option>
+                </select>
+
+                <select id="cf-filter-status" class="form-select form-control">
+                    <option value="all">All Cards</option>
+                    <option value="auto">Auto-created only</option>
+                    <option value="warned">Shared / Cross-page only</option>
+                </select>
+
+                <button type="button" id="cf-clear-filters" class="btn btn-default" title="Clear Filters">
+                    <core:icon identifier="actions-close" size="small" />
+                </button>
+            </div>
         </div>
 
         <div class="contentflow-board">
@@ -39,6 +64,7 @@
                          data-contentflow-column="{column.key}"
                          data-contentflow-state="{column.state}"
                          data-contentflow-stage="{column.stageUid}"
+                         data-contentflow-accepts-drop="{f:if(condition: column.acceptsDrop, then: 'true', else: 'false')}"
                          aria-labelledby="cf-col-{column.key}">
                     <h3 class="contentflow-column-header" id="cf-col-{column.key}">
                         <span class="contentflow-column-title">{column.label}</span>
@@ -53,7 +79,10 @@
                                 aria-selected="false"
                                 data-contentflow-task="{card.uid}"
                                 data-contentflow-record="{card.subject_table}:{card.subject_uid}"
-                                data-contentflow-title="{card.title}">
+                                data-contentflow-title="{card.title}"
+                                data-contentflow-assignee="{card.assignee}"
+                                data-contentflow-auto="{card.auto_created}"
+                                data-contentflow-warned="{card.warnedCount}">
                                 <div class="contentflow-card-header">
                                     <span class="contentflow-card-icon">
                                         <f:if condition="{card.iconIdentifier}">

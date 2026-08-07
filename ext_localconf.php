@@ -5,8 +5,11 @@ declare(strict_types=1);
 defined('TYPO3') or die();
 
 // Creates or advances a task when an editor edits a record inside a workspace.
-// A hook rather than a PSR-14 listener because TYPO3 core dispatches no event for
-// "a workspace version was created" - see the class docblock.
+//
+// A DataHandler hook, not a PSR-14 listener: TYPO3 core dispatches no event for
+// "a workspace version was created". An attempt to replace this with a listener on
+// PostProcessDatabaseOperationsEvent was reverted - that event does not exist, and
+// removing the registration silently switched auto-creation off entirely.
 $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processDatamapClass'][] =
     \GbWeb\ContentFlow\Hooks\TaskAutoCreationDataHandlerHook::class;
 

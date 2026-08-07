@@ -68,12 +68,23 @@ class ContentFlowController extends ActionController
 
         $this->pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css');
         $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/board.js');
+        $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/wizard.js');
         // Core's element browser gives the "+" button a page tree with live search
         // and depth navigation - no bespoke picker needed.
+        //
+        // Plain route URL only: the parameters are appended client-side the way
+        // core's FormEngine.openPopupWindow() builds them (mode/allowedTypes/
+        // useEvents as query params). The old pipe-delimited `bparams` string is
+        // deprecated in v14 and silently produced a browser that selected nothing.
         $this->pageRenderer->addInlineSetting(
             'ContentFlow',
-            'pageBrowserUrl',
-            (string)$this->backendUriBuilder->buildUriFromRoute('wizard_element_browser', ['mode' => 'db', 'bparams' => '||pages|||']),
+            'elementBrowserUrl',
+            (string)$this->backendUriBuilder->buildUriFromRoute('wizard_element_browser'),
+        );
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'currentUserId',
+            (int)($backendUser->user['uid'] ?? 0),
         );
 
         return $moduleTemplate->renderResponse('ContentFlow/Index');

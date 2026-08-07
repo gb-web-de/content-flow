@@ -47,6 +47,7 @@ final class PageModuleEventListener
 
         $this->pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css');
         $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/board.js');
+        $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/wizard.js');
 
         $view = $this->viewFactory->create(new ViewFactoryData(
             templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
