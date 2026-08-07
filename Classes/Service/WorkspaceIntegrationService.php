@@ -6,11 +6,17 @@ namespace GbWeb\ContentFlow\Service;
 
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Imaging\IconSize;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceRepository;
+use TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceStageRepository;
+use TYPO3\CMS\Workspaces\Exception\WorkspaceStageNotFoundException;
 use TYPO3\CMS\Workspaces\Service\HistoryService;
+use TYPO3\CMS\Workspaces\Service\StagesService;
 
 final class WorkspaceIntegrationService
 {
@@ -20,6 +26,9 @@ final class WorkspaceIntegrationService
         private readonly ActivityLogger $activityLogger,
         private readonly HistoryService $historyService,
         private readonly IconFactory $iconFactory,
+        private readonly WorkspaceStageRepository $workspaceStageRepository,
+        private readonly WorkspaceRepository $workspaceRepository,
+        private readonly StagesService $stagesService,
     ) {
     }
 
@@ -145,6 +154,59 @@ final class WorkspaceIntegrationService
     }
 
     /**
+     * Turn the workspace dialog payload into the recipient array core expects.
+     *
+     * TYPO3's send-to-stage dialog submits backend user ids plus free-text email
+     * addresses. DataHandler, however, records and mails a list of recipient
+     * descriptors (`email`, optionally `lang`). Matching core's merge here keeps
+     * the task board on the same contract as the native workspace popup.
+     *
+     * @param list<int> $selectedRecipientUids
+     * @return list<array{email: string, lang?: string}>
+     */
+    public function buildNotificationRecipients(
+        int $workspaceUid,
+        int $stageUid,
+        array $selectedRecipientUids,
+        string $additionalRecipients,
+    ): array {
+        $additional = $this->normalizeAdditionalRecipients($additionalRecipients);
+        if ($workspaceUid < 1) {
+            return array_values($additional);
+        }
+
+        try {
+            $workspaceRecord = $this->workspaceRepository->findByUid($workspaceUid);
+            $stageRecord = $this->stagesService->getStage(
+                $this->workspaceStageRepository->findAllStagesByWorkspace($this->getBackendUser(), $workspaceRecord),
+                $stageUid,
+            );
+        } catch (\RuntimeException|WorkspaceStageNotFoundException) {
+            return array_values($additional);
+        }
+
+        $selected = [];
+        $allowedRecipients = $this->stagesService->getResponsibleBeUser($stageRecord);
+        foreach ($selectedRecipientUids as $backendUserId) {
+            $recipient = $this->recipientFromBackendUser($allowedRecipients[$backendUserId] ?? null);
+            if ($recipient !== null) {
+                $selected[$recipient['email']] = $recipient;
+            }
+        }
+
+        if (!$stageRecord->isPreselectionChangeable && $stageRecord->preselectedRecipients !== []) {
+            foreach ($this->stagesService->getBackendUsers($stageRecord->preselectedRecipients) as $backendUser) {
+                $recipient = $this->recipientFromBackendUser($backendUser);
+                if ($recipient !== null) {
+                    $selected[$recipient['email']] = $recipient;
+                }
+            }
+        }
+
+        return array_values(array_merge($additional, $selected));
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function getTaskComments(int $taskUid): array
@@ -265,6 +327,55 @@ final class WorkspaceIntegrationService
         return is_array($decoded) ? $decoded : [];
     }
 
+    /**
+     * @return array<string, array{email: string}>
+     */
+    private function normalizeAdditionalRecipients(string $additionalRecipients): array
+    {
+        $normalized = [];
+        foreach (GeneralUtility::trimExplode(LF, $additionalRecipients, true) as $email) {
+            if (!GeneralUtility::validEmail($email)) {
+                continue;
+            }
+            $normalized[$email] = ['email' => $email];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed>|null $backendUser
+     * @return array{email: string, lang?: string}|null
+     */
+    private function recipientFromBackendUser(?array $backendUser): ?array
+    {
+        if (!is_array($backendUser)) {
+            return null;
+        }
+
+        $email = (string)($backendUser['email'] ?? '');
+        if ($email === '' || !GeneralUtility::validEmail($email)) {
+            return null;
+        }
+
+        $recipient = ['email' => $email];
+        $language = '';
+        if (!empty($backendUser['uc'])) {
+            $userConfiguration = unserialize((string)$backendUser['uc'], ['allowed_classes' => false]);
+            if (is_array($userConfiguration) && ($userConfiguration['lang'] ?? '') !== '') {
+                $language = (string)$userConfiguration['lang'];
+            }
+        }
+        if ($language === '') {
+            $language = (string)($backendUser['lang'] ?? '');
+        }
+        if ($language !== '') {
+            $recipient['lang'] = $language;
+        }
+
+        return $recipient;
+    }
+
     private function resolveUserName(int $beUserId): string
     {
         if ($beUserId < 1) {
@@ -278,5 +389,10 @@ final class WorkspaceIntegrationService
         return trim((string)($user['realName'] ?? '')) !== ''
             ? (string)$user['realName']
             : (string)($user['username'] ?? 'unknown');
+    }
+
+    private function getBackendUser(): BackendUserAuthentication
+    {
+        return $GLOBALS['BE_USER'];
     }
 }

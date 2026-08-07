@@ -47,10 +47,11 @@ final class TaskAjaxController
     }
 
     /**
-     * Create a task for a page (or any page-like record) picked in the wizard.
+     * Create a task for a record explicitly picked in the wizard.
      *
-     * This is the "+" button's endpoint: the page is chosen with core's page
-     * browser, so search and tree navigation come for free.
+     * The "+" flow is intentional user input: if an editor selects a content
+     * element or another trackable record here, it should get its own task even
+     * though the same record would usually auto-join its page's task.
      */
     public function createAction(ServerRequestInterface $request): ResponseInterface
     {
@@ -61,13 +62,6 @@ final class TaskAjaxController
         $error = $this->assertMayEdit($table, $uid);
         if ($error !== null) {
             return $this->error($error);
-        }
-        if (!$this->subjectRegistry->isSubject($table)) {
-            return $this->reject(
-                'subject-not-page-like',
-                sprintf('"%s" records cannot carry their own task - only page-like tables can.', $table),
-                ['table' => $table],
-            );
         }
 
         // Values the wizard collected. Ignoring them would make the wizard a
@@ -159,9 +153,9 @@ final class TaskAjaxController
     /**
      * "Split from task": pull a record out into a task of its own.
      *
-     * The escape hatch from page aggregation - one banner really being its own piece
-     * of work. Only records that can carry a task on their own can be split off;
-     * everything else would produce a card the board cannot route edits back to.
+     * The escape hatch from page aggregation - one banner really being its own
+     * piece of work. The board can route any trackable record back to its edit
+     * form, so an editor may promote even page-bound content into its own task.
      */
     public function detachAction(ServerRequestInterface $request): ResponseInterface
     {
@@ -325,9 +319,16 @@ final class TaskAjaxController
         $taskUid = (int)($body['task'] ?? 0);
         $targetStageUid = (int)($body['stageUid'] ?? 0);
         $comment = trim((string)($body['comment'] ?? ''));
-        // array_values(): the client sends a list, but json_decode may hand back a
-        // map with gaps, and the type declarations below promise a list.
-        $recipients = is_array($body['recipients'] ?? null) ? array_values($body['recipients']) : [];
+        $additionalRecipients = trim((string)($body['additional'] ?? ''));
+        $selectedRecipientUids = [];
+        if (is_array($body['recipients'] ?? null)) {
+            foreach ($body['recipients'] as $recipientUid) {
+                $recipientUid = (int)$recipientUid;
+                if ($recipientUid > 0) {
+                    $selectedRecipientUids[$recipientUid] = $recipientUid;
+                }
+            }
+        }
 
         $task = $this->findOpenTaskOrError($taskUid, 'change its stage');
         if ($task instanceof ResponseInterface) {
@@ -351,6 +352,13 @@ final class TaskAjaxController
                 ['taskUid' => $taskUid, 'workspaceUid' => $workspaceUid],
             );
         }
+
+        $recipients = $this->workspaceService->buildNotificationRecipients(
+            $workspaceUid,
+            $targetStageUid,
+            array_values($selectedRecipientUids),
+            $additionalRecipients,
+        );
 
         $refusal = $this->askCoreToSetStage($versionsByTable, $targetStageUid, $comment, $recipients);
         if ($refusal !== null) {

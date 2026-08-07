@@ -5,71 +5,81 @@
  * TYPO3's DataHandler, which decides. Nothing here is drag-only: the same moves
  * are reachable from the keyboard and from the ticket view.
  */
-import AjaxRequest from '@typo3/core/ajax/ajax-request.js';
 import Notification from '@typo3/backend/notification.js';
 
 export function registerDragAndDrop(board) {
-    let draggedCard = null;
+  let draggedCard = null;
 
-    board.board.querySelectorAll('.contentflow-card').forEach((card) => {
-      card.addEventListener('dragstart', (e) => {
-        draggedCard = card;
-        card.classList.add('is-dragged');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', card.dataset.contentflowTask);
-      });
-
-      card.addEventListener('dragend', () => {
-        if (draggedCard) {
-          draggedCard.classList.remove('is-dragged');
-          draggedCard = null;
-        }
-        board.board.querySelectorAll('.contentflow-column').forEach((col) => {
-          col.classList.remove('is-drop-target-valid', 'is-drop-target-invalid');
-        });
-      });
-    });
-
+  const clearDropTargetStyles = () => {
     board.board.querySelectorAll('.contentflow-column').forEach((column) => {
-      column.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        const acceptsDrop = column.dataset.contentflowAcceptsDrop !== 'false';
-        if (acceptsDrop) {
-          e.dataTransfer.dropEffect = 'move';
-          column.classList.add('is-drop-target-valid');
-          column.classList.remove('is-drop-target-invalid');
-        } else {
-          e.dataTransfer.dropEffect = 'none';
-          column.classList.add('is-drop-target-invalid');
-          column.classList.remove('is-drop-target-valid');
-        }
-      });
-
-      column.addEventListener('dragleave', (e) => {
-        if (!column.contains(e.relatedTarget)) {
-          column.classList.remove('is-drop-target-valid', 'is-drop-target-invalid');
-        }
-      });
-
-      column.addEventListener('drop', async (e) => {
-        e.preventDefault();
-        const acceptsDrop = column.dataset.contentflowAcceptsDrop !== 'false';
-        column.classList.remove('is-drop-target-valid', 'is-drop-target-invalid');
-
-        if (!acceptsDrop) {
-          Notification.warning('Content Flow', 'This column does not accept manual card drops. Going live is an explicit action.');
-          return;
-        }
-
-        const taskUid = e.dataTransfer.getData('text/plain') || (draggedCard ? draggedCard.dataset.contentflowTask : null);
-        if (!taskUid) return;
-
-        const targetState = column.dataset.contentflowState;
-        const targetStageUid = parseInt(column.dataset.contentflowStage || '0', 10);
-        const colTitle = column.querySelector('.contentflow-column-title')?.textContent || targetState;
-
-        // Open Workspace Stage Confirmation Modal (comment & recipients)
-        board.openStageTransitionModal(parseInt(taskUid, 10), targetState, targetStageUid, colTitle);
-      });
+      column.classList.remove('is-drop-target-valid', 'is-drop-target-invalid');
     });
-  }
+  };
+
+  const updateDropTargetStyles = (card) => {
+    board.board.querySelectorAll('.contentflow-column').forEach((column) => {
+      const valid = board.canDropCardIntoColumn(card, column);
+      column.classList.toggle('is-drop-target-valid', valid);
+      column.classList.toggle('is-drop-target-invalid', !valid);
+    });
+  };
+
+  board.board.querySelectorAll('.contentflow-card').forEach((card) => {
+    card.addEventListener('dragstart', (event) => {
+      draggedCard = card;
+      card.classList.add('is-dragged');
+      updateDropTargetStyles(card);
+
+      if (event.dataTransfer !== null) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', card.dataset.contentflowTask || '');
+      }
+    });
+
+    card.addEventListener('dragend', () => {
+      if (draggedCard !== null) {
+        draggedCard.classList.remove('is-dragged');
+        draggedCard = null;
+      }
+      clearDropTargetStyles();
+    });
+  });
+
+  board.board.querySelectorAll('.contentflow-column').forEach((column) => {
+    column.addEventListener('dragover', (event) => {
+      if (draggedCard === null) {
+        return;
+      }
+
+      event.preventDefault();
+      if (event.dataTransfer !== null) {
+        event.dataTransfer.dropEffect = board.canDropCardIntoColumn(draggedCard, column) ? 'move' : 'none';
+      }
+    });
+
+    column.addEventListener('drop', async (event) => {
+      event.preventDefault();
+
+      if (draggedCard === null) {
+        return;
+      }
+
+      const taskUid = event.dataTransfer?.getData('text/plain') || draggedCard.dataset.contentflowTask || '';
+      const valid = board.canDropCardIntoColumn(draggedCard, column);
+      clearDropTargetStyles();
+
+      if (!valid) {
+        const message = board.getDropRejectionMessage(draggedCard, column);
+        Notification.warning('Content Flow', message);
+        board.announce(message);
+        return;
+      }
+
+      if (taskUid === '') {
+        return;
+      }
+
+      await board.handleCardDrop(parseInt(taskUid, 10), column, draggedCard);
+    });
+  });
+}
