@@ -13,6 +13,8 @@ use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
 use Symfony\Component\DependencyInjection\Attribute\Autoconfigure;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
+use TYPO3\CMS\Core\Schema\Capability\TcaSchemaCapability;
+use TYPO3\CMS\Core\Schema\TcaSchemaFactory;
 
 /**
  * Creates or advances a task whenever an editor edits something inside a workspace -
@@ -41,6 +43,7 @@ final class TaskAutoCreationDataHandlerHook
         private readonly TaskMemberSynchronizer $memberSynchronizer,
         private readonly ReferenceInspector $referenceInspector,
         private readonly ActivityLogger $activityLogger,
+        private readonly TcaSchemaFactory $tcaSchemaFactory,
     ) {
     }
 
@@ -67,16 +70,12 @@ final class TaskAutoCreationDataHandlerHook
             return;
         }
 
-        $liveUid = (int)$id;
-        if ($liveUid < 1) {
+        $resolved = $this->resolveLiveAndVersion($table, (int)$id, $workspaceUid, $dataHandler);
+        if ($resolved === null) {
             return;
         }
+        [$liveUid, $versionUid] = $resolved;
 
-        // Non-null exactly when this update was redirected into a workspace version.
-        $versionUid = $dataHandler->getAutoVersionId($table, $liveUid);
-        if ($versionUid === null) {
-            return;
-        }
         $stageUid = (int)(BackendUtility::getRecord($table, $versionUid, 't3ver_stage')['t3ver_stage'] ?? 0);
         $beUserId = (int)($dataHandler->BE_USER->user['uid'] ?? 0);
 
@@ -96,6 +95,55 @@ final class TaskAutoCreationDataHandlerHook
                 ['table' => $table, 'recordUid' => $liveUid, 'stageUid' => $stageUid],
             );
         }
+    }
+
+    /**
+     * Work out which live record this edit was really about, and which version now
+     * holds it.
+     *
+     * The subtlety that makes this necessary: DataHandler **rewrites `$id` to the
+     * version uid** before calling this hook. In processDatamap_afterDatabaseOperations
+     * `$id` is therefore usually the version, not the live record - see
+     * `$id = $this->autoVersionIdMap[$table][$id];` in DataHandler::process_datamap().
+     * Calling getAutoVersionId() on that id returns null, because a version has no
+     * version of its own, and an implementation that trusts it alone silently does
+     * nothing at all.
+     *
+     * Both directions are handled: `$id` already being a version (the normal case),
+     * and `$id` still being live with a version created alongside it.
+     *
+     * @return array{0: int, 1: int}|null [liveUid, versionUid]
+     */
+    private function resolveLiveAndVersion(
+        string $table,
+        int $id,
+        int $workspaceUid,
+        DataHandler $dataHandler,
+    ): ?array {
+        if ($id < 1) {
+            return null;
+        }
+
+        $record = BackendUtility::getRecord($table, $id, 'uid,t3ver_oid,t3ver_wsid');
+        if ($record === null) {
+            return null;
+        }
+
+        $versionedFrom = (int)($record['t3ver_oid'] ?? 0);
+        if ($versionedFrom > 0) {
+            // $id is the version. Only ours if it lives in the active workspace.
+            if ((int)($record['t3ver_wsid'] ?? 0) !== $workspaceUid) {
+                return null;
+            }
+            return [$versionedFrom, $id];
+        }
+
+        // $id is still the live record - a version may have been created next to it.
+        $autoVersionUid = $dataHandler->getAutoVersionId($table, $id);
+        if ($autoVersionUid === null) {
+            return null;
+        }
+        return [$id, $autoVersionUid];
     }
 
     /**
@@ -164,15 +212,30 @@ final class TaskAutoCreationDataHandlerHook
     /**
      * A task needs a human-readable title from the first moment, so an editor who
      * never opens the board still leaves behind something readable.
+     *
+     * Reads the label field via the TCA schema rather than calling
+     * BackendUtility::getRecordTitle(). That helper resolves LLL references and
+     * therefore requires $GLOBALS['LANG'], which is not guaranteed here: this hook
+     * also runs when DataHandler is driven from the CLI (imports, scheduler tasks,
+     * tests), and there it fataled on a null LanguageService.
      */
     private function deriveTitle(string $table, int $uid): string
     {
-        $record = BackendUtility::getRecord($table, $uid);
-        if ($record === null) {
-            return sprintf('%s:%d', $table, $uid);
+        $fallback = sprintf('%s:%d', $table, $uid);
+        if (!$this->tcaSchemaFactory->has($table)) {
+            return $fallback;
         }
-        $title = BackendUtility::getRecordTitle($table, $record);
-        return $title !== '' ? $title : sprintf('%s:%d', $table, $uid);
+
+        $labelCapability = $this->tcaSchemaFactory->get($table)->getCapability(TcaSchemaCapability::Label);
+        $labelField = $labelCapability->getPrimaryFieldName();
+        if ($labelField === null) {
+            return $fallback;
+        }
+
+        $record = BackendUtility::getRecord($table, $uid, $labelField);
+        $title = trim((string)($record[$labelField] ?? ''));
+
+        return $title !== '' ? $title : $fallback;
     }
 
     private function derivePid(string $table, int $uid): int
