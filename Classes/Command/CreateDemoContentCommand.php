@@ -7,6 +7,7 @@ namespace GbWeb\ContentFlow\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use TYPO3\CMS\Core\Core\Bootstrap;
@@ -17,30 +18,30 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\StringUtility;
 
 /**
- * Creates something to look at.
+ * Makes sure there is something to run the board against.
  *
- * The Camino theme does NOT ship demo content - on a fresh install it creates a site
- * and one empty page, nothing more. A board with no pages and no workspace shows
- * nothing at all, which makes the extension impossible to try out. This command fills
- * that gap: a handful of pages plus a workspace with two review stages, which is the
- * minimum needed to see Backlog -> In Progress -> Review -> Ready -> Done work.
+ * Pages and content are NOT created here: theme_camino ships a full demo site in
+ * Initialisation/data.xml (Camino, FAQs, Packing List, Route Comparison, plus
+ * images), which TYPO3 imports during `typo3 setup` when TYPO3_SETUP_DISTRIBUTION
+ * is set. This command only verifies that import happened.
  *
- * Everything goes through DataHandler rather than direct INSERTs, so the demo data is
- * indistinguishable from hand-created records (history, permissions, hooks all apply).
+ * What Camino cannot provide is a workspace with custom review stages, and without
+ * those the board has only the two fixed core stages - the whole
+ * Backlog -> In Progress -> Review -> Ready -> Done flow stays invisible. That is
+ * what this creates.
+ *
+ * Re-running is safe: existing data is kept unless the user explicitly says
+ * otherwise. Recreating deletes a workspace and therefore any versions inside it,
+ * so it is never done implicitly - `--force`, or an interactive confirmation.
  */
 #[AsCommand(
     name: 'contentflow:democontent',
-    description: 'Create demo pages and a workspace with review stages to try the board with.',
+    description: 'Ensure demo content and a workspace with review stages exist for the board.',
 )]
 final class CreateDemoContentCommand extends Command
 {
-    private const DEMO_PAGES = [
-        'Content Flow Demo',
-        'About us',
-        'Products',
-        'Blog',
-        'Contact',
-    ];
+    private const WORKSPACE_TITLE = 'Editorial';
+    private const STAGE_TITLES = ['Review', 'Approval'];
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,
@@ -48,61 +49,118 @@ final class CreateDemoContentCommand extends Command
         parent::__construct();
     }
 
+    protected function configure(): void
+    {
+        $this->addOption(
+            'force',
+            'f',
+            InputOption::VALUE_NONE,
+            'Recreate the demo workspace even if it exists. Deletes it and any versions inside it.',
+        );
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
         Bootstrap::initializeBackendAuthentication();
 
-        if ($this->demoAlreadyExists()) {
-            $io->note('Demo content already present, nothing to do.');
-            return Command::SUCCESS;
+        $this->reportPageContent($io);
+
+        $existingWorkspaceUid = $this->findWorkspace();
+        if ($existingWorkspaceUid > 0) {
+            if (!$this->shouldRecreate($input, $io, $existingWorkspaceUid)) {
+                $io->success(sprintf('Kept existing workspace "%s" (uid %d).', self::WORKSPACE_TITLE, $existingWorkspaceUid));
+                return Command::SUCCESS;
+            }
+            $this->deleteWorkspace($existingWorkspaceUid);
+            $io->note(sprintf('Deleted workspace uid %d.', $existingWorkspaceUid));
         }
 
-        $rootPageUid = $this->findRootPage();
-        if ($rootPageUid === 0) {
-            $io->error('No page found to attach demo content to. Run "typo3 setup" first.');
+        $workspaceUid = $this->createWorkspaceWithStages();
+        if ($workspaceUid === 0) {
+            $io->error('Could not create the demo workspace.');
             return Command::FAILURE;
         }
 
-        $this->createPages($rootPageUid);
-        $workspaceUid = $this->createWorkspaceWithStages();
-
         $io->success(sprintf(
-            'Created %d demo pages under page %d and workspace %d with two review stages.',
-            count(self::DEMO_PAGES),
-            $rootPageUid,
+            'Created workspace "%s" (uid %d) with stages: %s.',
+            self::WORKSPACE_TITLE,
             $workspaceUid,
+            implode(', ', self::STAGE_TITLES),
         ));
-        $io->writeln('Switch into the workspace, edit a page, and the board will show a task.');
+        $io->writeln('Switch into it, edit a demo page, and a task appears on the board.');
 
         return Command::SUCCESS;
     }
 
-    private function demoAlreadyExists(): bool
+    /**
+     * Decide whether to replace existing demo data.
+     *
+     * When there is no TTY - which is the case for DDEV post-start hooks - Symfony
+     * Console falls back to the default, so the answer is "keep". Destroying an
+     * editor's workspace must never be the outcome of a non-interactive run.
+     */
+    private function shouldRecreate(InputInterface $input, SymfonyStyle $io, int $workspaceUid): bool
+    {
+        if ($input->getOption('force')) {
+            return true;
+        }
+        if (!$input->isInteractive()) {
+            $io->writeln(sprintf(
+                'Workspace "%s" (uid %d) already exists - keeping it.',
+                self::WORKSPACE_TITLE,
+                $workspaceUid,
+            ));
+            $io->writeln('  To recreate it: <info>ddev contentflow-demo</info> (asks) or add <info>--force</info>.');
+            return false;
+        }
+
+        $io->warning(sprintf(
+            'Workspace "%s" (uid %d) already exists. Recreating deletes it and every version inside it.',
+            self::WORKSPACE_TITLE,
+            $workspaceUid,
+        ));
+        return $io->confirm('Recreate the demo workspace?', false);
+    }
+
+    /**
+     * The pages come from the Camino distribution, not from here - so this only
+     * checks and reports, it never creates pages.
+     */
+    private function reportPageContent(SymfonyStyle $io): void
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable('pages');
         $queryBuilder->getRestrictions()->removeAll();
 
-        return (bool)$queryBuilder
+        $pageCount = (int)$queryBuilder
             ->count('uid')
             ->from('pages')
-            ->where(
-                $queryBuilder->expr()->eq('title', $queryBuilder->createNamedParameter(self::DEMO_PAGES[0])),
-            )
+            ->where($queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)))
             ->executeQuery()
             ->fetchOne();
+
+        if ($pageCount === 0) {
+            $io->warning(
+                'No pages found. The Camino demo site is imported by "typo3 setup" via '
+                . 'TYPO3_SETUP_DISTRIBUTION=theme_camino and requires typo3/cms-impexp.',
+            );
+            return;
+        }
+        $io->writeln(sprintf('Found %d page(s) - demo content is present.', $pageCount));
     }
 
-    private function findRootPage(): int
+    private function findWorkspace(): int
     {
-        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('pages');
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_workspace');
         $queryBuilder->getRestrictions()->removeAll();
 
         $uid = $queryBuilder
             ->select('uid')
-            ->from('pages')
-            ->where($queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)))
-            ->orderBy('uid', 'ASC')
+            ->from('sys_workspace')
+            ->where(
+                $queryBuilder->expr()->eq('title', $queryBuilder->createNamedParameter(self::WORKSPACE_TITLE)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+            )
             ->setMaxResults(1)
             ->executeQuery()
             ->fetchOne();
@@ -110,56 +168,42 @@ final class CreateDemoContentCommand extends Command
         return (int)($uid ?: 0);
     }
 
-    private function createPages(int $rootPageUid): void
+    private function deleteWorkspace(int $workspaceUid): void
     {
-        $data = ['pages' => []];
-        // Negative pid means "after this record"; chaining the placeholders keeps the
-        // demo pages in the order listed above instead of reversed.
-        $previous = $rootPageUid;
-        foreach (self::DEMO_PAGES as $title) {
-            $placeholder = StringUtility::getUniqueId('NEW');
-            $data['pages'][$placeholder] = [
-                'pid' => $previous === $rootPageUid ? $rootPageUid : -$previous,
-                'title' => $title,
-                'doktype' => 1,
-                'hidden' => 0,
-            ];
-            $previous = $placeholder;
-        }
-
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
-        $dataHandler->start($data, []);
-        $dataHandler->process_datamap();
+        $dataHandler->start([], ['sys_workspace' => [$workspaceUid => ['delete' => 1]]]);
+        $dataHandler->process_cmdmap();
     }
 
     /**
-     * A workspace with two custom stages between "Editing" and "Ready to publish",
-     * so the board has review columns rather than just the two core defaults.
+     * A workspace with two custom stages between "Editing" and "Ready to publish".
+     *
+     * Written through DataHandler rather than direct INSERTs so the records are
+     * indistinguishable from hand-created ones - which matters here, because the
+     * extension's own auto-creation hook is exactly what we want to exercise.
      */
     private function createWorkspaceWithStages(): int
     {
         $workspacePlaceholder = StringUtility::getUniqueId('NEW');
-        $data = [
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([
             'sys_workspace' => [
                 $workspacePlaceholder => [
                     'pid' => 0,
-                    'title' => 'Editorial',
+                    'title' => self::WORKSPACE_TITLE,
                     'description' => 'Demo workspace created by content_flow',
                 ],
             ],
-        ];
-
-        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
-        $dataHandler->start($data, []);
+        ], []);
         $dataHandler->process_datamap();
-        $workspaceUid = (int)($dataHandler->substNEWwithIDs[$workspacePlaceholder] ?? 0);
 
+        $workspaceUid = (int)($dataHandler->substNEWwithIDs[$workspacePlaceholder] ?? 0);
         if ($workspaceUid === 0) {
             return 0;
         }
 
         $stageData = ['sys_workspace_stage' => []];
-        foreach (['Review', 'Approval'] as $stageTitle) {
+        foreach (self::STAGE_TITLES as $stageTitle) {
             $stageData['sys_workspace_stage'][StringUtility::getUniqueId('NEW')] = [
                 'pid' => 0,
                 'parentid' => $workspaceUid,

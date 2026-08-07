@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+## Description: Verify demo content and (re)create the demo workspace, asking before deleting anything
+## Usage: contentflow-demo [flags]
+## Example: "ddev contentflow-demo" or "ddev contentflow-demo --force"
+
+# Custom commands get a TTY, which post-start hooks do not - so this is the entry
+# point that can actually ask before replacing existing data.
+.Build/bin/typo3 contentflow:democontent "$@"
