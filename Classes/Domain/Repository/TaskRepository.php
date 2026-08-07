@@ -374,4 +374,51 @@ class TaskRepository
             ->executeQuery()
             ->fetchAllAssociative();
     }
+
+    /**
+     * Open tasks assigned to one editor - the "my tasks" view.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findOpenByAssignee(int $beUserId, int $limit = 10): array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+
+        return $queryBuilder
+            ->select('*')
+            ->from(self::TABLE)
+            ->where(
+                $queryBuilder->expr()->eq('assignee', $queryBuilder->createNamedParameter($beUserId, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+            )
+            ->orderBy('tstamp', 'DESC')
+            ->setMaxResults(max(1, $limit))
+            ->executeQuery()
+            ->fetchAllAssociative();
+    }
+
+    /**
+     * Open tasks nobody has taken yet. The board's "up for grabs" list - planning
+     * deliberately allows leaving a task unassigned so an editor can pick it up.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findUnassigned(int $limit = 10): array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+
+        return $queryBuilder
+            ->select('*')
+            ->from(self::TABLE)
+            ->where(
+                $queryBuilder->expr()->eq('assignee', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+            )
+            ->orderBy('sorting', 'ASC')
+            ->setMaxResults(max(1, $limit))
+            ->executeQuery()
+            ->fetchAllAssociative();
+    }
 }

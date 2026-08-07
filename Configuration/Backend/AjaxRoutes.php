@@ -26,4 +26,24 @@ return [
         'path' => '/contentflow/task/detach',
         'target' => TaskAjaxController::class . '::detachAction',
     ],
+    // Column drop / move stage: update task state or stage.
+    'contentflow_task_move_stage' => [
+        'path' => '/contentflow/task/move-stage',
+        'target' => TaskAjaxController::class . '::moveStageAction',
+    ],
+    // Self assign: assign task to current backend user.
+    'contentflow_task_assign_me' => [
+        'path' => '/contentflow/task/assign-me',
+        'target' => TaskAjaxController::class . '::assignMeAction',
+    ],
+    // Fetch full task inspector details (diffs, comments, activities).
+    'contentflow_task_details' => [
+        'path' => '/contentflow/task/details',
+        'target' => TaskAjaxController::class . '::detailsAction',
+    ],
+    // Workspace stage transition execution with comments and recipients.
+    'contentflow_task_execute_stage' => [
+        'path' => '/contentflow/task/execute-stage',
+        'target' => TaskAjaxController::class . '::executeStageAction',
+    ],
 ];

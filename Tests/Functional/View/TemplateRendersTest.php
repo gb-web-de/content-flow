@@ -27,6 +27,7 @@ final class TemplateRendersTest extends FunctionalTestCase
      */
     protected array $coreExtensionsToLoad = [
         'typo3/cms-workspaces',
+        'typo3/cms-dashboard',
     ];
 
     /**
@@ -86,7 +87,7 @@ final class TemplateRendersTest extends FunctionalTestCase
         self::assertStringContainsString('About us', $output);
         self::assertStringContainsString('pages:2', $output);
         // The badge that marks a task nobody planned.
-        self::assertStringContainsString('auto', $output);
+        self::assertStringContainsString('contentflow-badge-auto', $output);
         // The live region every board change is announced through.
         self::assertStringContainsString('aria-live="polite"', $output);
     }
@@ -116,6 +117,9 @@ final class TemplateRendersTest extends FunctionalTestCase
             ],
         ]);
 
-        self::assertStringNotContainsString('contentflow-card-badge', $output);
+        // Asserted on the auto badge's own class, not on the badge container:
+        // the container renders unconditionally, so a looser substring check passed
+        // for the wrong reason.
+        self::assertStringNotContainsString('contentflow-badge-auto', $output);
     }
 }

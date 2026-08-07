@@ -35,29 +35,73 @@
 
         <div class="contentflow-board">
             <f:for each="{columns}" as="column">
-                <section class="contentflow-column" aria-labelledby="cf-col-{column.key}">
-                    <h3 class="contentflow-column-title" id="cf-col-{column.key}">
-                        <span>{column.label}</span>
-                        <span class="badge">{column.cards -> f:count()}</span>
+                <section class="contentflow-column"
+                         data-contentflow-column="{column.key}"
+                         data-contentflow-state="{column.state}"
+                         data-contentflow-stage="{column.stageUid}"
+                         aria-labelledby="cf-col-{column.key}">
+                    <h3 class="contentflow-column-header" id="cf-col-{column.key}">
+                        <span class="contentflow-column-title">{column.label}</span>
+                        <span class="badge badge-pill badge-secondary">{column.cards -> f:count()}</span>
                     </h3>
                     <ul class="contentflow-column-cards" role="listbox" aria-multiselectable="true">
                         <f:for each="{column.cards}" as="card">
                             <li class="contentflow-card"
+                                draggable="true"
                                 tabindex="0"
                                 role="option"
                                 aria-selected="false"
                                 data-contentflow-task="{card.uid}"
                                 data-contentflow-record="{card.subject_table}:{card.subject_uid}"
                                 data-contentflow-title="{card.title}">
-                                <span class="contentflow-card-title">{card.title}</span>
-                                <span class="contentflow-card-meta">
-                                    {card.subject_table}:{card.subject_uid}
-                                    <f:if condition="{card.auto_created}">
-                                        <!-- Nobody planned this; it opened itself when
-                                             someone started editing. -->
-                                        <span class="contentflow-card-badge" title="Created automatically when editing started">auto</span>
+                                <div class="contentflow-card-header">
+                                    <span class="contentflow-card-icon">
+                                        <f:if condition="{card.iconIdentifier}">
+                                            <core:icon identifier="{card.iconIdentifier}" size="small" />
+                                        </f:if>
+                                    </span>
+                                    <strong class="contentflow-card-title">{card.title}</strong>
+                                </div>
+
+                                <div class="contentflow-card-body">
+                                    <span class="contentflow-card-meta">
+                                        <span class="contentflow-record-ref">{card.subject_table}:{card.subject_uid}</span>
+                                    </span>
+                                    <div class="contentflow-card-badges">
+                                        <f:if condition="{card.auto_created}">
+                                            <span class="badge badge-info contentflow-badge-auto" title="Created automatically when editing started">auto</span>
+                                        </f:if>
+                                        <f:if condition="{card.warnedCount} > 0">
+                                            <span class="badge badge-warning" title="Contains elements referenced across pages">
+                                                <core:icon identifier="actions-info" size="small" /> {card.warnedCount} shared
+                                            </span>
+                                        </f:if>
+                                    </div>
+                                </div>
+
+                                <div class="contentflow-card-footer">
+                                    <f:if condition="{card.assigneeName}">
+                                        <f:then>
+                                            <span class="contentflow-card-assignee" title="Assigned to {card.assigneeName}">
+                                                <core:icon identifier="status-user-backend" size="small" />
+                                                <span>{card.assigneeName}</span>
+                                            </span>
+                                        </f:then>
+                                        <f:else>
+                                            <button type="button" class="btn btn-xs btn-default contentflow-action-assign" data-task-uid="{card.uid}">
+                                                <core:icon identifier="actions-user" size="small" /> Assign me
+                                            </button>
+                                        </f:else>
                                     </f:if>
-                                </span>
+
+                                    <div class="contentflow-card-actions">
+                                        <f:if condition="{card.comments} > 0">
+                                            <span class="contentflow-comments-count" title="{card.comments} comments">
+                                                <core:icon identifier="actions-message-discussion" size="small" /> {card.comments}
+                                            </span>
+                                        </f:if>
+                                    </div>
+                                </div>
                             </li>
                         </f:for>
                     </ul>

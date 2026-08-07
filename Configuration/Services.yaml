@@ -7,3 +7,36 @@ services:
   GbWeb\ContentFlow\:
     resource: '../Classes/*'
     exclude: '../Classes/Domain/Model/*'
+
+  GbWeb\ContentFlow\Dashboard\Widget\TaskOverviewWidget:
+    tags:
+      - name: dashboard.widget
+        identifier: contentFlowTaskOverview
+        groupNames: 'general'
+        title: 'Content Flow: Task overview'
+        description: 'How much work sits in each state, and what nobody has taken yet'
+        iconIdentifier: apps-pagetree-page-default
+        height: 'medium'
+        width: 'medium'
+
+  GbWeb\ContentFlow\Dashboard\Widget\MyTasksWidget:
+    tags:
+      - name: dashboard.widget
+        identifier: contentFlowMyTasks
+        groupNames: 'general'
+        title: 'Content Flow: My tasks'
+        description: 'Tasks assigned to you'
+        iconIdentifier: status-user-backend
+        height: 'medium'
+        width: 'medium'
+
+  GbWeb\ContentFlow\Dashboard\Widget\RecentActivityWidget:
+    tags:
+      - name: dashboard.widget
+        identifier: contentFlowRecentActivity
+        groupNames: 'general'
+        title: 'Content Flow: Recent activity'
+        description: 'Latest editorial decisions across the board'
+        iconIdentifier: actions-document-history
+        height: 'medium'
+        width: 'medium'

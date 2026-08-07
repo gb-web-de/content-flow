@@ -23,6 +23,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
      */
     protected array $coreExtensionsToLoad = [
         'typo3/cms-workspaces',
+        'typo3/cms-dashboard',
     ];
 
     /**

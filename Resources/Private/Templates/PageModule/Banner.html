@@ -1,0 +1,53 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<div class="contentflow-page-banner">
+    <div class="contentflow-page-banner-info">
+        <core:icon identifier="apps-pagetree-page-default" size="medium" />
+        <div>
+            <f:if condition="{task}">
+                <f:then>
+                    <div class="contentflow-page-banner-title">
+                        Content Flow Task: <strong>{task.title}</strong>
+                    </div>
+                    <div style="font-size: 11px; opacity: 0.8; display: flex; gap: 8px; margin-top: 2px;">
+                        <span class="badge badge-info">{task.state}</span>
+                        <f:if condition="{assigneeName}">
+                            <span>Assigned to: <strong>{assigneeName}</strong></span>
+                        </f:if>
+                        <f:if condition="{task.auto_created}">
+                            <span class="badge badge-secondary" title="Created automatically when editing started">auto-created</span>
+                        </f:if>
+                    </div>
+                </f:then>
+                <f:else>
+                    <div class="contentflow-page-banner-title">
+                        Content Flow: <em>No active task for this page</em>
+                    </div>
+                </f:else>
+            </f:if>
+        </div>
+    </div>
+
+    <div class="contentflow-page-banner-actions">
+        <f:if condition="{task}">
+            <f:then>
+                <f:if condition="{assigneeName} == ''">
+                    <button type="button" class="btn btn-sm btn-default contentflow-action-assign" data-task-uid="{task.uid}">
+                        <core:icon identifier="actions-user" size="small" /> Assign to me
+                    </button>
+                </f:if>
+                <a href="{boardUrl}" class="btn btn-sm btn-primary">
+                    <core:icon identifier="actions-view-page" size="small" /> Open in Board
+                </a>
+            </f:then>
+            <f:else>
+                <button type="button" class="btn btn-sm btn-primary" data-contentflow-action="create-task">
+                    <core:icon identifier="actions-plus" size="small" /> Plan task for this page
+                </button>
+            </f:else>
+        </f:if>
+    </div>
+</div>
+</html>

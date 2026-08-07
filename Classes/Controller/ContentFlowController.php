@@ -89,15 +89,29 @@ class ContentFlowController extends ActionController
             return $columns;
         }
 
-        // One query for the whole board; the cards are then handed to the column they
-        // belong to. Building a new array (rather than mutating $columns in place)
-        // keeps this a plain read - $column is a copy on every pass.
         $tasks = $this->taskRepository->findOpenForBoard($pageUid);
+        $enrichedTasks = array_map(function (array $task): array {
+            $table = (string)($task['subject_table'] ?? 'pages');
+            $uid = (int)($task['subject_uid'] ?? 0);
+            $task['iconIdentifier'] = $table === 'pages' ? 'apps-pagetree-page-default' : 'mimetypes-x-content-text';
+
+            $assigneeUid = (int)($task['assignee'] ?? 0);
+            if ($assigneeUid > 0) {
+                $userRecord = BackendUtility::getRecord('be_users', $assigneeUid, 'username,realName');
+                if ($userRecord) {
+                    $task['assigneeName'] = !empty($userRecord['realName']) ? $userRecord['realName'] : $userRecord['username'];
+                }
+            }
+
+            $task['warnedMembers'] = $this->taskRepository->findWarnedMembers((int)$task['uid'], (int)$task['subject_pid']);
+            $task['warnedCount'] = count($task['warnedMembers']);
+            return $task;
+        }, $tasks);
 
         $board = [];
         foreach ($columns as $column) {
             $column['cards'] = [];
-            foreach ($tasks as $task) {
+            foreach ($enrichedTasks as $task) {
                 if ($this->belongsInColumn($task, $column)) {
                     $column['cards'][] = $task;
                 }

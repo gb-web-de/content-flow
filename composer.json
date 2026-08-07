@@ -18,6 +18,7 @@
         "php": "~8.2.0 || ~8.3.0 || ~8.4.0 || ~8.5.0",
         "typo3/cms-backend": "^14.3",
         "typo3/cms-core": "^14.3",
+        "typo3/cms-dashboard": "^14.3",
         "typo3/cms-extbase": "^14.3",
         "typo3/cms-fluid": "^14.3",
         "typo3/cms-workspaces": "^14.3"
@@ -28,7 +29,6 @@
         "phpstan/phpstan-phpunit": "^2.0.16",
         "phpunit/phpunit": "^11.5.55",
         "saschaegerer/phpstan-typo3": "^3.0.1",
-        "typo3/cms-dashboard": "^14.3",
         "typo3/cms-fluid-styled-content": "^14.3",
         "typo3/cms-impexp": "^14.3",
         "typo3/cms-install": "^14.3",

@@ -6,30 +6,22 @@ namespace GbWeb\ContentFlow\Controller;
 
 use GbWeb\ContentFlow\Domain\Model\TaskState;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\ContentFlow\Service\ActivityLogger;
 use GbWeb\ContentFlow\Service\ReferenceInspector;
 use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
 use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
+use GbWeb\ContentFlow\Service\WorkspaceIntegrationService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Http\JsonResponse;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 
 /**
- * Write endpoints for the board.
- *
- * Every action re-derives what it is allowed to touch from the server side. The
- * client says *what* it wants, never *whether it may*:
- *
- * - the workspace comes from the backend user, never from the request. A
- *   client-supplied workspace id was an actual IDOR in the reviewed
- *   kanban-workspaces AssignAjaxController.
- * - the table must be trackable (workspace-aware, per TaskSubjectRegistry).
- * - edit permission on the concrete record is checked before anything is written.
- *
- * CSRF is handled by the backend routing layer, which requires a valid request
- * token for every ajax route.
+ * Write and detail endpoints for the board and workspace popups.
  */
 final class TaskAjaxController
 {
@@ -38,6 +30,10 @@ final class TaskAjaxController
         private readonly TaskSubjectRegistry $subjectRegistry,
         private readonly TaskMemberSynchronizer $memberSynchronizer,
         private readonly ReferenceInspector $referenceInspector,
+        private readonly ActivityLogger $activityLogger,
+        private readonly ConnectionPool $connectionPool,
+        private readonly WorkspaceIntegrationService $workspaceService,
+        private readonly UriBuilder $uriBuilder,
     ) {
     }
 
@@ -177,6 +173,181 @@ final class TaskAjaxController
             'task' => (int)$task['uid'],
             'from' => (int)$current['uid'],
         ]);
+    }
+
+    /**
+     * Move a task to a different stage or state (column drop).
+     */
+    public function moveStageAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $taskUid = (int)($body['task'] ?? 0);
+        $targetState = (string)($body['state'] ?? 'backlog');
+        $targetStageUid = (int)($body['stageUid'] ?? 0);
+
+        $task = $this->taskRepository->findByUid($taskUid);
+        if ($task === null || (int)$task['closed'] === 1) {
+            return $this->error('Task not found or closed.');
+        }
+
+        $error = $this->assertMayEdit((string)$task['subject_table'], (int)$task['subject_uid']);
+        if ($error !== null) {
+            return $this->error($error);
+        }
+
+        $connection = $this->connectionPool->getConnectionForTable('tx_contentflow_task');
+        $connection->update(
+            'tx_contentflow_task',
+            [
+                'state' => $targetState,
+                'stage_uid' => $targetStageUid,
+                'tstamp' => $GLOBALS['EXEC_TIME'],
+            ],
+            ['uid' => $taskUid]
+        );
+
+        $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
+        $this->activityLogger->log($taskUid, ActivityLogger::EVENT_STAGE_CHANGED, $beUserId, [
+            'from_state' => $task['state'],
+            'from_stage' => $task['stage_uid'],
+            'to_state' => $targetState,
+            'to_stage' => $targetStageUid,
+        ]);
+
+        return new JsonResponse(['success' => true]);
+    }
+
+    /**
+     * Assign the task to the current logged in backend user.
+     */
+    public function assignMeAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $taskUid = (int)($body['task'] ?? 0);
+        $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
+
+        $task = $this->taskRepository->findByUid($taskUid);
+        if ($task === null || (int)$task['closed'] === 1) {
+            return $this->error('Task not found or closed.');
+        }
+
+        $connection = $this->connectionPool->getConnectionForTable('tx_contentflow_task');
+        $connection->update(
+            'tx_contentflow_task',
+            [
+                'assignee' => $beUserId,
+                'tstamp' => $GLOBALS['EXEC_TIME'],
+            ],
+            ['uid' => $taskUid]
+        );
+
+        $this->activityLogger->log($taskUid, ActivityLogger::EVENT_ASSIGNED, $beUserId, [
+            'assignee' => $beUserId,
+        ]);
+
+        return new JsonResponse(['success' => true]);
+    }
+
+    /**
+     * Fetch complete task inspector details (diffs, comments, activities, editUrl, recipients).
+     */
+    public function detailsAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $params = $request->getQueryParams();
+        $taskUid = (int)($params['task'] ?? 0);
+        if ($taskUid < 1) {
+            $body = $this->getBody($request);
+            $taskUid = (int)($body['task'] ?? 0);
+        }
+
+        $details = $this->workspaceService->getTaskDetails($taskUid);
+        if ($details === null) {
+            return $this->error('Task not found.');
+        }
+
+        $subjectTable = (string)$details['subject']['table'];
+        $subjectUid = (int)$details['subject']['uid'];
+
+        $editUrl = (string)$this->uriBuilder->buildUriFromRoute('record_edit', [
+            'edit' => [$subjectTable => [$subjectUid => 'edit']],
+            'returnUrl' => '',
+        ]);
+
+        $recipients = $this->workspaceService->getStageRecipients();
+
+        return new JsonResponse([
+            'success' => true,
+            'details' => $details,
+            'editUrl' => $editUrl,
+            'recipients' => $recipients,
+        ]);
+    }
+
+    /**
+     * Execute stage change with stage comments and recipients.
+     */
+    public function executeStageAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $taskUid = (int)($body['task'] ?? 0);
+        $targetState = (string)($body['state'] ?? 'backlog');
+        $targetStageUid = (int)($body['stageUid'] ?? 0);
+        $comment = trim((string)($body['comment'] ?? ''));
+        $recipients = is_array($body['recipients'] ?? null) ? $body['recipients'] : [];
+
+        $task = $this->taskRepository->findByUid($taskUid);
+        if ($task === null || (int)$task['closed'] === 1) {
+            return $this->error('Task not found or closed.');
+        }
+
+        $error = $this->assertMayEdit((string)$task['subject_table'], (int)$task['subject_uid']);
+        if ($error !== null) {
+            return $this->error($error);
+        }
+
+        $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
+
+        // Update task state/stage
+        $connection = $this->connectionPool->getConnectionForTable('tx_contentflow_task');
+        $connection->update(
+            'tx_contentflow_task',
+            [
+                'state' => $targetState,
+                'stage_uid' => $targetStageUid,
+                'tstamp' => $GLOBALS['EXEC_TIME'],
+            ],
+            ['uid' => $taskUid]
+        );
+
+        // Record comment if provided
+        if ($comment !== '') {
+            $commentConn = $this->connectionPool->getConnectionForTable('tx_contentflow_comment');
+            $commentConn->insert('tx_contentflow_comment', [
+                'task' => $taskUid,
+                'parent' => 0,
+                'content' => $comment,
+                'resolved' => 0,
+                'crdate' => $GLOBALS['EXEC_TIME'],
+                'tstamp' => $GLOBALS['EXEC_TIME'],
+            ]);
+
+            $connection->executeStatement(
+                'UPDATE tx_contentflow_task SET comments = comments + 1 WHERE uid = ?',
+                [$taskUid]
+            );
+        }
+
+        // Log stage change activity
+        $this->activityLogger->log($taskUid, ActivityLogger::EVENT_STAGE_CHANGED, $beUserId, [
+            'from_state' => $task['state'],
+            'from_stage' => $task['stage_uid'],
+            'to_state' => $targetState,
+            'to_stage' => $targetStageUid,
+            'comment' => $comment,
+            'recipients' => $recipients,
+        ]);
+
+        return new JsonResponse(['success' => true]);
     }
 
     /**

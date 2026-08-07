@@ -1,0 +1,21 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+<div class="widget-content" style="padding: 8px 12px;">
+    <f:if condition="{tasks -> f:count()} > 0">
+        <f:then>
+            <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px;">
+                <f:for each="{tasks}" as="task">
+                    <li style="padding: 8px 10px; background: var(--typo3-surface-base, #fff); border: 1px solid var(--typo3-component-border-color, #e0e0e0); border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 500; font-size: 12px;">{task.title}</span>
+                        <span class="badge badge-info">{task.state}</span>
+                    </li>
+                </f:for>
+            </ul>
+        </f:then>
+        <f:else>
+            <div style="font-size: 12px; opacity: 0.7; padding: 12px 0;">No tasks currently assigned to you.</div>
+        </f:else>
+    </f:if>
+</div>
+</html>

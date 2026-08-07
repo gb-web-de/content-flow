@@ -41,8 +41,14 @@ CREATE TABLE tx_contentflow_task (
     # Workspace the versions live in. 0 while the task has no version yet.
     workspace_uid int(11) unsigned DEFAULT '0' NOT NULL,
 
+    # 0 = deliberately unassigned, so an editor can pick the task up themselves.
     assignee int(11) unsigned DEFAULT '0' NOT NULL,
     due_date int(11) unsigned DEFAULT '0' NOT NULL,
+
+    # Backlog ordering and priority - planning needs both: sorting is the manual
+    # drag order within a column, priority is the editorial urgency label.
+    sorting int(11) unsigned DEFAULT '0' NOT NULL,
+    priority tinyint(4) unsigned DEFAULT '2' NOT NULL,
 
     # 1 when the task opened itself because someone just started editing, rather
     # than being planned. The board marks these, and the post-save wizard offers to
