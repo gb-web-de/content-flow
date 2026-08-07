@@ -198,7 +198,25 @@ kanban-workspaces' *drop proposes, core confirms* (never write a stage directly)
 *meet editors where they are* (context menu on the page tree, so a task can be planned without
 opening the board at all).
 
+## Investigated and rejected: core's new Wizard framework
+
+TYPO3 v14 introduced `TYPO3\CMS\Backend\Wizard\WizardProviderInterface` (plus
+`PageWizardProvider`, `PageWizardStepBuilder`, DTOs `Step`/`Configuration`/
+`Finisher`/`SubmissionResult`) - the machinery behind core's new page-creation
+wizard. It looked like the more idiomatic base for "+ New task" than the older
+`TYPO3.MultiStepWizard` JS API this extension actually uses.
+
+Checked and rejected: every class in that namespace is marked `@internal`. That is
+TYPO3's own signal that it is core-only implementation detail with no BC promise,
+built specifically for the page-creation dialog - not a general-purpose extension
+point despite the registry name suggesting otherwise. Building on it would mean
+this extension could break on any v14.3.x point release without a deprecation
+notice. `@typo3/backend/multi-step-wizard.js` carries no such marking and is what
+core's own established extensions (extension manager, redirects, and others) use
+for the same kind of flow - the existing choice was already the right one.
+
 ## Core APIs first
+
 
 Everything TYPO3 already solves is delegated. Verified present in v14.3:
 
@@ -246,7 +264,36 @@ The distinction that makes this workable: Backlog, Planned and Done are **Conten
 Flow's own** states, which exist precisely because core has no notion of "not
 versioned yet". Those are written directly. Everything between them belongs to core.
 
+## Errors: named for developers, worded for editors
+
+Every rejection from `TaskAjaxController` carries two things, deliberately kept
+apart: a stable, kebab-case `code` (`task-closed`, `no-workspace-version`,
+`record-not-in-open-task`, ...) that never gets rephrased once shipped, and a
+`message` specific enough for an editor to act on - never a bare "an error
+occurred". Both are logged server-side via a PSR-3 `LoggerInterface` (TYPO3 wires
+a class-scoped logger into any autowired `LoggerInterface` constructor argument
+automatically - `LoggerInterfacePass` - no manual setup) before the client
+response goes out, so `var/log` keeps the full context (table, uid, task,
+be_user) that the browser deliberately does not see.
+
+`findOpenTaskOrError()` is the concrete case that mattered: several actions used
+to fold "task does not exist" and "task exists but is closed" into one "not
+found or closed" message and one code. Those are different problems for both
+audiences - a missing task is a stale link or typo, a closed task is an archive
+record someone is trying to act on - so they now have distinct codes and
+messages, tested in `TaskAjaxControllerErrorsTest`.
+
+While auditing this path, `assertMayEdit()` was moved off
+`BackendUserAuthentication::recordEditAccessInternals()` (deprecated since v14,
+removed in v15, and trips `failOnDeprecation` in the test suite) onto
+`checkRecordEditAccess()`. Both are marked `@internal` - there is currently no
+public, non-deprecated API for this specific check - but since this extension
+targets v14.3.x only, the non-deprecated internal method is the more honest
+trade: no deprecation-log noise in production, and it is what core's own
+controllers use for the same check today.
+
 ## Select to task, split from task
+
 
 Two operations on the same invariant — *a record belongs to at most one open task*:
 
@@ -318,7 +365,29 @@ Checked against core sources rather than assumed — worth re-checking on core u
   `STAGE_PUBLISH_EXECUTE_ID` = -20. The last is a core implementation detail and is never
   shown as a column.
 
+## Dashboard widgets: not a 1:1 copy of xima's four
+
+xima/xima-typo3-content-planner ships four: `ContentStatusWidget`/
+`ConfigurableContentStatusWidget` (status counts), `ContentUpdateWidget` (recently
+changed records), `ContentCommentWidget` (recent comments). Content Flow ships
+four too, but not the same four:
+
+- `TaskOverviewWidget` covers the status-count case. xima's version is
+  configurable because xima's status list is open-ended and user-defined;
+  Content Flow's states are a fixed, small set (backlog/planned/in_progress/
+  review/ready/done), so a "which statuses to show" control would configure
+  nothing meaningful.
+- `RecentActivityWidget` covers "recently changed" - and more, since it reads
+  the durable activity trail rather than a raw changed-records list.
+- `MyTasksWidget` has no xima equivalent; it is Content Flow's own "what should
+  I work on" view, which follows directly from tasks having assignees.
+- `RecentCommentsWidget` is the one genuine gap this comparison found: none of
+  the other three surfaced comments as their own feed. Added once the ticket
+  view had a real comment form and therefore real comment data worth
+  surfacing on the dashboard.
+
 ## Status
+
 
 Audited against the code on 2026-08-07, not written from memory.
 
@@ -340,11 +409,17 @@ Audited against the code on 2026-08-07, not written from memory.
   selection, live-region announcements.
 - "+ New task": core element browser for the page, then core `MultiStepWizard` for
   title / priority / assignment.
-- Three Dashboard widgets on v14's `WidgetRendererInterface`.
+- Post-save routing wizard, reachable from anywhere in the backend via
+  `AfterBackendPageRenderEvent` (the same mechanism EXT:workspaces uses for
+  `workspace-state.js`) - not the dead `includeInModules` config key an earlier
+  version relied on, which nothing in core reads.
+- Four Dashboard widgets on v14's `WidgetRendererInterface`, including a task-title
+  join that an earlier version's template referenced but never populated.
 - Page module banner via `ModifyPageLayoutContentEvent`.
+- Comment form in the ticket view, refused server-side on closed tasks.
 - Ajax endpoints: create, attach, detach, move-stage, execute-stage, assign-me,
-  details, ticket, wizard-pending, wizard-submit - each re-deriving permissions
-  server-side.
+  details, ticket, comment, wizard-pending, wizard-submit - each re-deriving
+  permissions server-side and logging every rejection with a stable code.
 
 **Not implemented**
 
@@ -355,10 +430,7 @@ Audited against the code on 2026-08-07, not written from memory.
 - **Context-menu item provider** for planning a task by right-clicking the page tree.
   Listed under "meet editors where they are" as a lesson taken from the xima
   content-planner - the lesson is recorded, the code is not written.
-- **Writing comments from the ticket view.** Comments render, and stage comments are
-  captured, but there is no comment form; the ticket is read-only apart from the
-  actions in its header.
-- **Notification/@mention system**, dashboard notification feed, and the Visual Editor.
+- **Notification/@mention system** and the Visual Editor.
 - **Automated coverage for the JavaScript.** The PHP side is tested; the board modules
   are only syntax-checked.
 

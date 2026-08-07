@@ -15,6 +15,7 @@ use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
 use GbWeb\ContentFlow\Service\WorkspaceIntegrationService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Log\LoggerInterface;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
@@ -41,6 +42,7 @@ final class TaskAjaxController
         private readonly WorkspaceIntegrationService $workspaceService,
         private readonly UriBuilder $uriBuilder,
         private readonly ViewFactoryInterface $viewFactory,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -61,7 +63,11 @@ final class TaskAjaxController
             return $this->error($error);
         }
         if (!$this->subjectRegistry->isSubject($table)) {
-            return $this->error(sprintf('"%s" cannot carry a task of its own.', $table));
+            return $this->reject(
+                'subject-not-page-like',
+                sprintf('"%s" records cannot carry their own task - only page-like tables can.', $table),
+                ['table' => $table],
+            );
         }
 
         // Values the wizard collected. Ignoring them would make the wizard a
@@ -110,9 +116,9 @@ final class TaskAjaxController
         $taskUid = (int)($body['task'] ?? 0);
         $records = is_array($body['records'] ?? null) ? $body['records'] : [];
 
-        $task = $this->taskRepository->findByUid($taskUid);
-        if ($task === null || (int)$task['closed'] === 1) {
-            return $this->error('Task not found or already closed.');
+        $task = $this->findOpenTaskOrError($taskUid, 'attach records to it');
+        if ($task instanceof ResponseInterface) {
+            return $task;
         }
 
         $moved = [];
@@ -123,7 +129,7 @@ final class TaskAjaxController
 
             $error = $this->assertMayEdit($table, $uid);
             if ($error !== null) {
-                $refused[] = ['table' => $table, 'uid' => $uid, 'reason' => $error];
+                $refused[] = ['table' => $table, 'uid' => $uid] + $this->logAndExposeError($error);
                 continue;
             }
 
@@ -170,10 +176,18 @@ final class TaskAjaxController
 
         $current = $this->taskRepository->findOpenTaskByMember($table, $uid);
         if ($current === null) {
-            return $this->error('This record does not belong to an open task.');
+            return $this->reject(
+                'record-not-in-open-task',
+                'This record does not belong to an open task, so there is nothing to split.',
+                ['table' => $table, 'uid' => $uid],
+            );
         }
         if ((string)$current['subject_table'] === $table && (int)$current['subject_uid'] === $uid) {
-            return $this->error('A task cannot be split from itself.');
+            return $this->reject(
+                'cannot-split-task-from-itself',
+                'This is already the task\'s own subject - it cannot be split from itself.',
+                ['table' => $table, 'uid' => $uid, 'taskUid' => (int)$current['uid']],
+            );
         }
 
         $task = $this->taskRepository->detachIntoOwnTask($table, $uid, [
@@ -203,9 +217,9 @@ final class TaskAjaxController
         $targetState = (string)($body['state'] ?? 'backlog');
         $targetStageUid = (int)($body['stageUid'] ?? 0);
 
-        $task = $this->taskRepository->findByUid($taskUid);
-        if ($task === null || (int)$task['closed'] === 1) {
-            return $this->error('Task not found or closed.');
+        $task = $this->findOpenTaskOrError($taskUid, 'move it');
+        if ($task instanceof ResponseInterface) {
+            return $task;
         }
 
         $error = $this->assertMayEdit((string)$task['subject_table'], (int)$task['subject_uid']);
@@ -224,8 +238,10 @@ final class TaskAjaxController
         }
 
         if ((int)$task['workspace_uid'] > 0) {
-            return $this->error(
-                'This task already has a workspace version, so it cannot be moved back to a planning column.'
+            return $this->reject(
+                'cannot-return-versioned-task-to-planning',
+                'This task already has a workspace version, so it cannot be moved back to a planning column.',
+                ['taskUid' => $taskUid, 'workspaceUid' => (int)$task['workspace_uid']],
             );
         }
 
@@ -251,9 +267,9 @@ final class TaskAjaxController
         $taskUid = (int)($body['task'] ?? 0);
         $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
 
-        $task = $this->taskRepository->findByUid($taskUid);
-        if ($task === null || (int)$task['closed'] === 1) {
-            return $this->error('Task not found or closed.');
+        $task = $this->findOpenTaskOrError($taskUid, 'assign it');
+        if ($task instanceof ResponseInterface) {
+            return $task;
         }
 
         $this->taskRepository->assignTo($taskUid, $beUserId);
@@ -279,7 +295,7 @@ final class TaskAjaxController
 
         $details = $this->workspaceService->getTaskDetails($taskUid);
         if ($details === null) {
-            return $this->error('Task not found.');
+            return $this->reject('task-not-found', 'This task no longer exists.', ['taskUid' => $taskUid]);
         }
 
         $subjectTable = (string)$details['subject']['table'];
@@ -313,26 +329,46 @@ final class TaskAjaxController
         // map with gaps, and the type declarations below promise a list.
         $recipients = is_array($body['recipients'] ?? null) ? array_values($body['recipients']) : [];
 
-        $task = $this->taskRepository->findByUid($taskUid);
-        if ($task === null || (int)$task['closed'] === 1) {
-            return $this->error('Task not found or closed.');
+        $task = $this->findOpenTaskOrError($taskUid, 'change its stage');
+        if ($task instanceof ResponseInterface) {
+            return $task;
         }
 
         $workspaceUid = (int)$task['workspace_uid'];
         if ($workspaceUid < 1) {
-            return $this->error('This task has no workspace version yet, so it cannot change stage.');
+            return $this->reject(
+                'no-workspace-version',
+                'This task has no workspace version yet, so it cannot change stage.',
+                ['taskUid' => $taskUid],
+            );
         }
 
         $versionsByTable = $this->memberSynchronizer->findPendingVersionsByTable($taskUid, $workspaceUid);
         if ($versionsByTable === []) {
-            return $this->error('Nothing to move: this task has no pending versions.');
+            return $this->reject(
+                'no-pending-versions',
+                'There is nothing pending on this task to move to another stage.',
+                ['taskUid' => $taskUid, 'workspaceUid' => $workspaceUid],
+            );
         }
 
         $refusal = $this->askCoreToSetStage($versionsByTable, $targetStageUid, $comment, $recipients);
         if ($refusal !== null) {
             // Core refused. Our own state must not drift away from what core did,
-            // so nothing is written on this path.
-            return $this->error($refusal);
+            // so nothing is written on this path. Logged at warning, not notice -
+            // a core-level refusal usually means a permission or stage-workflow
+            // misconfiguration worth a developer's attention, not routine input.
+            $this->logger->warning('core-refused-stage-change', [
+                'taskUid' => $taskUid,
+                'targetStageUid' => $targetStageUid,
+                'reason' => $refusal,
+                'beUser' => (int)($this->getBackendUser()->user['uid'] ?? 0),
+            ]);
+            return new JsonResponse([
+                'success' => false,
+                'code' => 'core-refused-stage-change',
+                'message' => $refusal,
+            ], 400);
         }
 
         $this->recordStageChange($task, $targetStageUid, $comment, $recipients, $versionsByTable);
@@ -436,39 +472,81 @@ final class TaskAjaxController
     /**
      * May the current user edit this record at all?
      *
-     * @return string|null error message, or null when allowed
+     * Every branch names *which* check failed, not just that one did - "no
+     * permission" alone is not actionable for an editor filing a bug report, and
+     * "edit-not-allowed" covers several genuinely different TYPO3 conditions
+     * (deleted parent, disabled record, language mismatch...) that a developer
+     * reading the log needs told apart from a plain permission gap.
+     *
+     * @return TaskActionError|null the failure, or null when allowed
      */
-    private function assertMayEdit(string $table, int $uid): ?string
+    private function assertMayEdit(string $table, int $uid): ?TaskActionError
     {
         if ($uid < 1) {
-            return 'Missing record uid.';
+            return new TaskActionError('missing-record-uid', 'No record was specified.', ['table' => $table]);
         }
         if (!$this->subjectRegistry->isTrackable($table)) {
-            return sprintf('Table "%s" is not versionable and cannot be tracked.', $table);
+            return new TaskActionError(
+                'table-not-trackable',
+                sprintf('"%s" records cannot be tracked here - they support no workspace versioning.', $table),
+                ['table' => $table],
+            );
         }
 
         $record = BackendUtility::getRecord($table, $uid);
         if ($record === null) {
-            return sprintf('Record %s:%d does not exist.', $table, $uid);
+            return new TaskActionError(
+                'record-not-found',
+                sprintf('%s:%d no longer exists.', $table, $uid),
+                ['table' => $table, 'uid' => $uid],
+            );
         }
 
         $backendUser = $this->getBackendUser();
         if ($table === 'pages') {
             if (!$backendUser->doesUserHaveAccess($record, Permission::PAGE_EDIT)) {
-                return sprintf('No edit permission on page %d.', $uid);
+                return new TaskActionError(
+                    'no-page-edit-permission',
+                    'You do not have edit permission on this page.',
+                    ['table' => $table, 'uid' => $uid],
+                );
             }
         } else {
             $page = BackendUtility::getRecord('pages', (int)($record['pid'] ?? 0));
             if ($page === null || !$backendUser->doesUserHaveAccess($page, Permission::CONTENT_EDIT)) {
-                return sprintf('No edit permission on the page holding %s:%d.', $table, $uid);
+                return new TaskActionError(
+                    'no-content-edit-permission',
+                    'You do not have edit permission on the page this record is on.',
+                    ['table' => $table, 'uid' => $uid, 'pagePid' => $record['pid'] ?? null],
+                );
             }
         }
-        if (!$backendUser->recordEditAccessInternals($table, $record)) {
-            return sprintf('Editing %s:%d is not allowed.', $table, $uid);
+        // checkRecordEditAccess() over the older recordEditAccessInternals(): the
+        // latter is deprecated since v14 (removed in v15) and trips
+        // failOnDeprecation in the test suite on every call. Both are marked
+        // @internal ("should only be used from within TYPO3 Core") - there is
+        // currently no public, non-deprecated API for this specific check. Given
+        // this extension targets v14.3.x only (composer.json: ^14.3), the
+        // non-deprecated internal method is the more honest trade: it will not
+        // spam deprecation logs in production, and it is what core's own
+        // controllers use for the same check today.
+        $accessResult = $backendUser->checkRecordEditAccess($table, $record);
+        if (!$accessResult->isAllowed) {
+            return new TaskActionError(
+                'record-edit-not-allowed',
+                $accessResult->errorMessage !== ''
+                    ? $accessResult->errorMessage
+                    : sprintf('%s:%d cannot be edited right now.', $table, $uid),
+                ['table' => $table, 'uid' => $uid],
+            );
         }
         // The workspace is always the user's own - never taken from the request.
         if (!$backendUser->workspaceAllowsLiveEditingInTable($table) && $backendUser->workspace === 0) {
-            return sprintf('Table "%s" cannot be edited in the Live workspace.', $table);
+            return new TaskActionError(
+                'live-editing-not-allowed',
+                sprintf('"%s" records cannot be edited directly on the Live workspace.', $table),
+                ['table' => $table, 'workspace' => $backendUser->workspace],
+            );
         }
 
         return null;
@@ -518,9 +596,75 @@ final class TaskAjaxController
         return is_array($parsed) ? $parsed : [];
     }
 
-    private function error(string $message): ResponseInterface
+    /**
+     * Reject the request. Every rejection is logged server-side with its code and
+     * context before the (deliberately terser) client response goes out - "for
+     * developer logs" means the browser sees a clean message while `var/log`
+     * keeps table/uid/be_user detail nobody wants surfaced to the editor.
+     */
+    private function error(TaskActionError $error): ResponseInterface
     {
-        return new JsonResponse(['success' => false, 'message' => $message], 400);
+        return new JsonResponse(['success' => false] + $this->logAndExposeError($error), 400);
+    }
+
+    /**
+     * Log the full context for a developer, return only the safe subset (code +
+     * message) for the client. Shared between the hard-rejection path (error())
+     * and attachAction()'s per-record loop, where a failure does not abort the
+     * whole request but must still be both logged and reported per record.
+     *
+     * @return array{code: string, message: string}
+     */
+    private function logAndExposeError(TaskActionError $error): array
+    {
+        $this->logger->notice($error->code, $error->context + [
+            'message' => $error->message,
+            'beUser' => (int)($this->getBackendUser()->user['uid'] ?? 0),
+        ]);
+
+        return ['code' => $error->code, 'message' => $error->message];
+    }
+
+    /**
+     * Shorthand for the errors this controller raises itself, rather than ones
+     * assertMayEdit() already built - same logging, same response shape, so
+     * every failure path looks identical from the client's point of view.
+     *
+     * @param array<string, mixed> $context
+     */
+    private function reject(string $code, string $message, array $context = []): ResponseInterface
+    {
+        return $this->error(new TaskActionError($code, $message, $context));
+    }
+
+    /**
+     * Look up an open (not closed) task, or produce the rejection response.
+     *
+     * Splits what used to be a single "not found or closed" check into two
+     * distinctly-coded, distinctly-worded failures: a missing task usually means
+     * a stale link or typo'd id; a closed task exists but is an archive record
+     * an editor is trying to act on. A developer reading the log - or an editor
+     * reading the message - needs those told apart, not folded into one
+     * "not found or closed" sentence that hides which one actually happened.
+     *
+     * @param string $action named in the closed-task message, e.g. "change its stage"
+     * @return array<string, mixed>|ResponseInterface the task row, or the rejection
+     */
+    private function findOpenTaskOrError(int $taskUid, string $action = 'change it'): array|ResponseInterface
+    {
+        $task = $this->taskRepository->findByUid($taskUid);
+        if ($task === null) {
+            return $this->reject('task-not-found', 'This task no longer exists.', ['taskUid' => $taskUid]);
+        }
+        if ((int)$task['closed'] === 1) {
+            return $this->reject(
+                'task-closed',
+                sprintf('This task is closed - you cannot %s.', $action),
+                ['taskUid' => $taskUid],
+            );
+        }
+
+        return $task;
     }
 
     private function getBackendUser(): BackendUserAuthentication
@@ -595,7 +739,11 @@ final class TaskAjaxController
 
         if ($actionType === 'attach_to_page_task') {
             if ($pageTaskUid < 1) {
-                return $this->error('Missing page task ID.');
+                return $this->reject(
+                    'missing-page-task-id',
+                    'No page task was specified to attach this element to.',
+                    ['table' => $table, 'uid' => $uid],
+                );
             }
             $this->taskRepository->moveMemberToTask($table, $uid, $pageTaskUid);
             return new JsonResponse(['success' => true, 'action' => 'attached']);
@@ -604,7 +752,11 @@ final class TaskAjaxController
         // Otherwise create new task
         $title = trim((string)($body['title'] ?? ''));
         if ($title === '') {
-            return $this->error('Task title is required.');
+            return $this->reject(
+                'task-title-required',
+                'A title is required to create a new task.',
+                ['table' => $table, 'uid' => $uid],
+            );
         }
 
         $stageChoice = (string)($body['stageChoice'] ?? 'in_progress');
@@ -646,17 +798,12 @@ final class TaskAjaxController
         $content = trim((string)($body['content'] ?? ''));
 
         if ($content === '') {
-            return $this->error('A comment cannot be empty.');
+            return $this->reject('comment-empty', 'A comment cannot be empty.', ['taskUid' => $taskUid]);
         }
 
-        $task = $this->taskRepository->findByUid($taskUid);
-        if ($task === null) {
-            return $this->error('Task not found.');
-        }
-        if ((int)$task['closed'] === 1) {
-            // A closed task is an archive record; letting it grow silently would
-            // make the trail disagree with what was archived.
-            return $this->error('This task is closed and cannot be commented on.');
+        $task = $this->findOpenTaskOrError($taskUid, 'comment on it');
+        if ($task instanceof ResponseInterface) {
+            return $task;
         }
 
         // Commenting is a write on the subject, so it needs the same permission

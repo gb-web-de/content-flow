@@ -15,14 +15,17 @@ use TYPO3\CMS\Dashboard\Widgets\WidgetRendererInterface;
 use TYPO3\CMS\Dashboard\Widgets\WidgetResult;
 
 /**
- * What happened lately across the editorial board: stage moves, assignments,
- * comments, closures.
+ * The one dashboard widget xima/xima-typo3-content-planner has that Content Flow
+ * did not: a feed to catch up on discussion without opening every ticket.
  *
- * Reads tx_contentflow_activity rather than sys_history on purpose - the activity
- * trail is the durable one (sys_history is garbage-collected after 30 days by
- * default), and it holds the editorial decisions rather than field-level noise.
+ * The other three xima widgets (ContentUpdateWidget, ConfigurableContentStatusWidget)
+ * were deliberately not copied - RecentActivityWidget already covers "what recently
+ * changed", and TaskOverviewWidget already covers "how much sits in each state".
+ * xima's status widget is configurable because its status list is open-ended and
+ * user-defined; Content Flow's states are a fixed, small set, so that knob would
+ * configure nothing meaningful. This one had no equivalent at all.
  */
-final readonly class RecentActivityWidget implements WidgetRendererInterface
+final readonly class RecentCommentsWidget implements WidgetRendererInterface
 {
     public function __construct(
         private WidgetConfigurationInterface $configuration,
@@ -42,8 +45,8 @@ final readonly class RecentActivityWidget implements WidgetRendererInterface
             new SettingDefinition(
                 key: 'limit',
                 type: 'int',
-                default: (int)($this->options['limit'] ?? 15),
-                label: 'Number of entries',
+                default: (int)($this->options['limit'] ?? 10),
+                label: 'Number of comments',
                 readonly: array_key_exists('limit', $this->options),
             ),
         ];
@@ -51,57 +54,54 @@ final readonly class RecentActivityWidget implements WidgetRendererInterface
 
     public function renderWidget(WidgetContext $context): WidgetResult
     {
-        // SettingsInterface extends ContainerInterface, so get() takes no default -
-        // has() must be checked first.
         $limit = $context->settings->has('limit')
             ? (int)$context->settings->get('limit')
-            : (int)($this->options['limit'] ?? 15);
+            : (int)($this->options['limit'] ?? 10);
 
         $view = $this->backendViewFactory->create($context->request, ['gb-web/content-flow']);
         $view->assignMultiple([
-            'activities' => $this->findRecent($limit),
+            'comments' => $this->findRecent($limit),
             'configuration' => $this->configuration,
         ]);
 
         return new WidgetResult(
-            content: $view->render('Dashboard/RecentActivity'),
+            content: $view->render('Dashboard/RecentComments'),
             refreshable: true,
         );
     }
 
     /**
+     * One query for the comments, then one for their tasks - not one join, since
+     * the task title needs BackendUtility::getRecordTitle()-equivalent resolution
+     * that a plain SQL join cannot give us, and not N+1 queries for N comments.
+     *
      * @return list<array<string, mixed>>
      */
     private function findRecent(int $limit): array
     {
-        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_contentflow_activity');
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_contentflow_comment');
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
-        $activities = $queryBuilder
-            ->select('a.*')
-            ->from('tx_contentflow_activity', 'a')
-            ->orderBy('a.crdate', 'DESC')
+        $comments = $queryBuilder
+            ->select('*')
+            ->from('tx_contentflow_comment')
+            ->orderBy('crdate', 'DESC')
             ->setMaxResults(max(1, $limit))
             ->executeQuery()
             ->fetchAllAssociative();
 
-        if ($activities === []) {
+        if ($comments === []) {
             return [];
         }
 
-        // The template shows which task each entry belongs to
-        // (Resources/Private/Templates/Dashboard/RecentActivity.html references
-        // `activity.task_title`), but nothing here ever provided it - the column
-        // does not exist on tx_contentflow_activity, so it silently rendered
-        // empty. One batch query for the titles, not one per row.
-        $taskUids = array_values(array_unique(array_map(static fn (array $row): int => (int)$row['task'], $activities)));
+        $taskUids = array_values(array_unique(array_map(static fn (array $row): int => (int)$row['task'], $comments)));
         $taskTitles = $this->findTaskTitles($taskUids);
 
-        foreach ($activities as &$activity) {
-            $activity['task_title'] = $taskTitles[(int)$activity['task']] ?? sprintf('Task #%d', $activity['task']);
+        foreach ($comments as &$comment) {
+            $comment['taskTitle'] = $taskTitles[(int)$comment['task']] ?? sprintf('Task #%d', $comment['task']);
         }
 
-        return $activities;
+        return $comments;
     }
 
     /**

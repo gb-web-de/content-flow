@@ -43,3 +43,17 @@ services:
         iconIdentifier: actions-document-history
         height: 'medium'
         width: 'medium'
+
+  # The one widget xima/xima-typo3-content-planner has that the three above did
+  # not cover - a feed to catch up on discussion. See RecentCommentsWidget's
+  # docblock for why the other two xima widgets were not copied.
+  GbWeb\ContentFlow\Dashboard\Widget\RecentCommentsWidget:
+    tags:
+      - name: dashboard.widget
+        identifier: contentFlowRecentComments
+        groupNames: 'general'
+        title: 'Content Flow: Recent comments'
+        description: 'Catch up on discussion across the board'
+        iconIdentifier: actions-message
+        height: 'medium'
+        width: 'medium'
