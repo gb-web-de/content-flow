@@ -1,0 +1,169 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:comment>
+    The ticket view. One task, everything about it.
+
+    Rendered server-side on purpose: the diff markup comes from core's DiffUtility
+    already rendered, and escaping belongs here rather than in string building in
+    the browser.
+</f:comment>
+
+<div class="contentflow-ticket">
+
+    <header class="contentflow-ticket-header">
+        <div class="contentflow-ticket-heading">
+            <h2 class="contentflow-ticket-title">{subject.title}</h2>
+            <p class="contentflow-ticket-subtitle">
+                <span class="contentflow-record-ref">{subject.table}:{subject.uid}</span>
+                <f:if condition="{task.auto_created}">
+                    <span class="badge badge-info contentflow-badge-auto"
+                          title="Nobody planned this - it opened itself when someone started editing">auto</span>
+                </f:if>
+            </p>
+        </div>
+        <div class="contentflow-ticket-actions">
+            <a href="{editUrl}" class="btn btn-default btn-sm">
+                <core:icon identifier="actions-open" size="small" /> Edit record
+            </a>
+        </div>
+    </header>
+
+    <dl class="contentflow-ticket-facts">
+        <div><dt>State</dt><dd><span class="badge badge-{task.state}">{task.state}</span></dd></div>
+        <div>
+            <dt>Assignee</dt>
+            <dd>
+                <f:if condition="{assignee}">
+                    <f:then>
+                        <core:icon identifier="status-user-backend" size="small" /> {assignee.name}
+                    </f:then>
+                    <f:else>
+                        <span class="contentflow-unassigned">Up for grabs</span>
+                    </f:else>
+                </f:if>
+            </dd>
+        </div>
+        <div><dt>Priority</dt><dd>{task.priority}</dd></div>
+        <div>
+            <dt>Workspace</dt>
+            <dd>
+                <f:if condition="{task.workspace_uid} > 0">
+                    <f:then>#{task.workspace_uid}, stage {task.stage_uid}</f:then>
+                    <f:else><span class="contentflow-unassigned">not versioned yet</span></f:else>
+                </f:if>
+            </dd>
+        </div>
+    </dl>
+
+    <f:if condition="{task.description}">
+        <section class="contentflow-ticket-section">
+            <h3>Description</h3>
+            <p>{task.description}</p>
+        </section>
+    </f:if>
+
+    <section class="contentflow-ticket-section">
+        <h3>
+            Covered records
+            <span class="badge">{members -> f:count()}</span>
+        </h3>
+        <f:comment>
+            Members are pages just as often as content elements, so the icon is
+            resolved per record rather than assumed.
+        </f:comment>
+        <ul class="contentflow-member-list">
+            <f:for each="{members}" as="member">
+                <li class="contentflow-member {f:if(condition: member.needsAttention, then: 'needs-attention')}">
+                    <span class="contentflow-member-icon"><f:format.raw>{member.icon}</f:format.raw></span>
+                    <span class="contentflow-member-title">{member.title}</span>
+                    <span class="contentflow-record-ref">{member.record_table}:{member.record_uid}</span>
+                    <f:if condition="{member.isForeign}">
+                        <span class="badge badge-warning" title="This record lives on another page - changing it changes that page too">
+                            from page {member.home_pid}
+                        </span>
+                    </f:if>
+                    <f:if condition="{member.isShared}">
+                        <span class="badge badge-warning" title="Other pages reference this record">reused elsewhere</span>
+                    </f:if>
+                </li>
+            </f:for>
+        </ul>
+    </section>
+
+    <section class="contentflow-ticket-section">
+        <h3>Activity</h3>
+        <f:comment>
+            The durable trail. sys_history is garbage-collected after 30 days by
+            default, so the decisions live here instead.
+        </f:comment>
+        <f:if condition="{activities}">
+            <f:then>
+                <ol class="contentflow-activity">
+                    <f:for each="{activities}" as="entry">
+                        <li>
+                            <span class="contentflow-activity-event">{entry.event}</span>
+                            <f:format.date format="Y-m-d H:i">{entry.crdate}</f:format.date>
+                        </li>
+                    </f:for>
+                </ol>
+            </f:then>
+            <f:else><p class="contentflow-empty">Nothing recorded yet.</p></f:else>
+        </f:if>
+    </section>
+
+    <section class="contentflow-ticket-section">
+        <h3>Changes</h3>
+        <f:comment>
+            Step-by-step field diffs, rendered by core's DiffUtility via
+            EXT:workspaces HistoryService - not diffed by hand.
+        </f:comment>
+        <f:if condition="{diffs}">
+            <f:then>
+                <ul class="contentflow-diff-list">
+                    <f:for each="{diffs}" as="diff">
+                        <li class="contentflow-diff">
+                            <div class="contentflow-diff-head">
+                                <strong>{diff.label}</strong>
+                                <span class="contentflow-diff-meta">{diff.user} · {diff.datetime}</span>
+                            </div>
+                            <div class="contentflow-diff-body"><f:format.raw>{diff.html}</f:format.raw></div>
+                        </li>
+                    </f:for>
+                </ul>
+            </f:then>
+            <f:else>
+                <p class="contentflow-empty">
+                    No field changes recorded. Note that TYPO3 removes change history
+                    after 30 days by default, so older detail may have expired.
+                </p>
+            </f:else>
+        </f:if>
+    </section>
+
+    <section class="contentflow-ticket-section">
+        <h3>
+            Comments
+            <span class="badge">{comments -> f:count()}</span>
+        </h3>
+        <f:if condition="{comments}">
+            <f:then>
+                <ul class="contentflow-comments">
+                    <f:for each="{comments}" as="comment">
+                        <li>
+                            <div class="contentflow-comment-body">{comment.content}</div>
+                            <div class="contentflow-comment-meta">
+                                <f:format.date format="Y-m-d H:i">{comment.crdate}</f:format.date>
+                            </div>
+                        </li>
+                    </f:for>
+                </ul>
+            </f:then>
+            <f:else><p class="contentflow-empty">No comments yet.</p></f:else>
+        </f:if>
+    </section>
+
+</div>
+
+</html>

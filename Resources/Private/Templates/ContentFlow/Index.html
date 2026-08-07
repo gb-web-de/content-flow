@@ -60,7 +60,14 @@
                                             <core:icon identifier="{card.iconIdentifier}" size="small" />
                                         </f:if>
                                     </span>
-                                    <strong class="contentflow-card-title">{card.title}</strong>
+                                    <f:comment>
+                                        A button, not the whole card: the card body
+                                        toggles selection, so opening the ticket needs
+                                        its own control that is reachable by keyboard.
+                                    </f:comment>
+                                    <button type="button"
+                                            class="contentflow-card-title"
+                                            data-contentflow-open-ticket="{card.uid}">{card.title}</button>
                                 </div>
 
                                 <div class="contentflow-card-body">

@@ -122,4 +122,55 @@ final class TemplateRendersTest extends FunctionalTestCase
         // for the wrong reason.
         self::assertStringNotContainsString('contentflow-badge-auto', $output);
     }
+
+    #[Test]
+    public function theTicketViewRendersDiffsCommentsAndActivity(): void
+    {
+        $viewFactory = $this->get(ViewFactoryInterface::class);
+        $view = $viewFactory->create(new ViewFactoryData(
+            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
+        ));
+        $view->assignMultiple([
+            'task' => [
+                'uid' => 1,
+                'state' => 'in_progress',
+                'priority' => 2,
+                'workspace_uid' => 1,
+                'stage_uid' => 0,
+                'auto_created' => 1,
+                'description' => 'Rework the intro section.',
+                'subject_pid' => 2,
+            ],
+            'subject' => ['table' => 'pages', 'uid' => 2, 'title' => 'About us'],
+            'assignee' => null,
+            'editUrl' => '/typo3/record/edit',
+            'members' => [
+                [
+                    'record_table' => 'tt_content', 'record_uid' => 10, 'home_pid' => 2,
+                    'title' => 'Intro text', 'icon' => '', 'isForeign' => false,
+                    'isShared' => true, 'needsAttention' => true,
+                ],
+            ],
+            'activities' => [['event' => 'work_started', 'crdate' => 1754563200]],
+            'diffs' => [[
+                'label' => 'Header', 'html' => '<ins>new</ins><del>old</del>',
+                'user' => 'admin', 'datetime' => '2026-08-07 10:00',
+            ]],
+            'comments' => [],
+        ]);
+
+        $output = $view->render('ContentFlow/Ticket');
+
+        self::assertStringContainsString('About us', $output);
+        // An unassigned task must read as "take me", not as an empty field.
+        self::assertStringContainsString('Up for grabs', $output);
+        // Core's rendered diff markup is passed through, not re-escaped away.
+        self::assertStringContainsString('<ins>new</ins>', $output);
+        self::assertStringContainsString('work_started', $output);
+        // Reused content is flagged, because changing it changes other pages.
+        self::assertStringContainsString('needs-attention', $output);
+        self::assertStringContainsString('reused elsewhere', $output);
+        // Empty comments explain themselves rather than showing nothing.
+        self::assertStringContainsString('No comments yet', $output);
+    }
 }

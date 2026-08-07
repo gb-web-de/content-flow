@@ -317,3 +317,186 @@
     background: var(--contentflow-accent);
 }
 
+
+/* ---- Ticket view ------------------------------------------------------- */
+
+.contentflow-ticket {
+    padding: 4px 2px 8px;
+}
+
+.contentflow-ticket-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--typo3-component-border-color, #ddd);
+}
+
+.contentflow-ticket-title {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.3;
+}
+
+.contentflow-ticket-subtitle {
+    margin: 4px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.contentflow-record-ref {
+    font-family: var(--typo3-font-family-monospace, monospace);
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+.contentflow-ticket-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+    padding: 12px;
+    background: var(--typo3-surface-container, #f6f6f6);
+    border-radius: 4px;
+}
+
+.contentflow-ticket-facts dt {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.65;
+    margin-bottom: 2px;
+}
+
+.contentflow-ticket-facts dd {
+    margin: 0;
+    font-size: 14px;
+}
+
+.contentflow-unassigned {
+    font-style: italic;
+    opacity: 0.7;
+}
+
+.contentflow-ticket-section {
+    margin-top: 24px;
+}
+
+.contentflow-ticket-section > h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.75;
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.contentflow-member-list,
+.contentflow-activity,
+.contentflow-diff-list,
+.contentflow-comments {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.contentflow-member {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--typo3-component-border-color, #ddd);
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+/* Content reached through a shortcut, or reused elsewhere: changing it
+   changes other pages too. That has to be visible, not buried. */
+.contentflow-member.needs-attention {
+    border-left: 3px solid var(--typo3-color-warning, #b8891a);
+    background: var(--typo3-surface-container, #fdf8ee);
+}
+
+.contentflow-member-title {
+    flex: 1 1 auto;
+}
+
+.contentflow-diff {
+    border: 1px solid var(--typo3-component-border-color, #ddd);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.contentflow-diff-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 10px;
+    background: var(--typo3-surface-container, #f6f6f6);
+    font-size: 12px;
+}
+
+.contentflow-diff-meta {
+    opacity: 0.7;
+}
+
+.contentflow-diff-body {
+    padding: 8px 10px;
+    font-size: 13px;
+    overflow-x: auto;
+}
+
+.contentflow-activity li,
+.contentflow-comments li {
+    padding: 6px 10px;
+    border-left: 2px solid var(--typo3-component-border-color, #ddd);
+    font-size: 13px;
+}
+
+.contentflow-activity-event {
+    font-family: var(--typo3-font-family-monospace, monospace);
+    font-size: 11px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--typo3-surface-container-high, #e8e8e8);
+    margin-right: 6px;
+}
+
+.contentflow-comment-meta {
+    font-size: 11px;
+    opacity: 0.65;
+    margin-top: 2px;
+}
+
+.contentflow-empty {
+    font-style: italic;
+    opacity: 0.65;
+    font-size: 13px;
+    margin: 0;
+}
+
+/* Title doubles as the ticket trigger, but must not look like a form button. */
+.contentflow-card-title {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: inherit;
+    cursor: pointer;
+}
+
+.contentflow-card-title:hover,
+.contentflow-card-title:focus-visible {
+    text-decoration: underline;
+}

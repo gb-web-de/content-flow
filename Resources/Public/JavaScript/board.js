@@ -38,6 +38,7 @@ class ContentFlowBoard {
     }
     this.announcer = document.querySelector('.contentflow-announcer');
     this.registerCardEvents();
+    this.registerTicketButtons();
     this.registerDragAndDrop();
     this.registerCreateButton();
     this.registerAssignButtons();
@@ -539,6 +540,38 @@ class ContentFlowBoard {
     }
     this.announce(title + ' now has its own task.');
     window.location.reload();
+  }
+
+  /**
+   * Open a task like a ticket. Uses core's Modal in ajax mode, so the markup is
+   * rendered server-side by Fluid rather than assembled here - diff markup and
+   * escaping stay out of the browser.
+   */
+  registerTicketButtons() {
+    document.querySelectorAll('[data-contentflow-open-ticket]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        // The card body toggles selection; opening the ticket must not also select.
+        event.stopPropagation();
+        event.preventDefault();
+        this.openTicket(button.dataset.contentflowOpenTicket, button.textContent.trim());
+      });
+    });
+  }
+
+  openTicket(taskUid, title) {
+    const url = TYPO3.settings.ajaxUrls.contentflow_task_ticket;
+    if (!url) {
+      Notification.error('Content Flow', 'Ticket view is not available.');
+      return;
+    }
+    this.announce('Opened task ' + title);
+    Modal.advanced({
+      type: Modal.types.ajax,
+      title: title,
+      content: url + '&task=' + encodeURIComponent(taskUid),
+      size: Modal.sizes.large,
+      severity: SeverityEnum.notice,
+    });
   }
 }
 

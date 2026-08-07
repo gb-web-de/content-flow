@@ -41,6 +41,11 @@ return [
         'path' => '/contentflow/task/details',
         'target' => TaskAjaxController::class . '::detailsAction',
     ],
+    // Ticket view: the full task rendered as HTML for a modal.
+    'contentflow_task_ticket' => [
+        'path' => '/contentflow/task/ticket',
+        'target' => TaskAjaxController::class . '::ticketAction',
+    ],
     // Workspace stage transition execution with comments and recipients.
     'contentflow_task_execute_stage' => [
         'path' => '/contentflow/task/execute-stage',

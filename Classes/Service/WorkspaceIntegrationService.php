@@ -8,6 +8,8 @@ use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+use TYPO3\CMS\Core\Imaging\IconFactory;
+use TYPO3\CMS\Core\Imaging\IconSize;
 use TYPO3\CMS\Workspaces\Service\HistoryService;
 
 class WorkspaceIntegrationService
@@ -17,6 +19,7 @@ class WorkspaceIntegrationService
         private readonly TaskRepository $taskRepository,
         private readonly ActivityLogger $activityLogger,
         private readonly HistoryService $historyService,
+        private readonly IconFactory $iconFactory,
     ) {
     }
 
@@ -62,7 +65,7 @@ class WorkspaceIntegrationService
                 'title' => $subjectRecord ? BackendUtility::getRecordTitle($subjectTable, $subjectRecord) : sprintf('%s:%d', $subjectTable, $subjectUid),
             ],
             'assignee' => $assigneeUser,
-            'members' => $members,
+            'members' => $this->decorateMembers($members, (int)$task['subject_pid']),
             'warnedCount' => count($warnedMembers),
             'comments' => $comments,
             'activities' => $activities,
@@ -155,5 +158,41 @@ class WorkspaceIntegrationService
             ->orderBy('crdate', 'ASC')
             ->executeQuery()
             ->fetchAllAssociative();
+    }
+
+    /**
+     * Turn raw membership rows into something a ticket view can show: what the
+     * record actually is, what it is called, and whether touching it reaches
+     * beyond this page.
+     *
+     * Records can be pages just as well as content elements, so the icon is
+     * resolved per record instead of assumed - that is the only honest way to
+     * show a mixed member list.
+     *
+     * @param list<array<string, mixed>> $members
+     * @return list<array<string, mixed>>
+     */
+    private function decorateMembers(array $members, int $subjectPid): array
+    {
+        $decorated = [];
+        foreach ($members as $member) {
+            $table = (string)$member['record_table'];
+            $uid = (int)$member['record_uid'];
+            $record = BackendUtility::getRecord($table, $uid);
+
+            $homePid = (int)($member['home_pid'] ?? 0);
+            $member['title'] = $record !== null
+                ? BackendUtility::getRecordTitle($table, $record)
+                : sprintf('%s:%d', $table, $uid);
+            $member['icon'] = $record !== null
+                ? $this->iconFactory->getIconForRecord($table, $record, IconSize::SMALL)->render()
+                : '';
+            $member['isForeign'] = $homePid > 0 && $homePid !== $subjectPid;
+            $member['isShared'] = (int)($member['shared'] ?? 0) === 1;
+            $member['needsAttention'] = $member['isForeign'] || $member['isShared'];
+            $decorated[] = $member;
+        }
+
+        return $decorated;
     }
 }

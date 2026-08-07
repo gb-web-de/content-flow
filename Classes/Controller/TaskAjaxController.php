@@ -17,8 +17,11 @@ use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Http\HtmlResponse;
 use TYPO3\CMS\Core\Http\JsonResponse;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
+use TYPO3\CMS\Core\View\ViewFactoryData;
+use TYPO3\CMS\Core\View\ViewFactoryInterface;
 
 /**
  * Write and detail endpoints for the board and workspace popups.
@@ -34,6 +37,7 @@ final class TaskAjaxController
         private readonly ConnectionPool $connectionPool,
         private readonly WorkspaceIntegrationService $workspaceService,
         private readonly UriBuilder $uriBuilder,
+        private readonly ViewFactoryInterface $viewFactory,
     ) {
     }
 
@@ -429,5 +433,40 @@ final class TaskAjaxController
     private function getBackendUser(): BackendUserAuthentication
     {
         return $GLOBALS['BE_USER'];
+    }
+
+    /**
+     * The ticket view: everything about one task in one place.
+     *
+     * Rendered server-side as HTML rather than assembled in JavaScript from the
+     * JSON endpoint. Diffs arrive as already-rendered markup from core's
+     * DiffUtility, and escaping decisions belong in Fluid, not in string
+     * concatenation in the browser.
+     */
+    public function ticketAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $taskUid = (int)($request->getQueryParams()['task'] ?? 0);
+        $details = $this->workspaceService->getTaskDetails($taskUid);
+        if ($details === null) {
+            return new HtmlResponse('<div class="callout callout-danger"><div class="callout-body">Task not found.</div></div>', 404);
+        }
+
+        $subjectTable = (string)$details['subject']['table'];
+        $subjectUid = (int)$details['subject']['uid'];
+
+        $view = $this->viewFactory->create(new ViewFactoryData(
+            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
+            partialRootPaths: ['EXT:content_flow/Resources/Private/Partials/'],
+            layoutRootPaths: ['EXT:content_flow/Resources/Private/Layouts/'],
+            request: $request,
+        ));
+        $view->assignMultiple($details + [
+            'editUrl' => (string)$this->uriBuilder->buildUriFromRoute('record_edit', [
+                'edit' => [$subjectTable => [$subjectUid => 'edit']],
+                'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_contentflow', ['id' => (int)$details['task']['subject_pid']]),
+            ]),
+        ]);
+
+        return new HtmlResponse($view->render('ContentFlow/Ticket'));
     }
 }
