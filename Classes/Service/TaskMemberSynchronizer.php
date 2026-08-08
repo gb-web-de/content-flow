@@ -161,22 +161,44 @@ final class TaskMemberSynchronizer
      */
     public function findPendingVersionsByTable(int $taskUid, int $workspaceUid): array
     {
+        $versions = [];
+        foreach ($this->findPendingVersionPairsByTable($taskUid, $workspaceUid) as $table => $pairs) {
+            $versions[$table] = array_map(static fn (array $pair): int => $pair['version'], $pairs);
+        }
+        return $versions;
+    }
+
+    /**
+     * The same pending versions as findPendingVersionsByTable(), but keeping the
+     * live uid each one belongs to.
+     *
+     * setStage/discard are keyed by the version uid alone, which is all
+     * findPendingVersionsByTable() needs to give DataHandler. Publishing is keyed
+     * by the LIVE uid instead, with the version uid as `swapWith` - the opposite
+     * order (see WORKSPACE-STAGES.md) - so publishTaskAction() needs both sides
+     * of the pair, not just the version.
+     *
+     * @return array<string, list<array{live: int, version: int}>>
+     */
+    public function findPendingVersionPairsByTable(int $taskUid, int $workspaceUid): array
+    {
         if ($workspaceUid < 1) {
             return [];
         }
 
-        $versions = [];
+        $pairs = [];
         foreach ($this->taskRepository->findMembers($taskUid) as $member) {
             $table = (string)$member['record_table'];
             if (!$this->subjectRegistry->isTrackable($table)) {
                 continue;
             }
-            $versionUid = $this->findVersionUid($table, (int)$member['record_uid'], $workspaceUid);
+            $liveUid = (int)$member['record_uid'];
+            $versionUid = $this->findVersionUid($table, $liveUid, $workspaceUid);
             if ($versionUid > 0) {
-                $versions[$table][] = $versionUid;
+                $pairs[$table][] = ['live' => $liveUid, 'version' => $versionUid];
             }
         }
 
-        return $versions;
+        return $pairs;
     }
 }

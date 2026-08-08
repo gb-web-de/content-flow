@@ -16,6 +16,7 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
+use TYPO3\CMS\Workspaces\Authorization\WorkspacePublishGate;
 
 /**
  * The Content Flow board.
@@ -34,6 +35,7 @@ final class ContentFlowController extends ActionController
         protected readonly TaskRepository $taskRepository,
         protected readonly TaskSubjectRegistry $subjectRegistry,
         protected readonly UriBuilder $backendUriBuilder,
+        protected readonly WorkspacePublishGate $workspacePublishGate,
     ) {
     }
 
@@ -97,6 +99,16 @@ final class ContentFlowController extends ActionController
             'currentPageId',
             $pageUid,
         );
+        // One flag for the whole board, not per card: a backend user is in
+        // exactly one workspace at a time, and WorkspacePublishGate::isGranted()
+        // returns true unconditionally for the live workspace (uid 0) - matching
+        // that a task can only ever hold a real pending version once its own
+        // workspace_uid is set to this same current workspace.
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'canPublish',
+            $workspaceUid > 0 && $this->workspacePublishGate->isGranted($backendUser, $workspaceUid),
+        );
 
         return $moduleTemplate->renderResponse('ContentFlow/Index');
     }
@@ -129,7 +141,7 @@ final class ContentFlowController extends ActionController
         }
 
         $tasks = $this->taskRepository->findOpenForBoard($pageUid);
-        $enrichedTasks = array_map(function (array $task): array {
+        $enrichedTasks = array_map(function (array $task) use ($backendUser): array {
             $table = (string)($task['subject_table'] ?? 'pages');
             $uid = (int)($task['subject_uid'] ?? 0);
             $task['iconIdentifier'] = $table === 'pages' ? 'apps-pagetree-page-default' : 'mimetypes-x-content-text';
@@ -144,6 +156,14 @@ final class ContentFlowController extends ActionController
 
             $task['warnedMembers'] = $this->taskRepository->findWarnedMembers((int)$task['uid'], (int)$task['subject_pid']);
             $task['warnedCount'] = count($task['warnedMembers']);
+            // Gates dragging the card at all (board.js checks the DRAGGED card's
+            // own canAct, not the drop target's). Mirrors the real rule behind
+            // every stage transition, BackendUserAuthentication::
+            // workspaceCheckStageForCurrent(): responsibility is for what
+            // currently SITS in a stage, never for what may move into one - see
+            // WORKSPACE-STAGES.md. Correct unmodified for stage_uid 0 (always
+            // allowed) and for tasks with no workspace version yet (also 0).
+            $task['canAct'] = $backendUser->workspaceCheckStageForCurrent((int)($task['stage_uid'] ?? 0));
             return $task;
         }, $tasks);
 

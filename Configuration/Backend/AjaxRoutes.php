@@ -56,6 +56,11 @@ return [
         'path' => '/contentflow/task/execute-stage',
         'target' => TaskAjaxController::class . '::executeStageAction',
     ],
+    // Publish everything a task still has pending, straight to live.
+    'contentflow_task_publish' => [
+        'path' => '/contentflow/task/publish',
+        'target' => TaskAjaxController::class . '::publishTaskAction',
+    ],
     // Post-Save Task Routing Wizard session check and submission.
     'contentflow_task_wizard_pending' => [
         'path' => '/contentflow/task/wizard-pending',

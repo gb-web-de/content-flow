@@ -21,6 +21,7 @@ import Notification from '@typo3/backend/notification.js';
 import Modal from '@typo3/backend/modal.js';
 import { SeverityEnum } from '@typo3/backend/enum/severity.js';
 import Workspaces from '@typo3/workspaces/workspaces.js';
+import { topLevelModuleImport } from '@typo3/backend/utility/top-level-module-import.js';
 
 import { registerFilters } from '@gb-web/content-flow/board/filters.js';
 import { registerDragAndDrop } from '@gb-web/content-flow/board/drag-drop.js';
@@ -28,6 +29,7 @@ import { registerAssignButtons } from '@gb-web/content-flow/task/assign.js';
 import { registerTicketButtons } from '@gb-web/content-flow/task/ticket.js';
 import { registerCreateButton } from '@gb-web/content-flow/task/create-wizard.js';
 import { registerCommentForm } from '@gb-web/content-flow/task/comment.js';
+import { registerPublishButtons } from '@gb-web/content-flow/task/publish.js';
 
 class ContentFlowBoard {
   constructor() {
@@ -55,6 +57,7 @@ class ContentFlowBoard {
     this.registerCardEvents();
     registerDragAndDrop(this);
     registerFilters(this);
+    registerPublishButtons(this);
   }
 
   /**
@@ -99,6 +102,14 @@ class ContentFlowBoard {
     if (column.dataset.contentflowAcceptsDrop === 'false') {
       return false;
     }
+    // Gates the DRAGGED card, not the target column: core's own stage
+    // permission is about who may act on whatever currently sits in a stage,
+    // never about who may move things into one (see WORKSPACE-STAGES.md).
+    // ContentFlowController::buildBoard() stamps this from the card's own
+    // current stage_uid.
+    if (card.dataset.contentflowCanAct === 'false') {
+      return false;
+    }
 
     const currentState = card.dataset.contentflowState || '';
     const currentStage = this.parseStageUid(card.dataset.contentflowStage);
@@ -123,6 +134,9 @@ class ContentFlowBoard {
   getDropRejectionMessage(card, column) {
     if (column.dataset.contentflowAcceptsDrop === 'false') {
       return 'This column does not accept manual card drops. Going live is an explicit action.';
+    }
+    if (card.dataset.contentflowCanAct === 'false') {
+      return 'You are not responsible for the stage this task currently sits in, so you cannot move it.';
     }
 
     const currentState = card.dataset.contentflowState || '';
@@ -188,6 +202,16 @@ class ContentFlowBoard {
 
   async openStageTransitionModal(taskUid, targetStageUid, columnTitle, cardTitle) {
     try {
+      // TYPO3.Modal is reused from the parent frame when this board runs inside
+      // the backend's content iframe (see modal.js), so the dialog is built in
+      // the parent's realm. A plain `import` here would only register
+      // <typo3-workspaces-send-to-stage-form> in this iframe's realm and the
+      // element would stay undefined where it actually renders. Core's own
+      // iframe-hosted caller of this API (workspaces/backend.js) resolves this
+      // the same way: dispatch the import to the parent frame and let it
+      // register there.
+      await topLevelModuleImport('@typo3/workspaces/renderable/send-to-stage-form.js');
+
       const response = await this.workspaceUi.sendRemoteRequest(
         this.workspaceUi.generateRemotePayloadBody('sendToSpecificStageWindow', [targetStageUid]),
         '.contentflow-board',
@@ -205,8 +229,12 @@ class ContentFlowBoard {
           return;
         }
 
+        // Not `instanceof HTMLFormElement`: TYPO3.Modal is reused from the parent
+        // frame when the board runs inside the backend content iframe (see
+        // modal.js), so the dialog's nodes belong to the parent's realm and
+        // would never match this frame's HTMLFormElement constructor.
         const form = modal.querySelector('form');
-        if (!(form instanceof HTMLFormElement)) {
+        if (form === null || form.tagName !== 'FORM') {
           Notification.error('Content Flow', 'The workspace stage dialog could not be rendered.');
           return;
         }
@@ -217,7 +245,7 @@ class ContentFlowBoard {
 
         modal.dataset.contentflowSubmitting = '1';
         const submitButton = modal.querySelector('button[name="ok"]');
-        if (submitButton instanceof HTMLButtonElement) {
+        if (submitButton !== null) {
           submitButton.disabled = true;
         }
 
@@ -246,7 +274,7 @@ class ContentFlowBoard {
           );
         } finally {
           delete modal.dataset.contentflowSubmitting;
-          if (submitButton instanceof HTMLButtonElement) {
+          if (submitButton !== null) {
             submitButton.disabled = false;
           }
         }

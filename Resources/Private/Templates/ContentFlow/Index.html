@@ -85,7 +85,8 @@
                                 data-contentflow-stage="{card.stage_uid}"
                                 data-contentflow-workspace="{card.workspace_uid}"
                                 data-contentflow-auto="{card.auto_created}"
-                                data-contentflow-warned="{card.warnedCount}">
+                                data-contentflow-warned="{card.warnedCount}"
+                                data-contentflow-can-act="{f:if(condition: card.canAct, then: 'true', else: 'false')}">
                                 <div class="contentflow-card-header">
                                     <span class="contentflow-card-icon">
                                         <f:if condition="{card.iconIdentifier}">
@@ -134,9 +135,15 @@
                                     </f:if>
 
                                     <div class="contentflow-card-actions">
+                                        <f:if condition="{card.workspace_uid} > 0">
+                                            <button type="button" class="btn btn-xs btn-primary contentflow-action-publish"
+                                                    data-task-uid="{card.uid}" data-task-title="{card.title}">
+                                                <core:icon identifier="actions-cloud-upload" size="small" /> Publish
+                                            </button>
+                                        </f:if>
                                         <f:if condition="{card.comments} > 0">
                                             <span class="contentflow-comments-count" title="{card.comments} comments">
-                                                <core:icon identifier="actions-message-discussion" size="small" /> {card.comments}
+                                                <core:icon identifier="actions-message" size="small" /> {card.comments}
                                             </span>
                                         </f:if>
                                     </div>

@@ -37,6 +37,9 @@ final class TaskRepository
     public function findOpenBySubject(string $subjectTable, int $subjectUid): ?array
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        // DeletedRestriction is a no-op here: it only ever adds a constraint for
+        // tables it finds in the TCA schema, and this table has none. `deleted`
+        // must be filtered explicitly or a soft-deleted task keeps being found.
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
         $row = $queryBuilder
@@ -46,6 +49,7 @@ final class TaskRepository
                 $queryBuilder->expr()->eq('subject_table', $queryBuilder->createNamedParameter($subjectTable)),
                 $queryBuilder->expr()->eq('subject_uid', $queryBuilder->createNamedParameter($subjectUid, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )
             ->setMaxResults(1)
             ->executeQuery()
@@ -65,6 +69,13 @@ final class TaskRepository
     public function findOpenTaskByMember(string $recordTable, int $recordUid): ?array
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE_ITEM);
+        // DeletedRestriction is a no-op here: it only ever adds a constraint for
+        // tables it finds in the TCA schema, and this table has none. Without the
+        // explicit filter below, a soft-deleted row (e.g. one released by
+        // RepairTaskDataCommand or TaskRepository::close()'s collision fallback)
+        // still matches here, and with `one_open_task_per_record` now correctly
+        // allowing a fresh open claim alongside it, this lookup would have two
+        // candidate rows and no way to prefer the live one.
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
         $taskUid = $queryBuilder
@@ -74,6 +85,7 @@ final class TaskRepository
                 $queryBuilder->expr()->eq('record_table', $queryBuilder->createNamedParameter($recordTable)),
                 $queryBuilder->expr()->eq('record_uid', $queryBuilder->createNamedParameter($recordUid, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )
             ->setMaxResults(1)
             ->executeQuery()
@@ -88,12 +100,17 @@ final class TaskRepository
     public function findByUid(int $taskUid): ?array
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        // DeletedRestriction is a no-op here: it only ever adds a constraint for
+        // tables it finds in the TCA schema, and this table has none.
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
         $row = $queryBuilder
             ->select('*')
             ->from(self::TABLE)
-            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($taskUid, Connection::PARAM_INT)))
+            ->where(
+                $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($taskUid, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+            )
             ->executeQuery()
             ->fetchAssociative();
 
@@ -130,7 +147,16 @@ final class TaskRepository
         try {
             // The subject is a member of its own task. This insert is what actually
             // claims the record, so it is also what detects a concurrent creation.
-            $this->addMember($taskUid, $subjectTable, $subjectUid, self::ORIGIN_SUBJECT);
+            // `subject_pid` in $values is the same "page this covers" value every
+            // other addMember() call passes as homePid - for a page subject that is
+            // the page's own uid, matching TaskAutoCreationService::derivePid().
+            $this->addMember(
+                $taskUid,
+                $subjectTable,
+                $subjectUid,
+                self::ORIGIN_SUBJECT,
+                (int)($values['subject_pid'] ?? 0),
+            );
         } catch (UniqueConstraintViolationException) {
             // Someone else got there first - drop our now-orphaned task and use theirs.
             $connection->delete(self::TABLE, ['uid' => $taskUid]);
@@ -158,6 +184,11 @@ final class TaskRepository
      * Claim a record for a task. Throws UniqueConstraintViolationException when the
      * record already belongs to another open task - callers decide whether that is
      * an error or simply "leave it where the editor put it".
+     *
+     * `pid` mirrors `home_pid`: the page the record's content actually lives on.
+     * Written into the standard `pid` column too (previously left at its default
+     * 0) so a query can filter "everything under this page" directly instead of
+     * joining back through every record_uid one at a time.
      */
     public function addMember(
         int $taskUid,
@@ -168,6 +199,7 @@ final class TaskRepository
         bool $shared = false,
     ): void {
         $this->connectionPool->getConnectionForTable(self::TABLE_ITEM)->insert(self::TABLE_ITEM, [
+            'pid' => $homePid,
             'task' => $taskUid,
             'record_table' => $recordTable,
             'record_uid' => $recordUid,
@@ -248,6 +280,8 @@ final class TaskRepository
     public function findMembers(int $taskUid): array
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE_ITEM);
+        // DeletedRestriction is a no-op here: it only ever adds a constraint for
+        // tables it finds in the TCA schema, and this table has none.
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
         return $queryBuilder
@@ -256,6 +290,7 @@ final class TaskRepository
             ->where(
                 $queryBuilder->expr()->eq('task', $queryBuilder->createNamedParameter($taskUid, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )
             ->executeQuery()
             ->fetchAllAssociative();
@@ -366,11 +401,40 @@ final class TaskRepository
             ],
             ['uid' => $taskUid],
         );
-        $this->connectionPool->getConnectionForTable(self::TABLE_ITEM)->update(
-            self::TABLE_ITEM,
-            ['closed' => 1, 'tstamp' => $GLOBALS['EXEC_TIME']],
-            ['task' => $taskUid],
-        );
+
+        $itemConnection = $this->connectionPool->getConnectionForTable(self::TABLE_ITEM);
+        try {
+            $itemConnection->update(
+                self::TABLE_ITEM,
+                ['closed' => 1, 'tstamp' => $GLOBALS['EXEC_TIME']],
+                ['task' => $taskUid],
+            );
+        } catch (UniqueConstraintViolationException) {
+            // A record can only ever hold one closed-and-not-deleted slot in
+            // one_open_task_per_record - the bulk update above hit a record that
+            // was already closed once before under an earlier task (edited again
+            // later, e.g. after being detached and re-claimed). That older row
+            // already carries this record's closed history; this one adds
+            // nothing, so it is superseded row by row instead of closed: the
+            // records that CAN close still do, and only the genuine collisions
+            // fall back to being marked deleted.
+            foreach ($this->findMembers($taskUid) as $member) {
+                $itemUid = (int)$member['uid'];
+                try {
+                    $itemConnection->update(
+                        self::TABLE_ITEM,
+                        ['closed' => 1, 'tstamp' => $GLOBALS['EXEC_TIME']],
+                        ['uid' => $itemUid],
+                    );
+                } catch (UniqueConstraintViolationException) {
+                    $itemConnection->update(
+                        self::TABLE_ITEM,
+                        ['deleted' => 1, 'tstamp' => $GLOBALS['EXEC_TIME']],
+                        ['uid' => $itemUid],
+                    );
+                }
+            }
+        }
     }
 
     /**
@@ -390,6 +454,7 @@ final class TaskRepository
             ->where(
                 $queryBuilder->expr()->eq('subject_pid', $queryBuilder->createNamedParameter($pageUid, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )
             ->orderBy('tstamp', 'DESC')
             ->executeQuery()
@@ -412,6 +477,7 @@ final class TaskRepository
             ->where(
                 $queryBuilder->expr()->eq('assignee', $queryBuilder->createNamedParameter($beUserId, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )
             ->orderBy('tstamp', 'DESC')
             ->setMaxResults(max(1, $limit))
@@ -436,6 +502,7 @@ final class TaskRepository
             ->where(
                 $queryBuilder->expr()->eq('assignee', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )
             ->orderBy('sorting', 'ASC')
             ->setMaxResults(max(1, $limit))
