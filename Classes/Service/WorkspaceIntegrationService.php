@@ -74,7 +74,7 @@ final class WorkspaceIntegrationService
                 'title' => $subjectRecord ? BackendUtility::getRecordTitle($subjectTable, $subjectRecord) : sprintf('%s:%d', $subjectTable, $subjectUid),
             ],
             'assignee' => $assigneeUser,
-            'members' => $this->decorateMembers($members, (int)$task['subject_pid']),
+            'members' => $this->decorateMembers($members, (int)$task['subject_pid'], (int)$task['workspace_uid']),
             'warnedCount' => count($warnedMembers),
             'comments' => $comments,
             'activities' => $activities,
@@ -235,7 +235,7 @@ final class WorkspaceIntegrationService
      * @param list<array<string, mixed>> $members
      * @return list<array<string, mixed>>
      */
-    private function decorateMembers(array $members, int $subjectPid): array
+    private function decorateMembers(array $members, int $subjectPid, int $workspaceUid): array
     {
         $decorated = [];
         foreach ($members as $member) {
@@ -253,6 +253,11 @@ final class WorkspaceIntegrationService
             $member['isForeign'] = $homePid > 0 && $homePid !== $subjectPid;
             $member['isShared'] = (int)($member['shared'] ?? 0) === 1;
             $member['needsAttention'] = $member['isForeign'] || $member['isShared'];
+            // Gates the preview/discard buttons: neither makes sense for a
+            // record with nothing pending (e.g. the page subject itself,
+            // before anyone has touched it in this workspace).
+            $member['hasPendingVersion'] = $workspaceUid > 0
+                && BackendUtility::getWorkspaceVersionOfRecord($workspaceUid, $table, $uid, 'uid') !== false;
             $decorated[] = $member;
         }
 

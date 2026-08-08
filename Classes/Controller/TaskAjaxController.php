@@ -27,6 +27,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\View\ViewFactoryData;
 use TYPO3\CMS\Core\View\ViewFactoryInterface;
 use TYPO3\CMS\Workspaces\Authorization\WorkspacePublishGate;
+use TYPO3\CMS\Workspaces\Preview\PreviewUriBuilder;
 
 /**
  * Write and detail endpoints for the board and workspace popups.
@@ -201,6 +202,115 @@ final class TaskAjaxController
             'task' => (int)$task['uid'],
             'from' => (int)$current['uid'],
         ]);
+    }
+
+    /**
+     * A shareable link to preview one member's pending version - the workspace
+     * module's own "view" action (WorkspacesAjaxController::viewSingleRecord()),
+     * scoped to a single record instead of the whole page.
+     */
+    public function previewMemberAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $table = (string)($body['table'] ?? '');
+        $uid = (int)($body['uid'] ?? 0);
+
+        $error = $this->assertMayEdit($table, $uid);
+        if ($error !== null) {
+            return $this->error($error);
+        }
+
+        $task = $this->taskRepository->findOpenTaskByMember($table, $uid);
+        if ($task === null) {
+            return $this->reject(
+                'record-not-in-open-task',
+                'This record does not belong to an open task.',
+                ['table' => $table, 'uid' => $uid],
+            );
+        }
+
+        $workspaceUid = (int)$task['workspace_uid'];
+        // buildUriForElement() wants the version(!) uid - passing the live uid
+        // straight through would preview the already-live content, defeating
+        // the point of a workspace preview.
+        $versionRecord = $workspaceUid > 0
+            ? BackendUtility::getWorkspaceVersionOfRecord($workspaceUid, $table, $uid, 'uid')
+            : false;
+        $versionUid = $versionRecord !== false ? (int)$versionRecord['uid'] : $uid;
+
+        $url = GeneralUtility::makeInstance(PreviewUriBuilder::class)->buildUriForElement($table, $versionUid);
+        if ($url === '') {
+            return $this->reject(
+                'preview-unavailable',
+                'Could not build a preview link for that record.',
+                ['table' => $table, 'uid' => $uid],
+            );
+        }
+
+        return new JsonResponse(['success' => true, 'url' => $url]);
+    }
+
+    /**
+     * Throw away one member's pending version, without touching its task
+     * membership - the live record stays claimed for whenever it is next
+     * edited. `discard()` accepts either uid and resolves the live one to its
+     * version itself (TYPO3\CMS\Core\DataHandling\DataHandler::discard()), so
+     * no separate version lookup is needed here the way publish/setStage need one.
+     */
+    public function discardMemberAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $table = (string)($body['table'] ?? '');
+        $uid = (int)($body['uid'] ?? 0);
+
+        $error = $this->assertMayEdit($table, $uid);
+        if ($error !== null) {
+            return $this->error($error);
+        }
+
+        $task = $this->taskRepository->findOpenTaskByMember($table, $uid);
+        if ($task === null) {
+            return $this->reject(
+                'record-not-in-open-task',
+                'This record does not belong to an open task.',
+                ['table' => $table, 'uid' => $uid],
+            );
+        }
+
+        $workspaceUid = (int)$task['workspace_uid'];
+        if ($workspaceUid < 1) {
+            return $this->reject(
+                'no-pending-versions',
+                'This record has no pending version to discard.',
+                ['table' => $table, 'uid' => $uid],
+            );
+        }
+
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([], [$table => [$uid => ['discard' => true]]]);
+        $dataHandler->process_cmdmap();
+
+        if ($dataHandler->errorLog !== []) {
+            $this->logger->warning('core-refused-discard', [
+                'table' => $table,
+                'uid' => $uid,
+                'taskUid' => (int)$task['uid'],
+                'errors' => $dataHandler->errorLog,
+            ]);
+            return new JsonResponse([
+                'success' => false,
+                'code' => 'core-refused-discard',
+                'message' => implode(' ', array_map('strval', $dataHandler->errorLog)),
+            ], 400);
+        }
+
+        $this->activityLogger->log((int)$task['uid'], ActivityLogger::EVENT_DISCARDED, (int)($this->getBackendUser()->user['uid'] ?? 0), [
+            'table' => $table,
+            'liveUid' => $uid,
+            'workspaceUid' => $workspaceUid,
+        ]);
+
+        return new JsonResponse(['success' => true]);
     }
 
     /**

@@ -26,6 +26,16 @@ return [
         'path' => '/contentflow/task/detach',
         'target' => TaskAjaxController::class . '::detachAction',
     ],
+    // Shareable preview link for one member's pending version.
+    'contentflow_task_preview_member' => [
+        'path' => '/contentflow/task/preview-member',
+        'target' => TaskAjaxController::class . '::previewMemberAction',
+    ],
+    // Throw away one member's pending version, keeping its task membership.
+    'contentflow_task_discard_member' => [
+        'path' => '/contentflow/task/discard-member',
+        'target' => TaskAjaxController::class . '::discardMemberAction',
+    ],
     // Column drop / move stage: update task state or stage.
     'contentflow_task_move_stage' => [
         'path' => '/contentflow/task/move-stage',

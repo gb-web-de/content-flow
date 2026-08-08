@@ -87,6 +87,18 @@
                     <f:if condition="{member.isShared}">
                         <span class="badge badge-warning" title="Other pages reference this record">reused elsewhere</span>
                     </f:if>
+                    <f:if condition="{member.hasPendingVersion}">
+                        <span class="contentflow-member-actions">
+                            <button type="button" class="btn btn-xs btn-default contentflow-member-preview"
+                                    data-table="{member.record_table}" data-uid="{member.record_uid}">
+                                <core:icon identifier="actions-eye" size="small" /> Preview
+                            </button>
+                            <button type="button" class="btn btn-xs btn-danger contentflow-member-discard"
+                                    data-table="{member.record_table}" data-uid="{member.record_uid}" data-title="{member.title}">
+                                <core:icon identifier="actions-delete" size="small" /> Discard
+                            </button>
+                        </span>
+                    </f:if>
                 </li>
             </f:for>
         </ul>

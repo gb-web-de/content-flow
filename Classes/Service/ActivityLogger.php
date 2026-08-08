@@ -44,6 +44,8 @@ final class ActivityLogger
     /** One member went live while others are still pending; the task stays open. */
     public const EVENT_PUBLISHED = 'published';
     public const EVENT_CLOSED = 'closed';
+    /** A member's pending version was thrown away; the record stays claimed. */
+    public const EVENT_DISCARDED = 'discarded';
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,
@@ -80,6 +82,8 @@ final class ActivityLogger
     public function findByTask(int $taskUid): array
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        // DeletedRestriction is a no-op here: it only ever adds a constraint for
+        // tables it finds in the TCA schema, and this table has none.
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
         return $queryBuilder
@@ -87,6 +91,7 @@ final class ActivityLogger
             ->from(self::TABLE)
             ->where(
                 $queryBuilder->expr()->eq('task', $queryBuilder->createNamedParameter($taskUid, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )
             ->orderBy('crdate', 'ASC')
             ->executeQuery()
