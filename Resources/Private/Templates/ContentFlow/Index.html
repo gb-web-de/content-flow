@@ -34,25 +34,78 @@
                 </button>
             </div>
 
+            <f:comment>
+                Scope: how far the board looks beyond the exact selected page.
+                "From workspace root" and the depth select are mutually exclusive in
+                the UI (board/scope.js hides the depth select while root mode is on,
+                and sets both controls' initial value/checked state from
+                TYPO3.settings.ContentFlow.depth/fromWorkspaceRoot on load - no
+                server-rendered selected/checked/hidden attributes here to avoid
+                duplicating that state in two places).
+            </f:comment>
+            <div class="contentflow-scope">
+                <label class="form-label contentflow-scope-label" for="cf-depth">Depth</label>
+                <select id="cf-depth" class="form-select form-control">
+                    <option value="0">This page only</option>
+                    <option value="1">1 level</option>
+                    <option value="2">2 levels</option>
+                    <option value="3">3 levels</option>
+                    <option value="4">4 levels</option>
+                    <option value="999">Infinite</option>
+                </select>
+
+                <label class="contentflow-scope-checkbox">
+                    <input type="checkbox" id="cf-wsroot" />
+                    From workspace root
+                </label>
+
+                <f:if condition="{fromWorkspaceRoot} && {workspaceHasNoRootPages}">
+                    <span class="contentflow-scope-note" title="Set the workspace's root page(s) on the sys_workspace record's Mountpoints tab to use this">
+                        <core:icon identifier="actions-info" size="small" /> This workspace has no root page configured - showing the current page only.
+                    </span>
+                </f:if>
+            </div>
+
             <div class="contentflow-filters">
                 <div class="input-group">
+                    <label class="form-label visually-hidden" for="cf-search-input">Search tasks</label>
                     <span class="input-group-addon"><core:icon identifier="actions-search" size="small" /></span>
                     <input type="search" id="cf-search-input" class="form-control" placeholder="Search tasks by title, record UID...">
                 </div>
 
+                <label class="form-label visually-hidden" for="cf-filter-assignee">Filter by assignee</label>
                 <select id="cf-filter-assignee" class="form-select form-control">
                     <option value="all">All Assignees</option>
                     <option value="me">Assigned to Me</option>
                     <option value="unassigned">Unassigned</option>
                 </select>
 
+                <label class="form-label visually-hidden" for="cf-filter-status">Filter by card status</label>
                 <select id="cf-filter-status" class="form-select form-control">
                     <option value="all">All Cards</option>
                     <option value="auto">Auto-created only</option>
                     <option value="warned">Shared / Cross-page only</option>
                 </select>
 
-                <button type="button" id="cf-clear-filters" class="btn btn-default" title="Clear Filters">
+                <f:comment>
+                    Permission-gated: only rendered when the current backend user
+                    actually has access to more than one workspace
+                    (WorkspaceService::getAvailableWorkspaces() in
+                    ContentFlowController::indexAction() is already filtered through
+                    core's own checkWorkspace()) - a single-workspace editor never
+                    sees a filter with nothing meaningful to filter.
+                </f:comment>
+                <f:if condition="{otherWorkspaces}">
+                    <label class="form-label visually-hidden" for="cf-filter-workspace">Filter by workspace</label>
+                    <select id="cf-filter-workspace" class="form-select form-control">
+                        <option value="all">All Workspaces</option>
+                        <f:for each="{otherWorkspaces}" as="otherWorkspace">
+                            <option value="{otherWorkspace.uid}">{otherWorkspace.title}</option>
+                        </f:for>
+                    </select>
+                </f:if>
+
+                <button type="button" id="cf-clear-filters" class="btn btn-default" title="Clear Filters" aria-label="Clear Filters">
                     <core:icon identifier="actions-close" size="small" />
                 </button>
             </div>
@@ -73,15 +126,16 @@
                         <span class="badge badge-pill badge-secondary">{column.cards -> f:count()}</span>
                         <f:if condition="{column.canManageChecklist}">
                             <button type="button" class="btn btn-xs btn-default contentflow-column-checklist-manage"
-                                    title="Manage review checklist for this stage">
+                                    title="Manage review checklist for this stage"
+                                    aria-label="Manage review checklist for this stage">
                                 <core:icon identifier="actions-cog" size="small" />
                             </button>
                         </f:if>
                     </h3>
                     <ul class="contentflow-column-cards" role="listbox" aria-multiselectable="true">
                         <f:for each="{column.cards}" as="card">
-                            <li class="contentflow-card"
-                                draggable="true"
+                            <li class="contentflow-card {f:if(condition: card.foreignWorkspace, then: 'contentflow-card--foreign-workspace')}"
+                                draggable="{f:if(condition: card.foreignWorkspace, then: 'false', else: 'true')}"
                                 tabindex="0"
                                 role="option"
                                 aria-selected="false"
@@ -124,6 +178,11 @@
                                                 <core:icon identifier="actions-info" size="small" /> {card.warnedCount} shared
                                             </span>
                                         </f:if>
+                                        <f:if condition="{card.foreignWorkspace}">
+                                            <span class="badge contentflow-badge-foreign-workspace" title="Belongs to workspace &quot;{card.foreignWorkspaceTitle}&quot; - switch to it to act on this task">
+                                                <core:icon identifier="actions-workspace" size="small" /> {card.foreignWorkspaceTitle}
+                                            </span>
+                                        </f:if>
                                     </div>
                                 </div>
 
@@ -143,7 +202,7 @@
                                     </f:if>
 
                                     <div class="contentflow-card-actions">
-                                        <f:if condition="{card.workspace_uid} > 0">
+                                        <f:if condition="{card.workspace_uid} > 0 && !{card.foreignWorkspace}">
                                             <button type="button" class="btn btn-xs btn-primary contentflow-action-publish"
                                                     data-task-uid="{card.uid}" data-task-title="{card.title}">
                                                 <core:icon identifier="actions-cloud-upload" size="small" /> Publish

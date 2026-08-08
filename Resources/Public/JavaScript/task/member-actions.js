@@ -1,19 +1,30 @@
 /*
  * Preview / discard for one task member, from inside the ticket modal.
  *
- * Delegated from the document, same reasoning as comment.js: the ticket's
- * member list arrives with the modal, loaded by ajax after the page is ready.
+ * Delegated from the TOP document, not this module's own: the ticket modal is
+ * rendered by TYPO3.Modal into the top-level backend document (see dom-scope.js),
+ * while this script runs inside the board's content iframe - a listener bound to
+ * the iframe's own document would never see clicks on the modal's buttons. The
+ * member list itself arrives with that modal, loaded by ajax after the page is
+ * ready, hence delegation in the first place (same reasoning as comment.js).
  */
 import AjaxRequest from '@typo3/core/ajax/ajax-request.js';
 import Notification from '@typo3/backend/notification.js';
 import Modal from '@typo3/backend/modal.js';
 import { SeverityEnum } from '@typo3/backend/enum/severity.js';
+import { topDocument } from '@gb-web/content-flow/dom-scope.js';
 
 export function registerMemberActions() {
-  document.addEventListener('click', async (event) => {
+  topDocument().addEventListener('click', async (event) => {
     const previewButton = event.target.closest('.contentflow-member-preview');
     if (previewButton !== null) {
       await previewMember(previewButton.dataset.table, parseInt(previewButton.dataset.uid, 10));
+      return;
+    }
+
+    const diffButton = event.target.closest('.contentflow-member-diff');
+    if (diffButton !== null) {
+      jumpToDiff(diffButton.dataset.table, diffButton.dataset.uid, diffButton.closest('.contentflow-ticket'));
       return;
     }
 
@@ -26,6 +37,24 @@ export function registerMemberActions() {
       );
     }
   });
+}
+
+/*
+ * Scrolls the ticket's Changes section to this member's own diff entries and
+ * briefly highlights them - read-only, so no server round trip needed, the data
+ * is already in the DOM (see Ticket.html's `data-table`/`data-uid` on each
+ * .contentflow-diff item, stamped from WorkspaceIntegrationService::
+ * getAggregatedMemberDiffs()).
+ */
+function jumpToDiff(table, uid, ticketRoot) {
+  const scope = ticketRoot || topDocument();
+  const target = scope.querySelector(`.contentflow-diff[data-table="${table}"][data-uid="${uid}"]`);
+  if (target === null) {
+    return;
+  }
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  target.classList.add('is-highlighted');
+  window.setTimeout(() => target.classList.remove('is-highlighted'), 2000);
 }
 
 async function previewMember(table, uid) {

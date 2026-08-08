@@ -6,6 +6,7 @@ namespace GbWeb\ContentFlow\Controller;
 
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use GbWeb\ContentFlow\Service\BoardColumnRegistry;
+use GbWeb\ContentFlow\Service\BoardScopeResolver;
 use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Backend\Attribute\AsController;
@@ -17,6 +18,7 @@ use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use TYPO3\CMS\Workspaces\Authorization\WorkspacePublishGate;
+use TYPO3\CMS\Workspaces\Service\WorkspaceService;
 
 /**
  * The Content Flow board.
@@ -36,6 +38,8 @@ final class ContentFlowController extends ActionController
         protected readonly TaskSubjectRegistry $subjectRegistry,
         protected readonly UriBuilder $backendUriBuilder,
         protected readonly WorkspacePublishGate $workspacePublishGate,
+        protected readonly BoardScopeResolver $boardScopeResolver,
+        protected readonly WorkspaceService $workspaceService,
     ) {
     }
 
@@ -43,8 +47,20 @@ final class ContentFlowController extends ActionController
     {
         $moduleTemplate = $this->moduleTemplateFactory->create($this->request);
         $backendUser = $this->getBackendUser();
-        $pageUid = (int)($this->request->getQueryParams()['id'] ?? 0);
+        $queryParams = $this->request->getQueryParams();
+        $pageUid = (int)($queryParams['id'] ?? 0);
         $workspaceUid = (int)$backendUser->workspace;
+        $depth = (int)($queryParams['depth'] ?? 0);
+        $fromWorkspaceRoot = (bool)($queryParams['wsroot'] ?? false);
+
+        // Own workspaces the user has access to, live workspace excluded (it is
+        // never "other" for the purposes of the cross-workspace badge/filter) and
+        // the currently active one excluded too - only populated, and only then
+        // rendered by the view at all, when there is actually something to filter.
+        $otherWorkspaces = array_values(array_filter(
+            $this->workspaceService->getAvailableWorkspaces(true),
+            static fn (array $workspace): bool => (int)$workspace['uid'] > 0 && (int)$workspace['uid'] !== $workspaceUid,
+        ));
 
         $pageRecord = $pageUid > 0 ? (BackendUtility::getRecord('pages', $pageUid) ?? []) : [];
         $pageTitle = $pageRecord !== [] ? BackendUtility::getRecordTitle('pages', $pageRecord) : '';
@@ -63,11 +79,17 @@ final class ContentFlowController extends ActionController
             ['id' => $pageUid],
         );
 
+        $board = $this->buildBoard($backendUser, $workspaceUid, $pageUid, $depth, $fromWorkspaceRoot);
+
         $moduleTemplate->assignMultiple([
             'pageUid' => $pageUid,
             'pageSelected' => $pageUid > 0,
             'workspaceUid' => $workspaceUid,
-            'columns' => $this->buildBoard($backendUser, $workspaceUid, $pageUid),
+            'columns' => $board['columns'],
+            'depth' => $depth,
+            'fromWorkspaceRoot' => $fromWorkspaceRoot,
+            'workspaceHasNoRootPages' => $board['workspaceHasNoRootPages'],
+            'otherWorkspaces' => $otherWorkspaces,
         ]);
 
         $this->pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css');
@@ -109,6 +131,10 @@ final class ContentFlowController extends ActionController
             'canPublish',
             $workspaceUid > 0 && $this->workspacePublishGate->isGranted($backendUser, $workspaceUid),
         );
+        // Read by board/scope.js to restore the toolbar's depth/root controls after
+        // a reload, and to know which query params to rebuild the module URL with.
+        $this->pageRenderer->addInlineSetting('ContentFlow', 'depth', $depth);
+        $this->pageRenderer->addInlineSetting('ContentFlow', 'fromWorkspaceRoot', $fromWorkspaceRoot);
 
         return $moduleTemplate->renderResponse('ContentFlow/Index');
     }
@@ -131,17 +157,37 @@ final class ContentFlowController extends ActionController
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return array{columns: list<array<string, mixed>>, workspaceHasNoRootPages: bool}
      */
-    private function buildBoard(BackendUserAuthentication $backendUser, int $workspaceUid, int $pageUid): array
-    {
+    private function buildBoard(
+        BackendUserAuthentication $backendUser,
+        int $workspaceUid,
+        int $pageUid,
+        int $depth,
+        bool $fromWorkspaceRoot,
+    ): array {
         $columns = $this->boardColumnRegistry->getColumns($backendUser, $workspaceUid);
         if ($pageUid < 1) {
-            return $columns;
+            return ['columns' => $columns, 'workspaceHasNoRootPages' => false];
         }
 
-        $tasks = $this->taskRepository->findOpenForBoard($pageUid);
-        $enrichedTasks = array_map(function (array $task) use ($backendUser): array {
+        $workspaceHasNoRootPages = false;
+        if ($fromWorkspaceRoot && $workspaceUid > 0) {
+            $pageUids = $this->boardScopeResolver->resolveWorkspaceRootPageUids($workspaceUid, $backendUser);
+            $workspaceHasNoRootPages = $pageUids === [];
+            if ($workspaceHasNoRootPages) {
+                // This workspace has no db_mountpoints configured (the common case -
+                // see BoardScopeResolver's docblock) - fall back to "just the
+                // selected page" rather than showing nothing or silently ignoring
+                // the checkbox. Index.html surfaces this fallback explicitly.
+                $pageUids = $this->boardScopeResolver->resolvePageUids($pageUid, 0, $backendUser);
+            }
+        } else {
+            $pageUids = $this->boardScopeResolver->resolvePageUids($pageUid, $depth, $backendUser);
+        }
+
+        $tasks = $this->taskRepository->findOpenForBoard($pageUids);
+        $enrichedTasks = array_map(function (array $task) use ($backendUser, $workspaceUid): array {
             $table = (string)($task['subject_table'] ?? 'pages');
             $uid = (int)($task['subject_uid'] ?? 0);
             $task['iconIdentifier'] = $table === 'pages' ? 'apps-pagetree-page-default' : 'mimetypes-x-content-text';
@@ -156,6 +202,21 @@ final class ContentFlowController extends ActionController
 
             $task['warnedMembers'] = $this->taskRepository->findWarnedMembers((int)$task['uid'], (int)$task['subject_pid']);
             $task['warnedCount'] = count($task['warnedMembers']);
+
+            // A task whose own workspace_uid points elsewhere than the currently
+            // active workspace: meaningless to act on from here (stage/publish
+            // permissions below are all scoped to the active workspace), so it is
+            // shown read-only in the "Other workspaces" column instead - see
+            // BoardColumnRegistry::getColumns() and belongsInColumn().
+            $taskWorkspaceUid = (int)($task['workspace_uid'] ?? 0);
+            $task['foreignWorkspace'] = $taskWorkspaceUid > 0 && $taskWorkspaceUid !== $workspaceUid;
+            if ($task['foreignWorkspace']) {
+                $foreignWorkspaceRecord = BackendUtility::getRecord('sys_workspace', $taskWorkspaceUid, 'title');
+                $task['foreignWorkspaceTitle'] = $foreignWorkspaceRecord['title'] ?? ('#' . $taskWorkspaceUid);
+                $task['canAct'] = false;
+                return $task;
+            }
+
             // Gates dragging the card at all (board.js checks the DRAGGED card's
             // own canAct, not the drop target's). Mirrors the real rule behind
             // every stage transition, BackendUserAuthentication::
@@ -187,18 +248,28 @@ final class ContentFlowController extends ActionController
             $board[] = $column;
         }
 
-        return $board;
+        return ['columns' => $board, 'workspaceHasNoRootPages' => $workspaceHasNoRootPages];
     }
 
     /**
      * A versioned task belongs to the column of its concrete stage; an unversioned
-     * task belongs to the column of its state.
+     * task belongs to the column of its state. A task from a foreign workspace
+     * belongs to neither - it is routed to the dedicated sentinel column instead
+     * (matched by key, since stageUid/state are already spoken for above).
      *
      * @param array<string, mixed> $task
      * @param array<string, mixed> $column
      */
     private function belongsInColumn(array $task, array $column): bool
     {
+        $foreignWorkspace = (bool)($task['foreignWorkspace'] ?? false);
+        if ($column['key'] === 'other-workspaces') {
+            return $foreignWorkspace;
+        }
+        if ($foreignWorkspace) {
+            return false;
+        }
+
         if ($column['stageUid'] !== null) {
             return (int)($task['workspace_uid'] ?? 0) > 0
                 && (int)($task['stage_uid'] ?? 0) === $column['stageUid'];

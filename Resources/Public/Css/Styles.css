@@ -4,19 +4,24 @@
 :root {
     --contentflow-gap: 16px;
     --contentflow-col-width: 310px;
-    --contentflow-col-bg: var(--typo3-surface-container, #f3f3f3);
+    --contentflow-col-bg: var(--typo3-surface-container-low, #f3f3f3);
     --contentflow-col-border: var(--typo3-component-border-color, #e0e0e0);
     --contentflow-card-bg: var(--typo3-surface-base, #ffffff);
     --contentflow-card-border: var(--typo3-component-border-color, #e2e4e8);
     --contentflow-card-radius: var(--typo3-component-border-radius, 6px);
     --contentflow-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
     --contentflow-card-hover-shadow: 0 6px 16px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
-    --contentflow-accent: var(--typo3-color-primary, #0078d4);
+    --contentflow-accent: var(--typo3-component-primary-color, #0078d4);
     --contentflow-drag-over-bg: var(--typo3-state-info-bg, #e3f2fd);
     --contentflow-typo3-green: #68a614;
     --contentflow-typo3-green-bg: rgba(104, 166, 20, 0.12);
     --contentflow-typo3-red: #d9534f;
     --contentflow-typo3-red-bg: rgba(217, 83, 79, 0.12);
+    /* Deliberately its own hue, distinct from the warning color already used for
+       "needs attention" (shared/foreign-page members) - a foreign-workspace card
+       is a different kind of fact (whose workspace this is), not a warning. */
+    --contentflow-foreign-accent: #6f42c1;
+    --contentflow-foreign-accent-bg: rgba(111, 66, 193, 0.12);
 }
 
 .contentflow-toolbar {
@@ -32,6 +37,41 @@
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+.contentflow-scope {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    background: var(--contentflow-col-bg);
+    border: 1px solid var(--contentflow-col-border);
+    border-radius: 6px;
+}
+
+.contentflow-scope-label {
+    margin: 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    opacity: 0.7;
+}
+
+.contentflow-scope-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.contentflow-scope-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    opacity: 0.75;
 }
 
 .contentflow-filters .input-group {
@@ -123,6 +163,32 @@
     box-shadow: inset 4px 0 0 var(--contentflow-accent), var(--contentflow-card-hover-shadow);
 }
 
+/* Read-only: belongs to a workspace other than the one currently active - see
+   ContentFlowController::buildBoard()'s `foreignWorkspace` flag. Not draggable
+   (cursor communicates that too), Preview/Discard/Publish are all withheld. */
+.contentflow-card--foreign-workspace {
+    cursor: default;
+    border-left: 3px solid var(--contentflow-foreign-accent);
+    background: var(--contentflow-foreign-accent-bg);
+}
+
+.contentflow-card--foreign-workspace:hover {
+    transform: none;
+    border-color: var(--contentflow-foreign-accent);
+}
+
+.contentflow-badge-foreign-workspace {
+    background: var(--contentflow-foreign-accent-bg);
+    color: var(--contentflow-foreign-accent);
+    border: 1px solid var(--contentflow-foreign-accent);
+}
+
+.contentflow-foreign-notice {
+    font-size: 11px;
+    font-style: italic;
+    opacity: 0.75;
+}
+
 /* Drag & Drop States: Valid (TYPO3 Green) vs Invalid (Red) */
 .contentflow-card.is-dragged {
     opacity: 0.4;
@@ -158,7 +224,7 @@
     font-size: 13px;
     font-weight: 600;
     line-height: 1.35;
-    color: var(--typo3-text-color, #222);
+    color: var(--typo3-text-color-base, #222);
     word-break: break-word;
 }
 
@@ -171,7 +237,7 @@
 }
 
 .contentflow-card-meta {
-    color: var(--typo3-text-color-light, #777);
+    color: var(--typo3-text-color-variant, #777);
     font-family: var(--typo3-font-family-monospace, monospace);
 }
 
@@ -204,7 +270,7 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    color: var(--typo3-text-color-light, #666);
+    color: var(--typo3-text-color-variant, #666);
 }
 
 /* Announcer */
@@ -224,7 +290,7 @@
 .contentflow-page-banner {
     margin: 12px 16px;
     padding: 12px 16px;
-    background: var(--typo3-surface-container, #f8f9fa);
+    background: var(--typo3-surface-container-low, #f8f9fa);
     border: 1px solid var(--typo3-component-border-color, #d1d5db);
     border-left: 4px solid var(--contentflow-accent);
     border-radius: 6px;
@@ -298,13 +364,13 @@
 }
 
 .contentflow-diff-table th {
-    background: var(--typo3-surface-container, #f3f4f6);
+    background: var(--typo3-surface-container-low, #f3f4f6);
     font-weight: 600;
 }
 
 .contentflow-diff-old {
     background-color: var(--typo3-state-danger-bg, #fde8e8);
-    color: var(--typo3-state-danger-text, #9b1c1c);
+    color: var(--typo3-state-danger-color, #9b1c1c);
     text-decoration: line-through;
     padding: 2px 4px;
     border-radius: 3px;
@@ -312,7 +378,7 @@
 
 .contentflow-diff-new {
     background-color: var(--typo3-state-success-bg, #def7ec);
-    color: var(--typo3-state-success-text, #03543f);
+    color: var(--typo3-state-success-color, #03543f);
     font-weight: 600;
     padding: 2px 4px;
     border-radius: 3px;
@@ -386,7 +452,7 @@
     gap: 12px;
     margin: 16px 0;
     padding: 12px;
-    background: var(--typo3-surface-container, #f6f6f6);
+    background: var(--typo3-surface-container-low, #f6f6f6);
     border-radius: 4px;
 }
 
@@ -448,8 +514,8 @@
 /* Content reached through a shortcut, or reused elsewhere: changing it
    changes other pages too. That has to be visible, not buried. */
 .contentflow-member.needs-attention {
-    border-left: 3px solid var(--typo3-color-warning, #b8891a);
-    background: var(--typo3-surface-container, #fdf8ee);
+    border-left: 3px solid var(--typo3-state-warning-color, #b8891a);
+    background: var(--typo3-surface-container-low, #fdf8ee);
 }
 
 .contentflow-member-title {
@@ -460,6 +526,20 @@
     border: 1px solid var(--typo3-component-border-color, #ddd);
     border-radius: 4px;
     overflow: hidden;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Jumped to via a member's "Diff" button (task/member-actions.js) - briefly draws
+   the eye to which entries belong to that member. */
+.contentflow-diff.is-highlighted {
+    border-color: var(--contentflow-accent);
+    background: var(--contentflow-drag-over-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .contentflow-diff {
+        transition: none !important;
+    }
 }
 
 .contentflow-diff-head {
@@ -467,7 +547,7 @@
     justify-content: space-between;
     gap: 12px;
     padding: 6px 10px;
-    background: var(--typo3-surface-container, #f6f6f6);
+    background: var(--typo3-surface-container-low, #f6f6f6);
     font-size: 12px;
 }
 
@@ -557,7 +637,7 @@
 }
 
 .contentflow-timeline-entry.is-comment::before {
-    background: var(--typo3-color-info, #0b78d1);
+    background: var(--typo3-state-info-color, #0b78d1);
 }
 
 .contentflow-timeline-head {
@@ -582,8 +662,8 @@
 .contentflow-timeline-comment {
     margin: 6px 0 0;
     padding: 6px 10px;
-    border-left: 3px solid var(--typo3-color-info, #0b78d1);
-    background: var(--typo3-surface-container, #f6f6f6);
+    border-left: 3px solid var(--typo3-state-info-color, #0b78d1);
+    background: var(--typo3-surface-container-low, #f6f6f6);
     font-size: 13px;
 }
 

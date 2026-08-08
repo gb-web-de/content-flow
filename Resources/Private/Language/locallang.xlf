@@ -12,6 +12,9 @@
             <trans-unit id="column.done" xml:space="preserve">
                 <source>Done</source>
             </trans-unit>
+            <trans-unit id="column.other_workspaces" xml:space="preserve">
+                <source>Other workspaces</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

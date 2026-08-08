@@ -6,6 +6,9 @@ export function registerFilters(board) {
     const searchInput = document.querySelector('#cf-search-input');
     const assigneeSelect = document.querySelector('#cf-filter-assignee');
     const statusSelect = document.querySelector('#cf-filter-status');
+    // Only present when ContentFlowController::indexAction() found more than one
+    // workspace the current user has access to - see Index.html.
+    const workspaceSelect = document.querySelector('#cf-filter-workspace');
     const clearBtn = document.querySelector('#cf-clear-filters');
 
     if (!searchInput) return;
@@ -14,15 +17,20 @@ export function registerFilters(board) {
       const query = searchInput.value.toLowerCase().trim();
       const assigneeFilter = assigneeSelect ? assigneeSelect.value : 'all';
       const statusFilter = statusSelect ? statusSelect.value : 'all';
+      const workspaceFilter = workspaceSelect ? workspaceSelect.value : 'all';
 
+      let totalVisible = 0;
+      let totalCards = 0;
       board.board.querySelectorAll('.contentflow-column').forEach((column) => {
         let visibleCount = 0;
         column.querySelectorAll('.contentflow-card').forEach((card) => {
+          totalCards++;
           const title = (card.dataset.contentflowTitle || '').toLowerCase();
           const record = (card.dataset.contentflowRecord || '').toLowerCase();
           const cardAssignee = parseInt(card.dataset.contentflowAssignee || '0', 10);
           const isAuto = card.dataset.contentflowAuto === '1';
           const isWarned = parseInt(card.dataset.contentflowWarned || '0', 10) > 0;
+          const cardWorkspace = card.dataset.contentflowWorkspace || '0';
 
           // Match search query
           const matchesQuery = query === '' || title.includes(query) || record.includes(query);
@@ -44,10 +52,16 @@ export function registerFilters(board) {
             matchesStatus = isWarned;
           }
 
-          const visible = matchesQuery && matchesAssignee && matchesStatus;
+          // Match workspace filter - only ever narrows the "Other workspaces"
+          // column, since every other card already belongs to the active
+          // workspace (or none) and always matches 'all'.
+          const matchesWorkspace = workspaceFilter === 'all' || cardWorkspace === workspaceFilter;
+
+          const visible = matchesQuery && matchesAssignee && matchesStatus && matchesWorkspace;
           card.style.display = visible ? 'flex' : 'none';
           if (visible) {
             visibleCount++;
+            totalVisible++;
           }
         });
 
@@ -57,15 +71,21 @@ export function registerFilters(board) {
           badge.textContent = visibleCount;
         }
       });
+
+      // A board that only communicates a filter's effect by moving pixels is
+      // unusable without sight - see board.js's own announce() docblock.
+      board.announce(`Showing ${totalVisible} of ${totalCards} tasks.`);
     };
 
     searchInput.addEventListener('input', filterCards);
     assigneeSelect?.addEventListener('change', filterCards);
     statusSelect?.addEventListener('change', filterCards);
+    workspaceSelect?.addEventListener('change', filterCards);
     clearBtn?.addEventListener('click', () => {
       searchInput.value = '';
       if (assigneeSelect) assigneeSelect.value = 'all';
       if (statusSelect) statusSelect.value = 'all';
+      if (workspaceSelect) workspaceSelect.value = 'all';
       filterCards();
     });
   }

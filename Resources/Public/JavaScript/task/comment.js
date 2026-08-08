@@ -2,14 +2,17 @@
  * Posting a comment from the ticket view.
  *
  * The form lives inside the ticket modal, which is loaded by ajax after the page
- * is ready - so the handler is delegated from the document rather than bound to
- * an element that does not exist yet.
+ * is ready - so the handler is delegated rather than bound to an element that does
+ * not exist yet. Delegated from the TOP document specifically: TYPO3.Modal renders
+ * the ticket into the top-level backend document, not this script's own (it runs
+ * inside the board's content iframe) - see dom-scope.js.
  */
 import AjaxRequest from '@typo3/core/ajax/ajax-request.js';
 import Notification from '@typo3/backend/notification.js';
+import { topDocument } from '@gb-web/content-flow/dom-scope.js';
 
 export function registerCommentForm() {
-  document.addEventListener('submit', async (event) => {
+  topDocument().addEventListener('submit', async (event) => {
     const form = event.target.closest('[data-contentflow-comment-form]');
     if (form === null) {
       return;

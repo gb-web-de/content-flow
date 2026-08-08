@@ -1015,6 +1015,10 @@ final class TaskAjaxController
                 'edit' => [$subjectTable => [$subjectUid => 'edit']],
                 'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_contentflow', ['id' => (int)$details['task']['subject_pid']]),
             ]),
+            // Lets Ticket.html tell "this task belongs to another workspace than
+            // the one I'm currently in" apart from "not versioned yet" - Preview/
+            // Discard/Comment only make sense once those two match.
+            'activeWorkspaceUid' => (int)$this->getBackendUser()->workspace,
         ]);
 
         return new HtmlResponse($view->render('ContentFlow/Ticket'));

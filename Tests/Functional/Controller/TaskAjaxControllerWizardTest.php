@@ -56,22 +56,30 @@ final class TaskAjaxControllerWizardTest extends FunctionalTestCase
     {
         $connectionPool = $this->get(ConnectionPool::class);
         $taskRepository = $this->get(TaskRepository::class);
+        $checklistRepository = $this->get(\GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository::class);
         $activityLogger = $this->get(ActivityLogger::class);
 
         return new TaskAjaxController(
             $taskRepository,
             new CommentRepository($connectionPool),
+            $checklistRepository,
             $this->get(TaskSubjectRegistry::class),
             $this->get(TaskMemberSynchronizer::class),
             $this->get(ReferenceInspector::class),
             $activityLogger,
+            $this->get(\GbWeb\ContentFlow\Notification\AssignmentNotificationService::class),
             new WorkspaceIntegrationService(
                 $connectionPool,
                 $taskRepository,
+                $checklistRepository,
                 $activityLogger,
                 $this->get(\TYPO3\CMS\Workspaces\Service\HistoryService::class),
                 $this->get(\TYPO3\CMS\Core\Imaging\IconFactory::class),
+                $this->get(\TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceStageRepository::class),
+                $this->get(\TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceRepository::class),
+                $this->get(\TYPO3\CMS\Workspaces\Service\StagesService::class),
             ),
+            $this->get(\TYPO3\CMS\Workspaces\Authorization\WorkspacePublishGate::class),
             $this->get(UriBuilder::class),
             $this->get(ViewFactoryInterface::class),
             new NullLogger(),
