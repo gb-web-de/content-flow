@@ -449,11 +449,15 @@
 .contentflow-ticket-facts {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 12px;
+    gap: 10px;
     margin: 16px 0;
-    padding: 12px;
+}
+
+.contentflow-ticket-fact {
+    padding: 8px 12px;
     background: var(--typo3-surface-container-low, #f6f6f6);
-    border-radius: 4px;
+    border: 1px solid var(--typo3-component-border-color, #e2e4e8);
+    border-radius: var(--contentflow-card-radius, 6px);
 }
 
 .contentflow-ticket-facts dt {
@@ -467,12 +471,25 @@
 .contentflow-ticket-facts dd {
     margin: 0;
     font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .contentflow-unassigned {
     font-style: italic;
     opacity: 0.7;
 }
+
+/* One color per GbWeb\ContentFlow\Domain\Model\TaskState value - core's own
+   .badge class has no opinion on state-specific colors, so without this every
+   state badge (board card meta, ticket facts) rendered as the same flat gray. */
+.badge-backlog { background: var(--typo3-surface-container-low); color: var(--typo3-text-color-variant); }
+.badge-planned { background: var(--typo3-state-info-bg); color: var(--typo3-state-info-color); }
+.badge-in_progress { background: var(--typo3-state-warning-bg); color: var(--typo3-state-warning-color); }
+.badge-review { background: var(--typo3-state-warning-bg); color: var(--typo3-state-warning-color); }
+.badge-ready { background: var(--typo3-state-success-bg); color: var(--typo3-state-success-color); }
+.badge-done { background: var(--typo3-state-success-bg); color: var(--typo3-state-success-color); }
 
 .contentflow-ticket-section {
     margin-top: 24px;
@@ -503,23 +520,67 @@
 
 .contentflow-member {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 8px;
-    padding: 6px 10px;
+    padding: 10px 12px;
     border: 1px solid var(--typo3-component-border-color, #ddd);
-    border-radius: 4px;
+    border-radius: var(--contentflow-card-radius, 6px);
+    background: var(--typo3-surface-container-low, #fafafa);
     font-size: 13px;
+    transition: border-color 0.15s ease;
+}
+
+.contentflow-member:hover {
+    border-color: var(--contentflow-accent);
 }
 
 /* Content reached through a shortcut, or reused elsewhere: changing it
    changes other pages too. That has to be visible, not buried. */
 .contentflow-member.needs-attention {
     border-left: 3px solid var(--typo3-state-warning-color, #b8891a);
-    background: var(--typo3-surface-container-low, #fdf8ee);
+}
+
+.contentflow-member-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.contentflow-member-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.contentflow-member-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
 }
 
 .contentflow-member-title {
-    flex: 1 1 auto;
+    font-weight: 600;
+    word-break: break-word;
+}
+
+.contentflow-member-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.contentflow-member-badges {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.contentflow-member-actions {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
 }
 
 .contentflow-diff {

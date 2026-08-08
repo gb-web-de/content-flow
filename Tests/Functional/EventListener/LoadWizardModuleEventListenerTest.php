@@ -20,6 +20,21 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
  */
 final class LoadWizardModuleEventListenerTest extends FunctionalTestCase
 {
+    /**
+     * @var string[]
+     */
+    protected array $coreExtensionsToLoad = [
+        'typo3/cms-workspaces',
+        'typo3/cms-dashboard',
+    ];
+
+    /**
+     * @var string[]
+     */
+    protected array $testExtensionsToLoad = [
+        'gb-web/content-flow',
+    ];
+
     #[Test]
     public function itQueuesTheWizardModuleOnPageRenderer(): void
     {

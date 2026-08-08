@@ -63,6 +63,17 @@ final class WorkspaceIntegrationService
         // member so Ticket.html can offer a "Diff" jump button only where there is
         // something to jump to.
         $diffs = $this->getAggregatedMemberDiffs($decoratedMembers);
+        // "Covered records" is meant to show what this task actually did, not
+        // every record that merely sits on the page - a page with a dozen
+        // untouched content elements would otherwise bury the one that was
+        // edited. A member qualifies once it has something to act on (a
+        // pending version) or something to show (recorded diff history);
+        // untouched members stay counted in $decoratedMembers for the diff
+        // aggregation above, they just never reach the view.
+        $coveredMembers = array_values(array_filter(
+            $decoratedMembers,
+            static fn (array $member): bool => ($member['hasPendingVersion'] ?? false) || ($member['hasDiffs'] ?? false),
+        ));
         // Empty before the task has a version at all - a checklist reviews
         // work against a stage, and there is no stage to review against yet.
         $checklist = $workspaceUid > 0
@@ -89,7 +100,7 @@ final class WorkspaceIntegrationService
                 'title' => $subjectRecord ? BackendUtility::getRecordTitle($subjectTable, $subjectRecord) : sprintf('%s:%d', $subjectTable, $subjectUid),
             ],
             'assignee' => $assigneeUser,
-            'members' => $decoratedMembers,
+            'members' => $coveredMembers,
             'warnedCount' => count($warnedMembers),
             'comments' => $comments,
             'activities' => $activities,

@@ -31,8 +31,11 @@
     </header>
 
     <dl class="contentflow-ticket-facts">
-        <div><dt>State</dt><dd><span class="badge badge-{task.state}">{task.state}</span></dd></div>
-        <div>
+        <div class="contentflow-ticket-fact">
+            <dt>State</dt>
+            <dd><span class="badge badge-{task.state}">{task.state}</span></dd>
+        </div>
+        <div class="contentflow-ticket-fact">
             <dt>Assignee</dt>
             <dd>
                 <f:if condition="{assignee}">
@@ -45,8 +48,11 @@
                 </f:if>
             </dd>
         </div>
-        <div><dt>Priority</dt><dd>{task.priority}</dd></div>
-        <div>
+        <div class="contentflow-ticket-fact">
+            <dt>Priority</dt>
+            <dd>{task.priority}</dd>
+        </div>
+        <div class="contentflow-ticket-fact">
             <dt>Workspace</dt>
             <dd>
                 <f:if condition="{task.workspace_uid} > 0">
@@ -71,57 +77,76 @@
         </h3>
         <f:comment>
             Members are pages just as often as content elements, so the icon is
-            resolved per record rather than assumed.
+            resolved per record rather than assumed. Only records with something
+            to show (a pending version, or diff history) reach this view at all -
+            see WorkspaceIntegrationService::getTaskDetails()'s $coveredMembers
+            filter. A page task with a dozen untouched content elements would
+            otherwise bury the one record actually edited.
         </f:comment>
-        <ul class="contentflow-member-list">
-            <f:for each="{members}" as="member">
-                <li class="contentflow-member {f:if(condition: member.needsAttention, then: 'needs-attention')}">
-                    <span class="contentflow-member-icon"><f:format.raw>{member.icon}</f:format.raw></span>
-                    <span class="contentflow-member-title">{member.title}</span>
-                    <span class="contentflow-record-ref">{member.record_table}:{member.record_uid}</span>
-                    <f:if condition="{member.isForeign}">
-                        <span class="badge badge-warning" title="This record lives on another page - changing it changes that page too">
-                            from page {member.home_pid}
-                        </span>
-                    </f:if>
-                    <f:if condition="{member.isShared}">
-                        <span class="badge badge-warning" title="Other pages reference this record">reused elsewhere</span>
-                    </f:if>
-                    <f:comment>
-                        Read-only, so shown regardless of workspace context or
-                        pending-version state - jumps down to this member's own
-                        entries in the aggregated Changes section below.
-                    </f:comment>
-                    <f:if condition="{member.hasDiffs}">
-                        <button type="button" class="btn btn-xs btn-default contentflow-member-diff"
-                                data-table="{member.record_table}" data-uid="{member.record_uid}">
-                            <core:icon identifier="actions-code-compare" size="small" /> Diff
-                        </button>
-                    </f:if>
-                    <f:if condition="{member.hasPendingVersion}">
-                        <f:if condition="{task.workspace_uid} > 0 && {task.workspace_uid} != {activeWorkspaceUid}">
-                            <f:then>
-                                <span class="contentflow-foreign-notice" title="This task belongs to another workspace">
-                                    Switch to that workspace to act on this
-                                </span>
-                            </f:then>
-                            <f:else>
+        <f:if condition="{members}">
+            <f:then>
+                <ul class="contentflow-member-list">
+                    <f:for each="{members}" as="member">
+                        <li class="contentflow-member {f:if(condition: member.needsAttention, then: 'needs-attention')}">
+                            <div class="contentflow-member-main">
+                                <span class="contentflow-member-icon"><f:format.raw>{member.icon}</f:format.raw></span>
+                                <div class="contentflow-member-heading">
+                                    <span class="contentflow-member-title">{member.title}</span>
+                                    <span class="contentflow-record-ref">{member.record_table}:{member.record_uid}</span>
+                                </div>
+                            </div>
+                            <div class="contentflow-member-footer">
+                                <div class="contentflow-member-badges">
+                                    <f:if condition="{member.isForeign}">
+                                        <span class="badge badge-warning" title="This record lives on another page - changing it changes that page too">
+                                            from page {member.home_pid}
+                                        </span>
+                                    </f:if>
+                                    <f:if condition="{member.isShared}">
+                                        <span class="badge badge-warning" title="Other pages reference this record">reused elsewhere</span>
+                                    </f:if>
+                                </div>
+                                <f:comment>
+                                    Read-only, so shown regardless of workspace context or
+                                    pending-version state - jumps down to this member's own
+                                    entries in the aggregated Changes section below.
+                                </f:comment>
                                 <span class="contentflow-member-actions">
-                                    <button type="button" class="btn btn-xs btn-default contentflow-member-preview"
-                                            data-table="{member.record_table}" data-uid="{member.record_uid}">
-                                        <core:icon identifier="actions-eye" size="small" /> Preview
-                                    </button>
-                                    <button type="button" class="btn btn-xs btn-danger contentflow-member-discard"
-                                            data-table="{member.record_table}" data-uid="{member.record_uid}" data-title="{member.title}">
-                                        <core:icon identifier="actions-delete" size="small" /> Discard
-                                    </button>
+                                    <f:if condition="{member.hasDiffs}">
+                                        <button type="button" class="btn btn-xs btn-default contentflow-member-diff"
+                                                data-table="{member.record_table}" data-uid="{member.record_uid}">
+                                            <core:icon identifier="actions-code-compare" size="small" /> Diff
+                                        </button>
+                                    </f:if>
+                                    <f:if condition="{member.hasPendingVersion}">
+                                        <f:if condition="{task.workspace_uid} > 0 && {task.workspace_uid} != {activeWorkspaceUid}">
+                                            <f:then>
+                                                <span class="contentflow-foreign-notice" title="This task belongs to another workspace">
+                                                    Switch to that workspace to act on this
+                                                </span>
+                                            </f:then>
+                                            <f:else>
+                                                <button type="button" class="btn btn-xs btn-default contentflow-member-preview"
+                                                        data-table="{member.record_table}" data-uid="{member.record_uid}">
+                                                    <core:icon identifier="actions-eye" size="small" /> Preview
+                                                </button>
+                                                <button type="button" class="btn btn-xs btn-danger contentflow-member-discard"
+                                                        data-table="{member.record_table}" data-uid="{member.record_uid}" data-title="{member.title}">
+                                                    <core:icon identifier="actions-delete" size="small" /> Discard
+                                                </button>
+                                            </f:else>
+                                        </f:if>
+                                    </f:if>
                                 </span>
-                            </f:else>
-                        </f:if>
-                    </f:if>
-                </li>
-            </f:for>
-        </ul>
+                            </div>
+                        </li>
+                    </f:for>
+                </ul>
+            </f:then>
+            <f:else>
+                <p class="contentflow-empty">Nothing edited yet - this task's records will show up here once someone starts work.</p>
+            </f:else>
+        </f:if>
     </section>
 
     <f:if condition="{checklist -> f:count()} > 0">
