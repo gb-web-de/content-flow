@@ -26,6 +26,7 @@ use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\View\ViewFactoryData;
 use TYPO3\CMS\Core\View\ViewFactoryInterface;
+use TYPO3\CMS\Workspaces\Authorization\WorkspacePublishGate;
 
 /**
  * Write and detail endpoints for the board and workspace popups.
@@ -40,6 +41,7 @@ final class TaskAjaxController
         private readonly ReferenceInspector $referenceInspector,
         private readonly ActivityLogger $activityLogger,
         private readonly WorkspaceIntegrationService $workspaceService,
+        private readonly WorkspacePublishGate $workspacePublishGate,
         private readonly UriBuilder $uriBuilder,
         private readonly ViewFactoryInterface $viewFactory,
         private readonly LoggerInterface $logger,
@@ -407,6 +409,121 @@ final class TaskAjaxController
                     'stageId' => $stageUid,
                     'comment' => $comment,
                     'notificationAlternativeRecipients' => $recipients,
+                ];
+            }
+        }
+
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([], $cmd);
+        $dataHandler->process_cmdmap();
+
+        return $dataHandler->errorLog === []
+            ? null
+            : implode(' ', array_map('strval', $dataHandler->errorLog));
+    }
+
+    /**
+     * Publish everything a task still has pending, straight to live.
+     *
+     * Deliberately not a drop target - going live is irreversible, so the board
+     * makes it an explicit, confirmed action instead of something a slightly
+     * off-target drop could trigger (ARCHITECTURE.md).
+     *
+     * Gated by WorkspacePublishGate, the same check core's own
+     * WorkspacesAjaxController::publishSingleRecord() uses: owner/admin only,
+     * independent of stage `responsible_persons` - reaching the final stage
+     * never implies permission to actually publish.
+     *
+     * Closing the task once everything is live is not done here:
+     * CloseTaskAfterPublishListener does it off core's own
+     * AfterRecordPublishedEvent, one per published record, so a task that covers
+     * several records only closes once none of them are pending any more.
+     */
+    public function publishTaskAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $taskUid = (int)($body['task'] ?? 0);
+
+        $task = $this->findOpenTaskOrError($taskUid, 'publish it');
+        if ($task instanceof ResponseInterface) {
+            return $task;
+        }
+
+        $workspaceUid = (int)$task['workspace_uid'];
+        if ($workspaceUid < 1) {
+            return $this->reject(
+                'no-workspace-version',
+                'This task has no workspace version yet, so there is nothing to publish.',
+                ['taskUid' => $taskUid],
+            );
+        }
+
+        if (!$this->workspacePublishGate->isGranted($this->getBackendUser(), $workspaceUid)) {
+            return $this->reject(
+                'publish-not-permitted',
+                'You are not allowed to publish in this workspace.',
+                ['taskUid' => $taskUid, 'workspaceUid' => $workspaceUid],
+            );
+        }
+
+        $pairsByTable = $this->memberSynchronizer->findPendingVersionPairsByTable($taskUid, $workspaceUid);
+        if ($pairsByTable === []) {
+            return $this->reject(
+                'no-pending-versions',
+                'There is nothing pending on this task to publish.',
+                ['taskUid' => $taskUid, 'workspaceUid' => $workspaceUid],
+            );
+        }
+
+        $refusal = $this->askCoreToPublish($pairsByTable);
+        if ($refusal !== null) {
+            $this->logger->warning('core-refused-publish', [
+                'taskUid' => $taskUid,
+                'workspaceUid' => $workspaceUid,
+                'reason' => $refusal,
+                'beUser' => (int)($this->getBackendUser()->user['uid'] ?? 0),
+            ]);
+            return new JsonResponse([
+                'success' => false,
+                'code' => 'core-refused-publish',
+                'message' => $refusal,
+            ], 400);
+        }
+
+        // CloseTaskAfterPublishListener already closed the task, if everything it
+        // covers is now live - re-read rather than assume, since a task with
+        // members outside this workspace's pending set stays open.
+        $reloaded = $this->taskRepository->findByUid($taskUid);
+
+        return new JsonResponse([
+            'success' => true,
+            'closed' => $reloaded === null || (bool)$reloaded['closed'],
+        ]);
+    }
+
+    /**
+     * Hand the publish to TYPO3 and report back whether it was refused.
+     *
+     * Keyed by the LIVE uid with the version as `swapWith` - the opposite order
+     * from setStage/discard, which are keyed by the version uid. Verified
+     * directly against TYPO3\CMS\Workspaces\Hook\DataHandlerHook::version_swap():
+     * $id (the cmdmap key) must be the live record, $swapWith must be the
+     * version whose own t3ver_oid points back at $id. Getting this backwards
+     * fails with "In offline record, either t3ver_oid was not set or the
+     * t3ver_oid didn't match the id of the online version as it must" - see
+     * WORKSPACE-STAGES.md.
+     *
+     * @param array<string, list<array{live: int, version: int}>> $pairsByTable
+     * @return string|null the refusal reason, or null when core accepted
+     */
+    private function askCoreToPublish(array $pairsByTable): ?string
+    {
+        $cmd = [];
+        foreach ($pairsByTable as $table => $pairs) {
+            foreach ($pairs as $pair) {
+                $cmd[$table][$pair['live']]['version'] = [
+                    'action' => 'publish',
+                    'swapWith' => $pair['version'],
                 ];
             }
         }
@@ -803,6 +920,22 @@ final class TaskAjaxController
             return $this->reject(
                 'task-title-required',
                 'A title is required to create a new task.',
+                ['table' => $table, 'uid' => $uid],
+            );
+        }
+
+        // detachIntoOwnTask() only re-points an existing membership row - it never
+        // inserts one. Normally TaskAutoCreationService::resolveTask() has already
+        // claimed this record onto the page task by the time the wizard runs (see
+        // its comment on why), so this should always find something. But this
+        // action is reachable independently of that flow, and without this guard
+        // a miss here would silently create a task with zero members instead of
+        // failing - the same check detachAction() already makes before calling
+        // the same repository method.
+        if ($this->taskRepository->findOpenTaskByMember($table, $uid) === null) {
+            return $this->reject(
+                'record-not-in-open-task',
+                'This record does not belong to an open task, so there is nothing to split into a new one.',
                 ['table' => $table, 'uid' => $uid],
             );
         }

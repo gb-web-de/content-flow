@@ -344,10 +344,13 @@ final class WorkspaceIntegrationService
     }
 
     /**
+     * Public because the assignment notification builds its recipient the same
+     * way: same be_users record shape, same uc/lang fallback.
+     *
      * @param array<string, mixed>|null $backendUser
      * @return array{email: string, lang?: string}|null
      */
-    private function recipientFromBackendUser(?array $backendUser): ?array
+    public function recipientFromBackendUser(?array $backendUser): ?array
     {
         if (!is_array($backendUser)) {
             return null;
