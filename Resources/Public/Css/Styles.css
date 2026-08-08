@@ -189,6 +189,35 @@
     opacity: 0.75;
 }
 
+/* Due-date urgency - colors come from EXTCONF via ContentFlowController::
+   dueDateColorCss() (--contentflow-due-soon/--contentflow-overdue), not
+   hardcoded, so an integrator can retune the warning color without touching
+   this file. The badge (contentflow-badge-due-date, see Index.html) is what
+   actually carries the "why" in words - the border is only ever a repeat of
+   that, never the sole signal. */
+.contentflow-card--due-soon {
+    border-left: 3px solid var(--contentflow-due-soon, #e0a810);
+}
+
+.contentflow-card--overdue {
+    border-left: 3px solid var(--contentflow-overdue, #d9534f);
+}
+
+.contentflow-badge-due-date {
+    background: var(--typo3-surface-container-low, #eee);
+    color: var(--typo3-text-color-variant, #555);
+}
+
+.contentflow-card--due-soon .contentflow-badge-due-date {
+    background: color-mix(in srgb, var(--contentflow-due-soon, #e0a810) 15%, transparent);
+    color: var(--contentflow-due-soon, #e0a810);
+}
+
+.contentflow-card--overdue .contentflow-badge-due-date {
+    background: color-mix(in srgb, var(--contentflow-overdue, #d9534f) 15%, transparent);
+    color: var(--contentflow-overdue, #d9534f);
+}
+
 /* Drag & Drop States: Valid (TYPO3 Green) vs Invalid (Red) */
 .contentflow-card.is-dragged {
     opacity: 0.4;

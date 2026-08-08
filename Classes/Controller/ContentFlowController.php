@@ -93,6 +93,7 @@ final class ContentFlowController extends ActionController
         ]);
 
         $this->pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css');
+        $this->pageRenderer->addCssInlineBlock('content-flow-due-date-colors', $this->dueDateColorCss(), csp: true);
         $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/board.js');
         // Core's element browser gives the "+" button a page tree with live search
         // and depth navigation - no bespoke picker needed.
@@ -186,7 +187,7 @@ final class ContentFlowController extends ActionController
             $pageUids = $this->boardScopeResolver->resolvePageUids($pageUid, $depth, $backendUser);
         }
 
-        $tasks = $this->taskRepository->findOpenForBoard($pageUids);
+        $tasks = $this->taskRepository->findForBoard($pageUids);
         $enrichedTasks = array_map(function (array $task) use ($backendUser, $workspaceUid): array {
             $table = (string)($task['subject_table'] ?? 'pages');
             $uid = (int)($task['subject_uid'] ?? 0);
@@ -202,6 +203,19 @@ final class ContentFlowController extends ActionController
 
             $task['warnedMembers'] = $this->taskRepository->findWarnedMembers((int)$task['uid'], (int)$task['subject_pid']);
             $task['warnedCount'] = count($task['warnedMembers']);
+
+            // Never color-only (ARCHITECTURE.md's "always icon and label, never
+            // silence" rule, already followed everywhere else on the board) -
+            // dueDateLabel carries the same information in words, dueDateUrgency
+            // only picks which accent color the card gets.
+            $dueDate = (int)($task['due_date'] ?? 0);
+            $task['dueDateUrgency'] = $this->computeDueDateUrgency($dueDate);
+            $task['dueDateLabel'] = $this->computeDueDateLabel($dueDate);
+            $task['dueDateCardClass'] = match ($task['dueDateUrgency']) {
+                'overdue' => 'contentflow-card--overdue',
+                'due-soon' => 'contentflow-card--due-soon',
+                default => '',
+            };
 
             // A task whose own workspace_uid points elsewhere than the currently
             // active workspace: meaningless to act on from here (stage/publish
@@ -276,6 +290,80 @@ final class ContentFlowController extends ActionController
         }
         return (int)($task['workspace_uid'] ?? 0) === 0
             && (string)($task['state'] ?? '') === $column['state'];
+    }
+
+    /**
+     * How urgently a card's due date should be flagged, or null for "not due
+     * soon" (no accent). The threshold is EXTCONF-configurable - see
+     * ext_localconf.php - so an integrator can widen or narrow the warning
+     * window without touching this extension's code.
+     */
+    private function computeDueDateUrgency(int $dueDate): ?string
+    {
+        if ($dueDate < 1) {
+            return null;
+        }
+
+        $daysRemaining = $this->daysUntil($dueDate);
+        if ($daysRemaining < 0) {
+            return 'overdue';
+        }
+
+        $warningDays = (int)($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['dueDateThresholds']['warningDays'] ?? 3);
+
+        return $daysRemaining <= $warningDays ? 'due-soon' : null;
+    }
+
+    /**
+     * The words behind computeDueDateUrgency()'s color - a card must never
+     * communicate its due date by color alone (ARCHITECTURE.md's "always icon
+     * and label, never silence" rule, already followed by every other status
+     * indicator on the board).
+     */
+    private function computeDueDateLabel(int $dueDate): ?string
+    {
+        if ($dueDate < 1) {
+            return null;
+        }
+
+        $daysRemaining = $this->daysUntil($dueDate);
+        if ($daysRemaining < 0) {
+            $overdueBy = abs($daysRemaining);
+            return sprintf('Overdue by %d day%s', $overdueBy, $overdueBy === 1 ? '' : 's');
+        }
+        if ($daysRemaining === 0) {
+            return 'Due today';
+        }
+
+        return sprintf('Due in %d day%s', $daysRemaining, $daysRemaining === 1 ? '' : 's');
+    }
+
+    private function daysUntil(int $timestamp): int
+    {
+        $today = (new \DateTimeImmutable('today'))->getTimestamp();
+        $dueDay = (new \DateTimeImmutable('@' . $timestamp))->setTime(0, 0)->getTimestamp();
+
+        return (int)floor(($dueDay - $today) / 86400);
+    }
+
+    /**
+     * Injects the configured warning/overdue colors as CSS custom properties
+     * so Styles.css can consume them via var(--contentflow-due-soon, ...) the
+     * same way it already consumes every --typo3-* design token, with a safe
+     * fallback if EXTCONF holds something that isn't a color at all.
+     */
+    private function dueDateColorCss(): string
+    {
+        $thresholds = $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['dueDateThresholds'] ?? [];
+        $warningColor = $this->sanitizeCssColor((string)($thresholds['warningColor'] ?? ''), '#e0a810');
+        $overdueColor = $this->sanitizeCssColor((string)($thresholds['overdueColor'] ?? ''), '#d9534f');
+
+        return sprintf(':root { --contentflow-due-soon: %s; --contentflow-overdue: %s; }', $warningColor, $overdueColor);
+    }
+
+    private function sanitizeCssColor(string $color, string $fallback): string
+    {
+        return preg_match('/^#[0-9a-fA-F]{3,8}$/', $color) === 1 ? $color : $fallback;
     }
 
     protected function getBackendUser(): BackendUserAuthentication

@@ -79,14 +79,21 @@ final class TaskAjaxController
         // 'open' means deliberately unassigned so someone can take it - a real
         // planning state, not a missing value.
         $assignee = $this->resolveRequestedAssignee($body['assignee'] ?? 'me');
+        $startDate = $this->parseDate($body['startDate'] ?? null);
+        $dueDate = $this->parseDate($body['dueDate'] ?? null);
 
         $task = $this->taskRepository->findOrCreateOpenForSubject($table, $uid, [
             'title' => $title !== '' ? $title : $this->deriveTitle($table, $uid),
             'description' => $description,
             'subject_pid' => $table === 'pages' ? $uid : (int)(BackendUtility::getRecord($table, $uid, 'pid')['pid'] ?? 0),
-            'state' => TaskState::BACKLOG->value,
+            // A start date is the editorial commitment "this is being worked
+            // on" - the board should already show it as Planned rather than
+            // waiting for someone to notice a bare Backlog card and drag it.
+            'state' => $startDate > 0 ? TaskState::PLANNED->value : TaskState::BACKLOG->value,
             'priority' => $priority->value,
             'assignee' => $assignee,
+            'start_date' => $startDate,
+            'due_date' => $dueDate,
             // Planned by a human, so no auto_created flag and no wizard nagging.
             'auto_created' => 0,
         ]);
@@ -808,6 +815,23 @@ final class TaskAjaxController
         }
 
         return null;
+    }
+
+    /**
+     * Parses an HTML `<input type="date">` value ("YYYY-MM-DD") into a unix
+     * timestamp. 0 means "not set" - the wizard's fields are optional, and
+     * `start_date`/`due_date` both default to 0 in ext_tables.sql for exactly
+     * that reason, not to a sentinel that could collide with a real date.
+     */
+    private function parseDate(mixed $rawDate): int
+    {
+        $value = trim((string)($rawDate ?? ''));
+        if ($value === '') {
+            return 0;
+        }
+        $timestamp = strtotime($value . ' 00:00:00');
+
+        return $timestamp !== false ? $timestamp : 0;
     }
 
     private function deriveTitle(string $table, int $uid): string

@@ -1,23 +1,25 @@
 /*
- * Post-save task wizard. Built on TYPO3's supported MultiStepWizard JS API
- * rather than the newer PHP wizard provider classes, which core marks @internal.
+ * Post-save task wizard.
+ *
+ * Not built on TYPO3's MultiStepWizard, despite both flows below looking like
+ * natural candidates for it (a details step, then processing). Reproduced -
+ * with this file already running in the top-level backend chrome document via
+ * AfterBackendPageRenderEvent, no content iframe involved at all - that
+ * MultiStepWizard's own carousel setup in this TYPO3 version throws
+ * `Cannot read properties of null (reading 'addEventListener')` on its own,
+ * a timing race in core between Modal's `requestAnimationFrame`-gated
+ * `showModal()` and the wizard's async slide-advance setup. Not something
+ * this extension can work around short of patching core, so both wizards
+ * here are a single form inside a plain `Modal.advanced()` instead - see
+ * task/create-wizard.js's docblock for the same finding on the "+" flow.
  */
 import DocumentService from '@typo3/core/document-service.js'
 import AjaxRequest from '@typo3/core/ajax/ajax-request.js'
 import Notification from '@typo3/backend/notification.js'
-import MultiStepWizard from '@typo3/backend/multi-step-wizard.js'
+import Modal from '@typo3/backend/modal.js'
 import { SeverityEnum } from '@typo3/backend/enum/severity.js'
 
 import { buildTaskDetailsForm } from '@gb-web/content-flow/task/task-details-form.js'
-
-function updateTitleRequirement(wizard, titleInput, required) {
-  if (!required || titleInput.value.trim() !== '') {
-    wizard.unlockNextStep()
-    return
-  }
-
-  wizard.lockNextStep()
-}
 
 function buildIntro(text) {
   const intro = document.createElement('p')
@@ -97,214 +99,254 @@ class ContentFlowWizard {
   }
 
   openConfigureTaskWizard(pending) {
-    MultiStepWizard.set('actionType', 'configure_auto_task')
-    MultiStepWizard.set('taskUid', pending.taskUid)
-    MultiStepWizard.set('table', pending.table)
-    MultiStepWizard.set('uid', pending.uid)
-    MultiStepWizard.set('title', pending.defaultTitle || pending.subjectTitle || pending.editedTitle || '')
-    MultiStepWizard.set('description', '')
-    MultiStepWizard.set('assignee', 'me')
+    const settings = {
+      actionType: 'configure_auto_task',
+      taskUid: pending.taskUid,
+      table: pending.table,
+      uid: pending.uid,
+    }
 
-    MultiStepWizard.addSlide(
-      'contentflow-configure-auto-task',
-      'Finish task details',
-      '',
-      SeverityEnum.notice,
-      'Details',
-      (slide, settings) => {
-        const wrapper = document.createElement('div')
-        wrapper.append(
-          buildIntro(
-            'A task was opened automatically for this workspace edit. Please confirm the title and add optional details.',
-          ),
-        )
-
-        const fields = buildTaskDetailsForm(settings, {
-          title: pending.defaultTitle || pending.subjectTitle || pending.editedTitle || '',
-          description: '',
-          assignee: 'me',
-        })
-        wrapper.append(fields.element)
-        slide.html(wrapper)
-
-        updateTitleRequirement(MultiStepWizard, fields.titleInput, true)
-        fields.titleInput.addEventListener('input', () => {
-          updateTitleRequirement(MultiStepWizard, fields.titleInput, true)
-        })
-      },
+    const form = document.createElement('form')
+    form.addEventListener('submit', (event) => event.preventDefault())
+    form.append(
+      buildIntro(
+        'A task was opened automatically for this workspace edit. Please confirm the title and add optional details.',
+      ),
     )
 
-    MultiStepWizard.addFinalProcessingSlide(async () => {
-      const settings = MultiStepWizard.setup.settings
-      const title = String(settings.title || '').trim()
-      if (title === '') {
-        Notification.error('Content Flow', 'A title is required.')
-        MultiStepWizard.previous()
-        return
-      }
+    const fields = buildTaskDetailsForm(settings, {
+      title: pending.defaultTitle || pending.subjectTitle || pending.editedTitle || '',
+      description: '',
+      assignee: 'me',
+    })
+    form.append(fields.element)
 
-      try {
-        const result = await this.submit({
-          actionType: settings.actionType,
-          taskUid: settings.taskUid,
-          table: settings.table,
-          uid: settings.uid,
-          title,
-          description: String(settings.description || '').trim(),
-          assignee: settings.assignee,
-        })
+    const modal = Modal.advanced({
+      type: Modal.types.default,
+      title: 'Finish task details',
+      content: form,
+      severity: SeverityEnum.notice,
+      buttons: [
+        {
+          text: 'Cancel',
+          btnClass: 'btn-default',
+          name: 'cancel',
+          trigger: (event, currentModal) => currentModal.hideModal(),
+        },
+        {
+          text: 'Save',
+          btnClass: 'btn-notice',
+          name: 'save',
+          trigger: async (event, currentModal) => {
+            const title = String(settings.title || '').trim()
+            if (title === '') {
+              Notification.warning('Content Flow', 'A title is required.')
+              fields.titleInput.focus()
+              return
+            }
 
-        if (result.success !== true) {
-          Notification.error('Content Flow', result.message || 'Could not save the task details.')
-          MultiStepWizard.previous()
-          return
-        }
+            const saveButton = currentModal.querySelector('button[name="save"]')
+            if (saveButton) {
+              saveButton.disabled = true
+            }
 
-        MultiStepWizard.dismiss()
-        Notification.success('Content Flow', 'Task details saved.')
-        window.location.reload()
-      } catch (error) {
-        Notification.error('Content Flow', 'Could not reach the server.')
-        MultiStepWizard.previous()
-      }
+            try {
+              const result = await this.submit({
+                actionType: settings.actionType,
+                taskUid: settings.taskUid,
+                table: settings.table,
+                uid: settings.uid,
+                title,
+                description: String(settings.description || '').trim(),
+                assignee: settings.assignee,
+              })
+
+              if (result.success !== true) {
+                Notification.error('Content Flow', result.message || 'Could not save the task details.')
+                if (saveButton) {
+                  saveButton.disabled = false
+                }
+                return
+              }
+
+              currentModal.hideModal()
+              Notification.success('Content Flow', 'Task details saved.')
+              window.location.reload()
+            } catch (error) {
+              Notification.error('Content Flow', 'Could not reach the server.')
+              if (saveButton) {
+                saveButton.disabled = false
+              }
+            }
+          },
+        },
+      ],
     })
 
-    MultiStepWizard.show()
+    const updateSaveButton = () => {
+      const saveButton = modal.querySelector('button[name="save"]')
+      if (saveButton) {
+        saveButton.disabled = fields.titleInput.value.trim() === ''
+      }
+    }
+    modal.addEventListener('typo3-modal-shown', updateSaveButton, { once: true })
+    fields.titleInput.addEventListener('input', updateSaveButton)
   }
 
   openRouteMemberWizard(pending) {
-    MultiStepWizard.set('actionType', 'attach_to_page_task')
-    MultiStepWizard.set('table', pending.table)
-    MultiStepWizard.set('uid', pending.uid)
-    MultiStepWizard.set('pageTaskUid', pending.pageTaskUid)
-    MultiStepWizard.set('title', pending.defaultTitle || pending.recordTitle || '')
-    MultiStepWizard.set('description', '')
-    MultiStepWizard.set('assignee', 'me')
-    MultiStepWizard.set('stageChoice', 'in_progress')
+    const settings = {
+      actionType: 'attach_to_page_task',
+      table: pending.table,
+      uid: pending.uid,
+      pageTaskUid: pending.pageTaskUid,
+      stageChoice: 'in_progress',
+    }
 
-    MultiStepWizard.addSlide(
-      'contentflow-route-member',
-      'Route this edit',
-      '',
-      SeverityEnum.notice,
-      'Decision',
-      (slide, settings) => {
-        const wrapper = document.createElement('div')
-        wrapper.append(
-          buildIntro(
-            'An open task already exists for this page. Decide whether this edit belongs there or should become a separate task.',
-          ),
-        )
-
-        const choiceField = document.createElement('fieldset')
-        choiceField.className = 'form-group'
-        const choiceLegend = document.createElement('legend')
-        choiceLegend.className = 'form-label'
-        choiceLegend.textContent = 'Task destination'
-        choiceField.append(choiceLegend)
-
-        const existingChoice = document.createElement('div')
-        existingChoice.className = 'radio'
-        const existingLabel = document.createElement('label')
-        const existingRadio = document.createElement('input')
-        existingRadio.type = 'radio'
-        existingRadio.name = 'contentflow-action-type'
-        existingRadio.value = 'attach_to_page_task'
-        existingRadio.checked = settings.actionType !== 'create_new_task'
-        existingRadio.addEventListener('change', () => {
-          settings.actionType = existingRadio.value
-          toggleSeparateFields()
-        })
-        existingLabel.append(
-          existingRadio,
-          ' ',
-          'Add it to the existing page task ("' + (pending.pageTaskTitle || 'Untitled task') + '")',
-        )
-        existingChoice.append(existingLabel)
-
-        const separateChoice = document.createElement('div')
-        separateChoice.className = 'radio'
-        const separateLabel = document.createElement('label')
-        const separateRadio = document.createElement('input')
-        separateRadio.type = 'radio'
-        separateRadio.name = 'contentflow-action-type'
-        separateRadio.value = 'create_new_task'
-        separateRadio.checked = settings.actionType === 'create_new_task'
-        separateRadio.addEventListener('change', () => {
-          settings.actionType = separateRadio.value
-          toggleSeparateFields()
-        })
-        separateLabel.append(separateRadio, ' ', 'Create a separate task for this record')
-        separateChoice.append(separateLabel)
-
-        choiceField.append(existingChoice, separateChoice)
-        wrapper.append(choiceField)
-
-        const separateFields = document.createElement('div')
-        const fields = buildTaskDetailsForm(settings, {
-          title: pending.defaultTitle || pending.recordTitle || '',
-          description: '',
-          assignee: 'me',
-        })
-        separateFields.append(fields.element, buildStageChoice(settings))
-        wrapper.append(separateFields)
-        slide.html(wrapper)
-
-        const toggleSeparateFields = () => {
-          const separate = settings.actionType === 'create_new_task'
-          separateFields.hidden = !separate
-          updateTitleRequirement(MultiStepWizard, fields.titleInput, separate)
-        }
-
-        toggleSeparateFields()
-        fields.titleInput.addEventListener('input', () => {
-          updateTitleRequirement(MultiStepWizard, fields.titleInput, settings.actionType === 'create_new_task')
-        })
-      },
+    const form = document.createElement('form')
+    form.addEventListener('submit', (event) => event.preventDefault())
+    form.append(
+      buildIntro(
+        'An open task already exists for this page. Decide whether this edit belongs there or should become a separate task.',
+      ),
     )
 
-    MultiStepWizard.addFinalProcessingSlide(async () => {
-      const settings = MultiStepWizard.setup.settings
-      const title = String(settings.title || '').trim()
-      if (settings.actionType === 'create_new_task' && title === '') {
-        Notification.error('Content Flow', 'A title is required.')
-        MultiStepWizard.previous()
-        return
-      }
+    const choiceField = document.createElement('fieldset')
+    choiceField.className = 'form-group'
+    const choiceLegend = document.createElement('legend')
+    choiceLegend.className = 'form-label'
+    choiceLegend.textContent = 'Task destination'
+    choiceField.append(choiceLegend)
 
-      try {
-        const result = await this.submit({
-          actionType: settings.actionType,
-          table: settings.table,
-          uid: settings.uid,
-          pageTaskUid: settings.pageTaskUid,
-          title,
-          description: String(settings.description || '').trim(),
-          assignee: settings.assignee,
-          stageChoice: settings.stageChoice,
-        })
+    const existingChoice = document.createElement('div')
+    existingChoice.className = 'radio'
+    const existingLabel = document.createElement('label')
+    const existingRadio = document.createElement('input')
+    existingRadio.type = 'radio'
+    existingRadio.name = 'contentflow-action-type'
+    existingRadio.value = 'attach_to_page_task'
+    existingRadio.checked = true
+    existingRadio.addEventListener('change', () => {
+      settings.actionType = existingRadio.value
+      toggleSeparateFields()
+    })
+    existingLabel.append(
+      existingRadio,
+      ' ',
+      'Add it to the existing page task ("' + (pending.pageTaskTitle || 'Untitled task') + '")',
+    )
+    existingChoice.append(existingLabel)
 
-        if (result.success !== true) {
-          Notification.error('Content Flow', result.message || 'Could not route the task.')
-          MultiStepWizard.previous()
-          return
-        }
+    const separateChoice = document.createElement('div')
+    separateChoice.className = 'radio'
+    const separateLabel = document.createElement('label')
+    const separateRadio = document.createElement('input')
+    separateRadio.type = 'radio'
+    separateRadio.name = 'contentflow-action-type'
+    separateRadio.value = 'create_new_task'
+    separateRadio.addEventListener('change', () => {
+      settings.actionType = separateRadio.value
+      toggleSeparateFields()
+    })
+    separateLabel.append(separateRadio, ' ', 'Create a separate task for this record')
+    separateChoice.append(separateLabel)
 
-        MultiStepWizard.dismiss()
-        Notification.success(
-          'Content Flow',
-          result.action === 'attached'
-            ? 'Edit added to the existing task.'
-            : 'A separate task was created.',
-        )
-        window.location.reload()
-      } catch (error) {
-        Notification.error('Content Flow', 'Could not reach the server.')
-        MultiStepWizard.previous()
-      }
+    choiceField.append(existingChoice, separateChoice)
+    form.append(choiceField)
+
+    const separateFields = document.createElement('div')
+    const fields = buildTaskDetailsForm(settings, {
+      title: pending.defaultTitle || pending.recordTitle || '',
+      description: '',
+      assignee: 'me',
+    })
+    separateFields.append(fields.element, buildStageChoice(settings))
+    form.append(separateFields)
+
+    let updateSaveButton = () => {}
+    const toggleSeparateFields = () => {
+      const separate = settings.actionType === 'create_new_task'
+      separateFields.hidden = !separate
+      updateSaveButton()
+    }
+    toggleSeparateFields()
+    fields.titleInput.addEventListener('input', updateSaveButton)
+
+    const modal = Modal.advanced({
+      type: Modal.types.default,
+      title: 'Route this edit',
+      content: form,
+      severity: SeverityEnum.notice,
+      buttons: [
+        {
+          text: 'Cancel',
+          btnClass: 'btn-default',
+          name: 'cancel',
+          trigger: (event, currentModal) => currentModal.hideModal(),
+        },
+        {
+          text: 'Continue',
+          btnClass: 'btn-notice',
+          name: 'continue',
+          trigger: async (event, currentModal) => {
+            const title = String(settings.title || '').trim()
+            if (settings.actionType === 'create_new_task' && title === '') {
+              Notification.warning('Content Flow', 'A title is required.')
+              fields.titleInput.focus()
+              return
+            }
+
+            const continueButton = currentModal.querySelector('button[name="continue"]')
+            if (continueButton) {
+              continueButton.disabled = true
+            }
+
+            try {
+              const result = await this.submit({
+                actionType: settings.actionType,
+                table: settings.table,
+                uid: settings.uid,
+                pageTaskUid: settings.pageTaskUid,
+                title,
+                description: String(settings.description || '').trim(),
+                assignee: settings.assignee,
+                stageChoice: settings.stageChoice,
+              })
+
+              if (result.success !== true) {
+                Notification.error('Content Flow', result.message || 'Could not route the task.')
+                if (continueButton) {
+                  continueButton.disabled = false
+                }
+                return
+              }
+
+              currentModal.hideModal()
+              Notification.success(
+                'Content Flow',
+                result.action === 'attached'
+                  ? 'Edit added to the existing task.'
+                  : 'A separate task was created.',
+              )
+              window.location.reload()
+            } catch (error) {
+              Notification.error('Content Flow', 'Could not reach the server.')
+              if (continueButton) {
+                continueButton.disabled = false
+              }
+            }
+          },
+        },
+      ],
     })
 
-    MultiStepWizard.show()
+    updateSaveButton = () => {
+      const continueButton = modal.querySelector('button[name="continue"]')
+      if (continueButton) {
+        continueButton.disabled = settings.actionType === 'create_new_task' && fields.titleInput.value.trim() === ''
+      }
+    }
+    modal.addEventListener('typo3-modal-shown', updateSaveButton, { once: true })
+    toggleSeparateFields()
   }
 
   async submit(payload) {

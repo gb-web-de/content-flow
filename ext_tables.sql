@@ -47,6 +47,12 @@ CREATE TABLE tx_contentflow_task (
 
     # 0 = deliberately unassigned, so an editor can pick the task up themselves.
     assignee int(11) unsigned DEFAULT '0' NOT NULL,
+    # 0 = not planned yet. Setting one is what moves a task from Backlog into
+    # Planned (see TaskAjaxController::createAction()) - a start date is the
+    # editorial commitment "this starts being worked on", so the board should
+    # already show it as planned rather than waiting for someone to notice and
+    # drag the card themselves.
+    start_date int(11) unsigned DEFAULT '0' NOT NULL,
     due_date int(11) unsigned DEFAULT '0' NOT NULL,
 
     # Backlog ordering and priority - planning needs both: sorting is the manual

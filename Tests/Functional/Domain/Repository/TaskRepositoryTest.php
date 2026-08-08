@@ -87,24 +87,24 @@ final class TaskRepositoryTest extends FunctionalTestCase
     }
 
     #[Test]
-    public function findOpenForBoardDoesNotReturnASoftDeletedTask(): void
+    public function findForBoardDoesNotReturnASoftDeletedTask(): void
     {
         $taskUid = $this->createTask(['subject_pid' => 2]);
         $this->softDeleteTask($taskUid);
 
-        self::assertSame([], $this->subject()->findOpenForBoard([2]));
+        self::assertSame([], $this->subject()->findForBoard([2]));
     }
 
     #[Test]
-    public function findOpenForBoardReturnsEmptyForAnEmptyPageUidList(): void
+    public function findForBoardReturnsEmptyForAnEmptyPageUidList(): void
     {
         $this->createTask(['subject_pid' => 2]);
 
-        self::assertSame([], $this->subject()->findOpenForBoard([]));
+        self::assertSame([], $this->subject()->findForBoard([]));
     }
 
     #[Test]
-    public function findOpenForBoardCollectsTasksAcrossMultiplePages(): void
+    public function findForBoardCollectsTasksAcrossMultiplePages(): void
     {
         // The board scope (depth/root scanning, see BoardScopeResolver) resolves
         // to a list of page uids, not one page - this is the query that must
@@ -114,10 +114,45 @@ final class TaskRepositoryTest extends FunctionalTestCase
 
         $foundUids = array_map(
             static fn (array $task): int => (int)$task['uid'],
-            $this->subject()->findOpenForBoard([1, 2]),
+            $this->subject()->findForBoard([1, 2]),
         );
 
         self::assertEqualsCanonicalizing([$homeTaskUid, $aboutUsTaskUid], $foundUids);
+    }
+
+    #[Test]
+    public function findForBoardIncludesClosedTasksSoTheyCanLandInDone(): void
+    {
+        // findOpenForBoard() used to filter these out entirely, which was the
+        // reason a published task vanished from the board instead of showing
+        // up in the Done column - see ContentFlowController::belongsInColumn().
+        $taskUid = $this->createTask(['subject_pid' => 2, 'closed' => 1, 'state' => 'done']);
+
+        $foundUids = array_map(
+            static fn (array $task): int => (int)$task['uid'],
+            $this->subject()->findForBoard([2]),
+        );
+
+        self::assertSame([$taskUid], $foundUids);
+    }
+
+    #[Test]
+    public function closeResetsWorkspaceAndStageUidSoTheTaskMatchesTheDoneColumn(): void
+    {
+        // BoardColumnRegistry's Done column, and ContentFlowController::
+        // belongsInColumn(), both require workspace_uid === 0 for a
+        // Content-Flow-owned state like 'done' to match - a closed task that
+        // kept its old workspace/stage uid matched no column at all (or, worse,
+        // a review-stage column it no longer belonged to).
+        $taskUid = $this->createTask(['workspace_uid' => 1, 'stage_uid' => 2]);
+
+        $this->subject()->close($taskUid, 1);
+
+        $task = $this->subject()->findByUid($taskUid);
+        self::assertSame(0, (int)$task['workspace_uid']);
+        self::assertSame(0, (int)$task['stage_uid']);
+        self::assertSame('done', $task['state']);
+        self::assertSame(1, (int)$task['closed']);
     }
 
     #[Test]

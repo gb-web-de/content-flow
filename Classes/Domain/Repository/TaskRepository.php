@@ -398,6 +398,16 @@ final class TaskRepository
                 'closed_at' => $GLOBALS['EXEC_TIME'],
                 'closed_by' => $beUserId,
                 'tstamp' => $GLOBALS['EXEC_TIME'],
+                // DONE is one of the states TaskState::isOwnedByContentFlow()
+                // groups with BACKLOG/PLANNED as "no workspace version backing
+                // it" - leaving the old workspace_uid/stage_uid in place after
+                // close() contradicted that: ContentFlowController::
+                // belongsInColumn() requires workspace_uid === 0 for the Done
+                // column's state match, so a closed task with its workspace
+                // still attached never landed there, only in whichever stage
+                // column its old stage_uid happened to still match (or nowhere).
+                'workspace_uid' => 0,
+                'stage_uid' => 0,
             ],
             ['uid' => $taskUid],
         );
@@ -438,8 +448,14 @@ final class TaskRepository
     }
 
     /**
-     * All open tasks below one or more pages, for the board. One query - the cards
-     * are grouped in PHP, so adding review stages never adds queries.
+     * All tasks below one or more pages, for the board - open ones for every other
+     * column, and closed ones for Done. One query - the cards are grouped in PHP,
+     * so adding review stages never adds queries.
+     *
+     * Deliberately not filtered by `closed`: Done is a real board column
+     * (BoardColumnRegistry::getColumns()), and a closed task belongs there, not
+     * nowhere - excluding closed tasks here was the reason a published task used
+     * to vanish from the board instead of landing in Done.
      *
      * Not workspace-filtered on purpose: a task belonging to a workspace other than
      * the currently active one is still returned, so the board can show it (badged,
@@ -449,7 +465,7 @@ final class TaskRepository
      * @param list<int> $pageUids
      * @return list<array<string, mixed>>
      */
-    public function findOpenForBoard(array $pageUids): array
+    public function findForBoard(array $pageUids): array
     {
         if ($pageUids === []) {
             return [];
@@ -463,7 +479,6 @@ final class TaskRepository
             ->from(self::TABLE)
             ->where(
                 $queryBuilder->expr()->in('subject_pid', $queryBuilder->createNamedParameter($pageUids, Connection::PARAM_INT_ARRAY)),
-                $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )
             ->orderBy('tstamp', 'DESC')

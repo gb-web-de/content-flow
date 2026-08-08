@@ -134,7 +134,7 @@
                     </h3>
                     <ul class="contentflow-column-cards" role="listbox" aria-multiselectable="true">
                         <f:for each="{column.cards}" as="card">
-                            <li class="contentflow-card {f:if(condition: card.foreignWorkspace, then: 'contentflow-card--foreign-workspace')}"
+                            <li class="contentflow-card {f:if(condition: card.foreignWorkspace, then: 'contentflow-card--foreign-workspace')} {card.dueDateCardClass}"
                                 draggable="{f:if(condition: card.foreignWorkspace, then: 'false', else: 'true')}"
                                 tabindex="0"
                                 role="option"
@@ -181,6 +181,17 @@
                                         <f:if condition="{card.foreignWorkspace}">
                                             <span class="badge contentflow-badge-foreign-workspace" title="Belongs to workspace &quot;{card.foreignWorkspaceTitle}&quot; - switch to it to act on this task">
                                                 <core:icon identifier="actions-workspace" size="small" /> {card.foreignWorkspaceTitle}
+                                            </span>
+                                        </f:if>
+                                        <f:comment>
+                                            Never color-only: the card's left-border accent
+                                            (contentflow-card--due-soon/-overdue, see
+                                            ContentFlowController::computeDueDateUrgency())
+                                            always comes with this same label in words.
+                                        </f:comment>
+                                        <f:if condition="{card.dueDateLabel}">
+                                            <span class="badge contentflow-badge-due-date">
+                                                <core:icon identifier="actions-calendar" size="small" /> {card.dueDateLabel}
                                             </span>
                                         </f:if>
                                     </div>

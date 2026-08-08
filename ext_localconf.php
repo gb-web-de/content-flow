@@ -21,3 +21,15 @@ $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['proc
 // which of their tables work that way, so this is configuration - other
 // extensions may append to it from their own ext_localconf.php.
 $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['subjectTables'] ??= [];
+
+// How urgently a card's due date is flagged on the board (see
+// ContentFlowController::dueDateUrgency() and the Styles.css rules it feeds
+// via injected --contentflow-due-* custom properties). An integrator can
+// override any of these from their own ext_localconf.php; these are only the
+// defaults if they don't.
+$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['dueDateThresholds'] ??= [
+    // A card starts showing as "due soon" this many days before its due date.
+    'warningDays' => 3,
+    'warningColor' => '#e0a810',
+    'overdueColor' => '#d9534f',
+];

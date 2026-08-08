@@ -1,25 +1,27 @@
 /*
  * The "+" flow: pick a record with core's element browser, then collect the
- * task details on top of TYPO3's supported MultiStepWizard.
+ * task details on one form.
+ *
+ * Deliberately not TYPO3's MultiStepWizard: reproduced (with zero involvement
+ * from this extension or the board's content iframe - a bare top-level
+ * `MultiStepWizard.show()` in the browser console crashes identically) that
+ * MultiStepWizard's own carousel setup in this TYPO3 version throws
+ * `Cannot read properties of null (reading 'addEventListener')` the moment a
+ * second slide is involved - a race between Modal's `requestAnimationFrame`-
+ * gated `showModal()` and the wizard's own async slide-advance setup, not
+ * something this extension can work around short of patching core. The form
+ * here is short enough that a wizard added little anyway: one screen, a
+ * Cancel and a Create button, built the same way board/checklist.js's manage
+ * modal already builds a plain form inside `Modal.advanced()`.
  */
 import AjaxRequest from '@typo3/core/ajax/ajax-request.js'
 import Notification from '@typo3/backend/notification.js'
 import Modal from '@typo3/backend/modal.js'
-import MultiStepWizard from '@typo3/backend/multi-step-wizard.js'
 import { SeverityEnum } from '@typo3/backend/enum/severity.js'
 
 import { buildTaskDetailsForm } from '@gb-web/content-flow/task/task-details-form.js'
 
 const ELEMENT_BROWSER_FIELD_REFERENCE_PREFIX = 'contentflow-create-target'
-
-function updateTitleRequirement(wizard, titleInput) {
-  if (titleInput.value.trim() === '') {
-    wizard.lockNextStep()
-    return
-  }
-
-  wizard.unlockNextStep()
-}
 
 function addPriorityField(container, settings) {
   const priorityChoices = [
@@ -48,6 +50,46 @@ function addPriorityField(container, settings) {
 
   field.append(label, select)
   container.append(field)
+}
+
+/*
+ * Start date and due date - a start date moves the task straight into
+ * Planned instead of leaving it in Backlog for someone to notice and drag
+ * (see TaskAjaxController::createAction()). Both are optional: most tasks
+ * still open themselves from editing, unplanned, and that stays true here.
+ */
+function addDateFields(container, settings) {
+  const row = document.createElement('div')
+  row.className = 'form-row contentflow-date-fields'
+
+  const startField = document.createElement('div')
+  startField.className = 'form-group'
+  const startLabel = document.createElement('label')
+  startLabel.className = 'form-label'
+  startLabel.textContent = 'Start date'
+  const startInput = document.createElement('input')
+  startInput.type = 'date'
+  startInput.className = 'form-control'
+  startInput.addEventListener('change', () => {
+    settings.startDate = startInput.value
+  })
+  startField.append(startLabel, startInput)
+
+  const dueField = document.createElement('div')
+  dueField.className = 'form-group'
+  const dueLabel = document.createElement('label')
+  dueLabel.className = 'form-label'
+  dueLabel.textContent = 'Due date'
+  const dueInput = document.createElement('input')
+  dueInput.type = 'date'
+  dueInput.className = 'form-control'
+  dueInput.addEventListener('change', () => {
+    settings.dueDate = dueInput.value
+  })
+  dueField.append(dueLabel, dueInput)
+
+  row.append(startField, dueField)
+  container.append(row)
 }
 
 function getAllowedCreateTables() {
@@ -85,89 +127,95 @@ function formatRecordLabel(table, uid) {
 }
 
 function openNewTaskWizard(board, table, uid, recordTitle) {
-  if (!MultiStepWizard) {
-    createTask(table, uid, { title: recordTitle })
-      .then((result) => {
-        if (result.success !== true) {
-          Notification.error('Content Flow', result.message || 'Could not create the task.')
-          return
-        }
-        board.announce('Created task ' + recordTitle)
-        Notification.success('Content Flow', 'Task created.')
-        window.location.reload()
-      })
-      .catch(() => {
-        Notification.error('Content Flow', 'Could not reach the server.')
-      })
-    return
-  }
+  const settings = { table, uid, priority: 2 }
 
-  MultiStepWizard.set('table', table)
-  MultiStepWizard.set('uid', uid)
-  MultiStepWizard.set('title', recordTitle)
-  MultiStepWizard.set('description', '')
-  MultiStepWizard.set('assignee', 'me')
-  MultiStepWizard.set('priority', 2)
+  const form = document.createElement('form')
+  form.className = 'contentflow-create-form'
+  form.addEventListener('submit', (event) => event.preventDefault())
 
-  MultiStepWizard.addSlide(
-    'contentflow-details',
-    'New task',
-    '',
-    SeverityEnum.notice,
-    'Details',
-    (slide, settings) => {
-      const wrapper = document.createElement('div')
-      const fields = buildTaskDetailsForm(settings, {
-        title: recordTitle,
-        description: '',
-        assignee: 'me',
-      })
+  const fields = buildTaskDetailsForm(settings, {
+    title: recordTitle,
+    description: '',
+    assignee: 'me',
+  })
+  form.append(fields.element)
+  addPriorityField(form, settings)
+  addDateFields(form, settings)
 
-      wrapper.append(fields.element)
-      addPriorityField(wrapper, settings)
-      slide.html(wrapper)
+  const modal = Modal.advanced({
+    type: Modal.types.default,
+    title: 'New task',
+    content: form,
+    severity: SeverityEnum.notice,
+    buttons: [
+      {
+        text: 'Cancel',
+        btnClass: 'btn-default',
+        name: 'cancel',
+        trigger: (event, currentModal) => currentModal.hideModal(),
+      },
+      {
+        text: 'Create',
+        btnClass: 'btn-notice',
+        name: 'create',
+        trigger: async (event, currentModal) => {
+          const title = String(settings.title || '').trim()
+          if (title === '') {
+            Notification.warning('Content Flow', 'A title is required.')
+            fields.titleInput.focus()
+            return
+          }
 
-      updateTitleRequirement(MultiStepWizard, fields.titleInput)
-      fields.titleInput.addEventListener('input', () => {
-        updateTitleRequirement(MultiStepWizard, fields.titleInput)
-      })
-    },
-  )
+          const createButton = currentModal.querySelector('button[name="create"]')
+          if (createButton) {
+            createButton.disabled = true
+          }
 
-  MultiStepWizard.addFinalProcessingSlide(async () => {
-    const settings = MultiStepWizard.setup.settings
-    const title = String(settings.title || '').trim()
-    if (title === '') {
-      Notification.error('Content Flow', 'A title is required.')
-      MultiStepWizard.previous()
-      return
-    }
+          try {
+            const result = await createTask(settings.table, settings.uid, {
+              title,
+              description: String(settings.description || '').trim(),
+              priority: settings.priority,
+              assignee: settings.assignee,
+              startDate: settings.startDate || '',
+              dueDate: settings.dueDate || '',
+            })
 
-    try {
-      const result = await createTask(settings.table, settings.uid, {
-        title,
-        description: String(settings.description || '').trim(),
-        priority: settings.priority,
-        assignee: settings.assignee,
-      })
+            if (result.success !== true) {
+              Notification.error('Content Flow', result.message || 'Could not create the task.')
+              if (createButton) {
+                createButton.disabled = false
+              }
+              return
+            }
 
-      if (result.success !== true) {
-        Notification.error('Content Flow', result.message || 'Could not create the task.')
-        MultiStepWizard.previous()
-        return
-      }
-
-      MultiStepWizard.dismiss()
-      board.announce('Created task ' + title)
-      Notification.success('Content Flow', 'Task created.')
-      window.location.reload()
-    } catch (error) {
-      Notification.error('Content Flow', 'Could not reach the server.')
-      MultiStepWizard.previous()
-    }
+            currentModal.hideModal()
+            board.announce('Created task ' + title)
+            Notification.success('Content Flow', 'Task created.')
+            window.location.reload()
+          } catch (error) {
+            Notification.error('Content Flow', 'Could not reach the server.')
+            if (createButton) {
+              createButton.disabled = false
+            }
+          }
+        },
+      },
+    ],
   })
 
-  MultiStepWizard.show()
+  // Title is required to create the task. Looked up fresh each time rather
+  // than cached once: Modal.advanced() returns before Lit has necessarily
+  // committed its first render, so the button may not exist in the DOM yet
+  // at this point.
+  const updateCreateButton = () => {
+    const createButton = modal.querySelector('button[name="create"]')
+    if (createButton) {
+      createButton.disabled = fields.titleInput.value.trim() === ''
+    }
+  }
+  modal.addEventListener('typo3-modal-shown', updateCreateButton, { once: true })
+  fields.titleInput.addEventListener('input', updateCreateButton)
 }
 
 function openRecordPicker(board) {
