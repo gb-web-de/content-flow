@@ -136,7 +136,8 @@ class ContentFlowBoard {
       return 'This column does not accept manual card drops. Going live is an explicit action.';
     }
     if (card.dataset.contentflowCanAct === 'false') {
-      return 'You are not responsible for the stage this task currently sits in, so you cannot move it.';
+      return 'You are not responsible for the stage this task currently sits in, so you cannot move it. '
+        + 'An administrator can add you (or your group) as a responsible person for that stage in the workspace settings.';
     }
 
     const currentState = card.dataset.contentflowState || '';

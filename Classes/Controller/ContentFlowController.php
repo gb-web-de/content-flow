@@ -163,6 +163,15 @@ final class ContentFlowController extends ActionController
             // currently SITS in a stage, never for what may move into one - see
             // WORKSPACE-STAGES.md. Correct unmodified for stage_uid 0 (always
             // allowed) and for tasks with no workspace version yet (also 0).
+            //
+            // Who counts as "responsible" is entirely core's own, existing
+            // configuration - sys_workspace_stage.responsible_persons, edited on
+            // the stage record in the Workspaces module like any other stage
+            // setting. It already covers every case this could be asked to
+            // support: `be_users_<uid>` for one person, `be_groups_<uid>` for a
+            // team, several of either combined, or a group with every editor in
+            // it for "anyone may act here". Content Flow deliberately adds no
+            // parallel permission model of its own on top of it.
             $task['canAct'] = $backendUser->workspaceCheckStageForCurrent((int)($task['stage_uid'] ?? 0));
             return $task;
         }, $tasks);
