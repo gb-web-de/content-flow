@@ -63,6 +63,8 @@ final class CommentRepository
     public function findByTask(int $taskUid): array
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        // DeletedRestriction is a no-op here: it only ever adds a constraint for
+        // tables it finds in the TCA schema, and this table has none.
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
         return $queryBuilder
@@ -70,6 +72,7 @@ final class CommentRepository
             ->from(self::TABLE)
             ->where(
                 $queryBuilder->expr()->eq('task', $queryBuilder->createNamedParameter($taskUid, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )
             ->orderBy('crdate', 'ASC')
             ->executeQuery()

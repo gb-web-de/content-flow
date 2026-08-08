@@ -30,6 +30,7 @@ import { registerTicketButtons } from '@gb-web/content-flow/task/ticket.js';
 import { registerCreateButton } from '@gb-web/content-flow/task/create-wizard.js';
 import { registerCommentForm } from '@gb-web/content-flow/task/comment.js';
 import { registerPublishButtons } from '@gb-web/content-flow/task/publish.js';
+import { registerMemberActions } from '@gb-web/content-flow/task/member-actions.js';
 
 class ContentFlowBoard {
   constructor() {
@@ -48,6 +49,7 @@ class ContentFlowBoard {
     registerAssignButtons(this);
     // Delegated from the document: the ticket form arrives with the modal.
     registerCommentForm();
+    registerMemberActions();
 
     this.board = document.querySelector('.contentflow-board');
     if (this.board === null) {
