@@ -6,6 +6,7 @@ namespace GbWeb\ContentFlow\EventListener;
 
 use TYPO3\CMS\Backend\Controller\Event\AfterBackendPageRenderEvent;
 use TYPO3\CMS\Core\Attribute\AsEventListener;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Page\PageRenderer;
 
 /**
@@ -31,6 +32,7 @@ final readonly class LoadWizardModuleEventListener
 {
     public function __construct(
         private PageRenderer $pageRenderer,
+        private ConnectionPool $connectionPool,
     ) {
     }
 
@@ -38,5 +40,37 @@ final readonly class LoadWizardModuleEventListener
     public function __invoke(): void
     {
         $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/wizard.js');
+        // Populated here, not only in ContentFlowController, for the same reason
+        // the module itself is loaded here: the wizard's "assign to" field must
+        // work from the Page module, the List module, or a direct record_edit
+        // link, not only from the board.
+        $this->pageRenderer->addInlineSetting('ContentFlow', 'assignableUsers', $this->getAssignableUsers());
+    }
+
+    /**
+     * Every backend user, not just this workspace's members - core exposes no
+     * simple "who has access to workspace X" lookup, and the assignee column
+     * has never been restricted to workspace membership (an admin can already
+     * assign a task to anyone). Fine at the scale this extension targets; a
+     * large multi-thousand-user installation would want this list scoped or
+     * paginated instead of sent whole on every backend page load.
+     *
+     * @return list<array{uid: int, name: string}>
+     */
+    private function getAssignableUsers(): array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('be_users');
+        $rows = $queryBuilder
+            ->select('uid', 'username', 'realName')
+            ->from('be_users')
+            ->orderBy('realName', 'ASC')
+            ->addOrderBy('username', 'ASC')
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        return array_map(static fn (array $row): array => [
+            'uid' => (int)$row['uid'],
+            'name' => !empty($row['realName']) ? (string)$row['realName'] : (string)$row['username'],
+        ], $rows);
     }
 }
