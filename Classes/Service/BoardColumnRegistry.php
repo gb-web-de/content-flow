@@ -84,6 +84,24 @@ final class BoardColumnRegistry
         // drop target. Editors publish from the card, with a confirmation.
         $columns[] = $this->column('done', TaskState::DONE, false);
 
+        // A task whose workspace_uid points at a workspace other than the active
+        // one never matches a stage column above (stage uids are per-workspace) and
+        // never matches a Content Flow state column either (those require
+        // workspace_uid === 0) - it would silently vanish from the board once scope
+        // widens enough to reach it. This sentinel column is where
+        // ContentFlowController::belongsInColumn() routes it instead: visible,
+        // badged, read-only. Matched by 'key', not by state/stageUid, since those
+        // two are already spoken for by the distinction above.
+        $columns[] = [
+            'key' => 'other-workspaces',
+            'label' => $this->getLanguageService()->sL(
+                'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:column.other_workspaces'
+            ) ?: 'Other workspaces',
+            'state' => 'other_workspace',
+            'stageUid' => null,
+            'acceptsDrop' => false,
+        ];
+
         return $columns;
     }
 

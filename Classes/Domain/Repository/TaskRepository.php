@@ -438,13 +438,23 @@ final class TaskRepository
     }
 
     /**
-     * All open tasks below a page, for the board. One query - the cards are grouped
-     * in PHP, so adding review stages never adds queries.
+     * All open tasks below one or more pages, for the board. One query - the cards
+     * are grouped in PHP, so adding review stages never adds queries.
      *
+     * Not workspace-filtered on purpose: a task belonging to a workspace other than
+     * the currently active one is still returned, so the board can show it (badged,
+     * read-only) instead of it silently vanishing - see
+     * ContentFlowController::buildBoard().
+     *
+     * @param list<int> $pageUids
      * @return list<array<string, mixed>>
      */
-    public function findOpenForBoard(int $pageUid): array
+    public function findOpenForBoard(array $pageUids): array
     {
+        if ($pageUids === []) {
+            return [];
+        }
+
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
@@ -452,7 +462,7 @@ final class TaskRepository
             ->select('*')
             ->from(self::TABLE)
             ->where(
-                $queryBuilder->expr()->eq('subject_pid', $queryBuilder->createNamedParameter($pageUid, Connection::PARAM_INT)),
+                $queryBuilder->expr()->in('subject_pid', $queryBuilder->createNamedParameter($pageUids, Connection::PARAM_INT_ARRAY)),
                 $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )

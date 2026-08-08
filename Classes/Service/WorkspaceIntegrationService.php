@@ -54,8 +54,15 @@ final class WorkspaceIntegrationService
         $warnedMembers = $this->taskRepository->findWarnedMembers($taskUid, (int)$task['subject_pid']);
         $comments = $this->getTaskComments($taskUid);
         $activities = $this->activityLogger->findByTask($taskUid);
-        $diffs = $this->getRecordDiffs($subjectTable, $subjectUid);
         $workspaceUid = (int)$task['workspace_uid'];
+        $decoratedMembers = $this->decorateMembers($members, (int)$task['subject_pid'], $workspaceUid);
+        // The subject is always a member of its own task (see
+        // TaskRepository::findOrCreateOpenForSubject()), so aggregating diffs across
+        // every member already covers the subject too - no separate subject-only
+        // call needed, and nothing to deduplicate. Also stamps `hasDiffs` onto each
+        // member so Ticket.html can offer a "Diff" jump button only where there is
+        // something to jump to.
+        $diffs = $this->getAggregatedMemberDiffs($decoratedMembers);
         // Empty before the task has a version at all - a checklist reviews
         // work against a stage, and there is no stage to review against yet.
         $checklist = $workspaceUid > 0
@@ -82,7 +89,7 @@ final class WorkspaceIntegrationService
                 'title' => $subjectRecord ? BackendUtility::getRecordTitle($subjectTable, $subjectRecord) : sprintf('%s:%d', $subjectTable, $subjectUid),
             ],
             'assignee' => $assigneeUser,
-            'members' => $this->decorateMembers($members, (int)$task['subject_pid'], (int)$task['workspace_uid']),
+            'members' => $decoratedMembers,
             'warnedCount' => count($warnedMembers),
             'comments' => $comments,
             'activities' => $activities,
@@ -90,6 +97,46 @@ final class WorkspaceIntegrationService
             'diffs' => $diffs,
             'checklist' => $checklist,
         ];
+    }
+
+    /**
+     * The full change picture for a task: every member's own field diffs, not just
+     * the subject's - a page task with several content-element members previously
+     * only ever showed the page's own history, silently hiding what actually changed
+     * inside those elements.
+     *
+     * Grouped by member (each member's own diffs already newest-first, per core's
+     * HistoryService), not merge-sorted across members: `datetime` here is a
+     * site-formatted string from BackendUtility::datetime(), not a raw timestamp,
+     * so it cannot be compared reliably across records.
+     *
+     * Mutates $decoratedMembers in place, stamping `hasDiffs` onto each member -
+     * cheaper than a second pass, and keeps "does this member have a diff to jump
+     * to" defined in exactly one place.
+     *
+     * @param list<array<string, mixed>> $decoratedMembers
+     * @return list<array{label: string, html: string, user: string, datetime: string, record: string, table: string, uid: int}>
+     */
+    private function getAggregatedMemberDiffs(array &$decoratedMembers): array
+    {
+        $diffs = [];
+        foreach ($decoratedMembers as &$member) {
+            $table = (string)$member['record_table'];
+            $uid = (int)$member['record_uid'];
+            $memberDiffs = $this->getRecordDiffs($table, $uid);
+            $member['hasDiffs'] = $memberDiffs !== [];
+            foreach ($memberDiffs as $diff) {
+                $diff['record'] = ($member['title'] ?? '') !== ''
+                    ? sprintf('%s (%s:%d)', $member['title'], $table, $uid)
+                    : sprintf('%s:%d', $table, $uid);
+                $diff['table'] = $table;
+                $diff['uid'] = $uid;
+                $diffs[] = $diff;
+            }
+        }
+        unset($member);
+
+        return $diffs;
     }
 
     /**

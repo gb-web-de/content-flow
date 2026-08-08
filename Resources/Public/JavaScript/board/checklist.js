@@ -7,8 +7,11 @@ import AjaxRequest from '@typo3/core/ajax/ajax-request.js';
 import Notification from '@typo3/backend/notification.js';
 import Modal from '@typo3/backend/modal.js';
 import { SeverityEnum } from '@typo3/backend/enum/severity.js';
+import { topDocument } from '@gb-web/content-flow/dom-scope.js';
 
 export function registerChecklistManagement() {
+  // The gear button lives on the board itself (this script's own document), not
+  // inside a modal - no top-document delegation needed here.
   document.addEventListener('click', async (event) => {
     const button = event.target.closest('.contentflow-column-checklist-manage');
     if (button === null) {
@@ -23,11 +26,13 @@ export function registerChecklistManagement() {
 }
 
 /*
- * Checking an item off in the ticket - delegated, same reasoning as
- * task/comment.js: the ticket's checklist arrives with the modal.
+ * Checking an item off in the ticket - delegated from the TOP document, same
+ * reasoning as task/comment.js: the ticket's checklist arrives with a modal that
+ * TYPO3.Modal renders into the top-level backend document, not this script's own
+ * (see dom-scope.js).
  */
 export function registerChecklistToggle() {
-  document.addEventListener('change', async (event) => {
+  topDocument().addEventListener('change', async (event) => {
     const checkbox = event.target.closest('[data-contentflow-checklist-toggle]');
     if (checkbox === null) {
       return;

@@ -96,6 +96,31 @@ final class TaskRepositoryTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function findOpenForBoardReturnsEmptyForAnEmptyPageUidList(): void
+    {
+        $this->createTask(['subject_pid' => 2]);
+
+        self::assertSame([], $this->subject()->findOpenForBoard([]));
+    }
+
+    #[Test]
+    public function findOpenForBoardCollectsTasksAcrossMultiplePages(): void
+    {
+        // The board scope (depth/root scanning, see BoardScopeResolver) resolves
+        // to a list of page uids, not one page - this is the query that must
+        // aggregate across all of them in a single call.
+        $homeTaskUid = $this->createTask(['subject_pid' => 1, 'subject_uid' => 1]);
+        $aboutUsTaskUid = $this->createTask(['subject_pid' => 2, 'subject_uid' => 2]);
+
+        $foundUids = array_map(
+            static fn (array $task): int => (int)$task['uid'],
+            $this->subject()->findOpenForBoard([1, 2]),
+        );
+
+        self::assertEqualsCanonicalizing([$homeTaskUid, $aboutUsTaskUid], $foundUids);
+    }
+
+    #[Test]
     public function findOpenByAssigneeDoesNotReturnASoftDeletedTask(): void
     {
         $taskUid = $this->createTask(['assignee' => 7]);
