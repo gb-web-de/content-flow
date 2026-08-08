@@ -22,11 +22,13 @@ export function buildTaskDetailsForm(settings, defaults = {}) {
   const initialDescription = typeof settings.description === 'string'
     ? settings.description
     : (defaults.description || '')
-  const initialAssignee = settings.assignee === 'open' ? 'open' : (defaults.assignee === 'open' ? 'open' : 'me')
-  const assigneeChoices = [
-    ['me', 'Assign to me'],
-    ['open', 'Leave open for someone to take'],
-  ]
+  const assignableUsers = Array.isArray(TYPO3.settings.ContentFlow?.assignableUsers)
+    ? TYPO3.settings.ContentFlow.assignableUsers
+    : []
+  const isAssignableUserId = (value) => assignableUsers.some((user) => String(user.uid) === String(value))
+  const initialAssignee = settings.assignee === 'open' || isAssignableUserId(settings.assignee)
+    ? settings.assignee
+    : (defaults.assignee === 'open' || isAssignableUserId(defaults.assignee) ? defaults.assignee : 'me')
 
   const titleInput = document.createElement('input')
   titleInput.type = 'text'
@@ -52,9 +54,22 @@ export function buildTaskDetailsForm(settings, defaults = {}) {
   const assigneeSelect = document.createElement('select')
   assigneeSelect.className = 'form-select form-control'
   const assignee = initialAssignee
-  assigneeChoices.forEach(([value, label]) => {
+  const baseChoices = [
+    ['me', 'Assign to me'],
+    ['open', 'Leave open for someone to take'],
+  ]
+  baseChoices.forEach(([value, label]) => {
     assigneeSelect.add(new Option(label, value, value === assignee, value === assignee))
   })
+  if (assignableUsers.length > 0) {
+    const group = document.createElement('optgroup')
+    group.label = 'Assign to someone else'
+    assignableUsers.forEach((user) => {
+      const value = String(user.uid)
+      group.appendChild(new Option(user.name, value, value === assignee, value === assignee))
+    })
+    assigneeSelect.appendChild(group)
+  }
   settings.assignee = assigneeSelect.value
   assigneeSelect.addEventListener('change', () => {
     settings.assignee = assigneeSelect.value

@@ -9,6 +9,7 @@ use GbWeb\ContentFlow\Domain\Model\TaskState;
 use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
 use GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\ContentFlow\Notification\AssignmentNotificationService;
 use GbWeb\ContentFlow\Service\ActivityLogger;
 use GbWeb\ContentFlow\Service\ReferenceInspector;
 use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
@@ -43,6 +44,7 @@ final class TaskAjaxController
         private readonly TaskMemberSynchronizer $memberSynchronizer,
         private readonly ReferenceInspector $referenceInspector,
         private readonly ActivityLogger $activityLogger,
+        private readonly AssignmentNotificationService $assignmentNotificationService,
         private readonly WorkspaceIntegrationService $workspaceService,
         private readonly WorkspacePublishGate $workspacePublishGate,
         private readonly UriBuilder $uriBuilder,
@@ -93,6 +95,14 @@ final class TaskAjaxController
         $claimed = 0;
         if ($table === 'pages') {
             $claimed = $this->memberSynchronizer->syncPageMembers($taskUid, $uid);
+        }
+
+        // Guards the idempotent-existing-task path: findOrCreateOpenForSubject()
+        // ignores $values entirely when the task already existed, so the
+        // persisted assignee only matches what was requested here when it was
+        // genuinely just applied.
+        if ((int)$task['assignee'] === $assignee) {
+            $this->notifyAssignment($taskUid, (string)$task['title'], $table, $uid, $assignee);
         }
 
         return new JsonResponse([
@@ -821,15 +831,58 @@ final class TaskAjaxController
     }
 
     /**
-     * 'open' means deliberately unassigned so someone can take the task later;
-     * everything else collapses to the current editor because the wizard does not
-     * offer arbitrary user picking yet.
+     * 'open' means deliberately unassigned so someone can take the task later.
+     * 'me' and anything else that is not a valid be_user uid collapse to the
+     * current editor. A specific uid - offered by task-details-form.js's
+     * "assign to someone else" group, backed by the same be_users list
+     * LoadWizardModuleEventListener exposes - is honoured once verified to be
+     * a real, non-deleted user: never trust a client-supplied uid without
+     * looking it up.
      */
     private function resolveRequestedAssignee(mixed $rawAssignee): int
     {
-        return (string)$rawAssignee === 'open'
-            ? 0
-            : (int)($this->getBackendUser()->user['uid'] ?? 0);
+        if ((string)$rawAssignee === 'open') {
+            return 0;
+        }
+        $requestedUid = (int)$rawAssignee;
+        if ($requestedUid > 0 && BackendUtility::getRecord('be_users', $requestedUid, 'uid') !== null) {
+            return $requestedUid;
+        }
+        return (int)($this->getBackendUser()->user['uid'] ?? 0);
+    }
+
+    /**
+     * Tell an assignee they were handed a task.
+     *
+     * Deliberately does not decide *whether* this is a real, new assignment -
+     * that judgment differs by caller (a fresh task's assignee is always "new";
+     * an existing task's is only new if it actually changed from before) and
+     * belongs where that context already lives. AssignmentNotificationService
+     * itself still skips silently when $assigneeBeUserId is the acting editor.
+     */
+    private function notifyAssignment(int $taskUid, string $taskTitle, string $subjectTable, int $subjectUid, int $assigneeBeUserId): void
+    {
+        if ($assigneeBeUserId < 1) {
+            return;
+        }
+
+        $subjectRecord = BackendUtility::getRecord($subjectTable, $subjectUid);
+        $subjectTitle = $subjectRecord !== null
+            ? BackendUtility::getRecordTitle($subjectTable, $subjectRecord)
+            : sprintf('%s:%d', $subjectTable, $subjectUid);
+        $pageUid = $subjectTable === 'pages' ? $subjectUid : (int)($subjectRecord['pid'] ?? 0);
+
+        $this->assignmentNotificationService->notifyAssignee(
+            $assigneeBeUserId,
+            (int)($this->getBackendUser()->user['uid'] ?? 0),
+            $taskUid,
+            $taskTitle,
+            $subjectTitle,
+            (string)$this->uriBuilder->buildUriFromRoute('record_edit', [
+                'edit' => [$subjectTable => [$subjectUid => 'edit']],
+                'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_contentflow', ['id' => $pageUid]),
+            ]),
+        );
     }
 
     /**
@@ -1025,8 +1078,18 @@ final class TaskAjaxController
             if ($task instanceof ResponseInterface) {
                 return $task;
             }
+            $previousAssignee = (int)$task['assignee'];
 
             $this->taskRepository->updateDetails($taskUid, $title, $description, $assignee);
+
+            // Only when it actually changed - re-submitting the same wizard
+            // with the same assignee must not re-notify. Links to the task's
+            // own subject, not $table/$uid - those are the record that was
+            // being edited, which for a page-bound content element is not
+            // necessarily the same thing (see TaskAutoCreationService::resolveTask()).
+            if ($assignee !== $previousAssignee) {
+                $this->notifyAssignment($taskUid, $title, (string)$task['subject_table'], (int)$task['subject_uid'], $assignee);
+            }
 
             return new JsonResponse(['success' => true, 'task' => $taskUid, 'action' => 'configured']);
         }
@@ -1085,6 +1148,11 @@ final class TaskAjaxController
             'stageChoice' => $stageChoice,
             'wizard' => true,
         ]);
+
+        // Always a fresh task here - detachIntoOwnTask() has no idempotent
+        // "already existed" path the way findOrCreateOpenForSubject() does, so
+        // unlike createAction() there is nothing to guard against.
+        $this->notifyAssignment((int)$task['uid'], $title, $table, $uid, $assignee);
 
         return new JsonResponse(['success' => true, 'task' => (int)$task['uid'], 'action' => 'created']);
     }
