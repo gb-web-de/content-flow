@@ -104,6 +104,38 @@
         </ul>
     </section>
 
+    <f:if condition="{checklist -> f:count()} > 0">
+        <section class="contentflow-ticket-section">
+            <h3>Review checklist</h3>
+            <f:comment>
+                Only rendered once the task has entered a stage with a
+                configured checklist - see
+                WorkspaceIntegrationService::getTaskDetails(). Not gated by
+                canManageChecklist: filling this in is editorial work done
+                while passing through the stage, not workspace policy.
+            </f:comment>
+            <ul class="contentflow-checklist">
+                <f:for each="{checklist}" as="item">
+                    <li class="contentflow-checklist-item {f:if(condition: item.completed, then: 'is-completed')}">
+                        <label>
+                            <f:if condition="{item.completed}">
+                                <f:then>
+                                    <input type="checkbox" checked="checked"
+                                           data-contentflow-checklist-toggle="{task.uid}" data-item-uid="{item.uid}" />
+                                </f:then>
+                                <f:else>
+                                    <input type="checkbox"
+                                           data-contentflow-checklist-toggle="{task.uid}" data-item-uid="{item.uid}" />
+                                </f:else>
+                            </f:if>
+                            {item.title}
+                        </label>
+                    </li>
+                </f:for>
+            </ul>
+        </section>
+    </f:if>
+
     <section class="contentflow-ticket-section">
         <h3>History</h3>
         <f:comment>

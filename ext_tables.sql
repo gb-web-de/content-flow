@@ -1,7 +1,11 @@
 #
-# Content Flow owns four tables.
+# Content Flow owns six tables.
 # Because these tables do not have full TCA definitions, all base columns
 # (uid, pid, tstamp, crdate, deleted) are explicitly declared in this SQL schema.
+# The same absence means DeletedRestriction is a silent no-op for all of them -
+# every repository query filters `deleted` explicitly instead, see
+# GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository::findItemsForStage()
+# for the reasoning.
 #
 
 #
@@ -181,4 +185,60 @@ CREATE TABLE tx_contentflow_activity (
 
     PRIMARY KEY (uid),
     KEY task (task, crdate)
+);
+
+#
+# A stage's own review checklist definition - one policy, reused by every task
+# that passes through this stage in this workspace. Not per-task: "did we check
+# links" is a property of the Review stage itself, not of any one task.
+#
+# stage_uid follows the same convention tx_contentflow_task.stage_uid does:
+# a real sys_workspace_stage uid, or one of core's fixed stage ids (0, -10, -20).
+#
+CREATE TABLE tx_contentflow_stage_checklist_item (
+    uid int(11) unsigned NOT NULL auto_increment,
+    pid int(11) unsigned DEFAULT '0' NOT NULL,
+
+    workspace_uid int(11) unsigned DEFAULT '0' NOT NULL,
+    stage_uid int(11) DEFAULT '0' NOT NULL,
+    title varchar(255) DEFAULT '' NOT NULL,
+    sorting int(11) unsigned DEFAULT '0' NOT NULL,
+
+    tstamp int(11) unsigned DEFAULT '0' NOT NULL,
+    crdate int(11) unsigned DEFAULT '0' NOT NULL,
+    deleted tinyint(4) unsigned DEFAULT '0' NOT NULL,
+
+    PRIMARY KEY (uid),
+    KEY stage (workspace_uid, stage_uid, deleted)
+);
+
+#
+# One task's completion of one stage checklist item. The relationship - has this
+# task checked this item off - has its own row, independent of both sides: the
+# item definition can be edited or removed without rewriting every task's state,
+# and a task's state is never lost by a definition change.
+#
+# No `deleted` column: nothing soft-deletes a state row directly. Toggling
+# `completed` back to 0 is how a check is undone; when the item itself is
+# removed (stage_checklist_item.deleted = 1), its state rows simply stop being
+# reachable through findItemsForStage()'s join and are never read again.
+#
+CREATE TABLE tx_contentflow_task_checklist_state (
+    uid int(11) unsigned NOT NULL auto_increment,
+    pid int(11) unsigned DEFAULT '0' NOT NULL,
+
+    task int(11) unsigned DEFAULT '0' NOT NULL,
+    checklist_item int(11) unsigned DEFAULT '0' NOT NULL,
+    completed tinyint(1) unsigned DEFAULT '0' NOT NULL,
+    completed_by int(11) unsigned DEFAULT '0' NOT NULL,
+    completed_at int(11) unsigned DEFAULT '0' NOT NULL,
+
+    tstamp int(11) unsigned DEFAULT '0' NOT NULL,
+    crdate int(11) unsigned DEFAULT '0' NOT NULL,
+
+    PRIMARY KEY (uid),
+    # Enforces "one state row per task per item" at the database level - the
+    # insert-then-catch upsert in TaskChecklistRepository::setCompletion() relies
+    # on this constraint existing to detect "a row is already there".
+    UNIQUE KEY task_item (task, checklist_item)
 );

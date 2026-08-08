@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GbWeb\ContentFlow\Service;
 
+use GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
@@ -23,6 +24,7 @@ final class WorkspaceIntegrationService
     public function __construct(
         private readonly ConnectionPool $connectionPool,
         private readonly TaskRepository $taskRepository,
+        private readonly TaskChecklistRepository $checklistRepository,
         private readonly ActivityLogger $activityLogger,
         private readonly HistoryService $historyService,
         private readonly IconFactory $iconFactory,
@@ -53,6 +55,12 @@ final class WorkspaceIntegrationService
         $comments = $this->getTaskComments($taskUid);
         $activities = $this->activityLogger->findByTask($taskUid);
         $diffs = $this->getRecordDiffs($subjectTable, $subjectUid);
+        $workspaceUid = (int)$task['workspace_uid'];
+        // Empty before the task has a version at all - a checklist reviews
+        // work against a stage, and there is no stage to review against yet.
+        $checklist = $workspaceUid > 0
+            ? $this->checklistRepository->findChecklistForTask($taskUid, $workspaceUid, (int)$task['stage_uid'])
+            : [];
 
         $assigneeUser = null;
         $assigneeUid = (int)($task['assignee'] ?? 0);
@@ -80,6 +88,7 @@ final class WorkspaceIntegrationService
             'activities' => $activities,
             'timeline' => $this->buildTimeline($activities, $comments),
             'diffs' => $diffs,
+            'checklist' => $checklist,
         ];
     }
 
