@@ -31,6 +31,7 @@ import { registerCreateButton } from '@gb-web/content-flow/task/create-wizard.js
 import { registerCommentForm } from '@gb-web/content-flow/task/comment.js';
 import { registerPublishButtons } from '@gb-web/content-flow/task/publish.js';
 import { registerMemberActions } from '@gb-web/content-flow/task/member-actions.js';
+import { registerChecklistManagement, registerChecklistToggle } from '@gb-web/content-flow/board/checklist.js';
 
 class ContentFlowBoard {
   constructor() {
@@ -50,6 +51,7 @@ class ContentFlowBoard {
     // Delegated from the document: the ticket form arrives with the modal.
     registerCommentForm();
     registerMemberActions();
+    registerChecklistToggle();
 
     this.board = document.querySelector('.contentflow-board');
     if (this.board === null) {
@@ -60,6 +62,7 @@ class ContentFlowBoard {
     registerDragAndDrop(this);
     registerFilters(this);
     registerPublishButtons(this);
+    registerChecklistManagement();
   }
 
   /**
@@ -269,6 +272,15 @@ class ContentFlowBoard {
           modal.hideModal();
           this.announce(`Moved ${cardTitle} to ${columnTitle}.`);
           Notification.success('Content Flow', `${cardTitle} moved to ${columnTitle}.`);
+          // Soft warning, never a block: core already decided the move itself
+          // is allowed, this only flags that the stage being left had unchecked
+          // review items.
+          if (result.incompleteChecklistItems > 0) {
+            Notification.warning(
+              'Content Flow',
+              `${result.incompleteChecklistItems} checklist item(s) were left unchecked in the previous stage.`,
+            );
+          }
           window.location.reload();
         } catch (error) {
           Notification.error(

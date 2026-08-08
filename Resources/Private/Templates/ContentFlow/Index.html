@@ -64,11 +64,19 @@
                          data-contentflow-column="{column.key}"
                          data-contentflow-state="{column.state}"
                          data-contentflow-stage="{column.stageUid}"
+                         data-contentflow-workspace="{workspaceUid}"
                          data-contentflow-accepts-drop="{f:if(condition: column.acceptsDrop, then: 'true', else: 'false')}"
+                         data-contentflow-checklist-items="{column.checklistItemsJson}"
                          aria-labelledby="cf-col-{column.key}">
                     <h3 class="contentflow-column-header" id="cf-col-{column.key}">
                         <span class="contentflow-column-title">{column.label}</span>
                         <span class="badge badge-pill badge-secondary">{column.cards -> f:count()}</span>
+                        <f:if condition="{column.canManageChecklist}">
+                            <button type="button" class="btn btn-xs btn-default contentflow-column-checklist-manage"
+                                    title="Manage review checklist for this stage">
+                                <core:icon identifier="actions-cog" size="small" />
+                            </button>
+                        </f:if>
                     </h3>
                     <ul class="contentflow-column-cards" role="listbox" aria-multiselectable="true">
                         <f:for each="{column.cards}" as="card">

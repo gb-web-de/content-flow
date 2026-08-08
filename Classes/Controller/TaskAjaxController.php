@@ -7,6 +7,7 @@ namespace GbWeb\ContentFlow\Controller;
 use GbWeb\ContentFlow\Domain\Model\TaskPriority;
 use GbWeb\ContentFlow\Domain\Model\TaskState;
 use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
+use GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use GbWeb\ContentFlow\Service\ActivityLogger;
 use GbWeb\ContentFlow\Service\ReferenceInspector;
@@ -37,6 +38,7 @@ final class TaskAjaxController
     public function __construct(
         private readonly TaskRepository $taskRepository,
         private readonly CommentRepository $commentRepository,
+        private readonly TaskChecklistRepository $checklistRepository,
         private readonly TaskSubjectRegistry $subjectRegistry,
         private readonly TaskMemberSynchronizer $memberSynchronizer,
         private readonly ReferenceInspector $referenceInspector,
@@ -491,9 +493,20 @@ final class TaskAjaxController
             ], 400);
         }
 
+        // Read before recordStageChange() moves the task on: a soft warning
+        // about the stage being LEFT, not the one being entered - see
+        // TaskChecklistRepository::countIncomplete(). Never blocks the move;
+        // core is already the one true gate for whether this transition is
+        // allowed at all.
+        $incompleteChecklistItems = $this->checklistRepository->countIncomplete($taskUid, $workspaceUid, (int)$task['stage_uid']);
+
         $this->recordStageChange($task, $targetStageUid, $comment, $recipients, $versionsByTable);
 
-        return new JsonResponse(['success' => true, 'stageUid' => $targetStageUid]);
+        return new JsonResponse([
+            'success' => true,
+            'stageUid' => $targetStageUid,
+            'incompleteChecklistItems' => $incompleteChecklistItems,
+        ]);
     }
 
     /**
@@ -1112,5 +1125,122 @@ final class TaskAjaxController
         );
 
         return new JsonResponse(['success' => true]);
+    }
+
+    /**
+     * Check or uncheck one review checklist item for one task.
+     *
+     * Open to anyone who can act on the task, unlike add/remove: filling in a
+     * stage's checklist is editorial work done while passing through it, not
+     * workspace policy - that distinction is what canManageChecklist() gates
+     * instead.
+     */
+    public function checklistToggleAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $taskUid = (int)($body['task'] ?? 0);
+        $itemUid = (int)($body['itemUid'] ?? 0);
+        $completed = (bool)($body['completed'] ?? false);
+
+        $task = $this->findOpenTaskOrError($taskUid, 'update its checklist');
+        if ($task instanceof ResponseInterface) {
+            return $task;
+        }
+        if ($itemUid < 1) {
+            return $this->reject('missing-checklist-item', 'No checklist item was specified.', ['taskUid' => $taskUid]);
+        }
+
+        $this->checklistRepository->setCompletion(
+            $taskUid,
+            $itemUid,
+            $completed,
+            (int)($this->getBackendUser()->user['uid'] ?? 0),
+        );
+
+        return new JsonResponse(['success' => true]);
+    }
+
+    /**
+     * Add a checklist item to a stage's review policy.
+     */
+    public function checklistAddAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $workspaceUid = (int)($body['workspaceUid'] ?? 0);
+        $stageUid = (int)($body['stageUid'] ?? 0);
+        $title = trim((string)($body['title'] ?? ''));
+
+        if (!$this->canManageChecklist($workspaceUid)) {
+            return $this->reject(
+                'checklist-not-permitted',
+                'You are not allowed to manage this workspace\'s checklists.',
+                ['workspaceUid' => $workspaceUid],
+            );
+        }
+        if ($title === '') {
+            return $this->reject(
+                'checklist-title-required',
+                'A title is required to add a checklist item.',
+                ['workspaceUid' => $workspaceUid, 'stageUid' => $stageUid],
+            );
+        }
+
+        // Appended, not reordered - an integrator who wants a different order
+        // removes and re-adds; there is no drag-to-reorder in the manage modal.
+        $sorting = count($this->checklistRepository->findItemsForStage($workspaceUid, $stageUid));
+        $itemUid = $this->checklistRepository->addItem($workspaceUid, $stageUid, $title, $sorting);
+
+        return new JsonResponse(['success' => true, 'item' => ['uid' => $itemUid, 'title' => $title]]);
+    }
+
+    /**
+     * Remove a checklist item from a stage's review policy.
+     *
+     * Soft-deletes the definition only - existing tx_contentflow_task_checklist_state
+     * rows for it are left alone, and simply become unreachable through
+     * findItemsForStage()'s join. A task that already checked it off keeps no
+     * visible trace, which is correct: the policy no longer asks for it.
+     */
+    public function checklistRemoveAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $workspaceUid = (int)($body['workspaceUid'] ?? 0);
+        $itemUid = (int)($body['itemUid'] ?? 0);
+
+        if (!$this->canManageChecklist($workspaceUid)) {
+            return $this->reject(
+                'checklist-not-permitted',
+                'You are not allowed to manage this workspace\'s checklists.',
+                ['workspaceUid' => $workspaceUid],
+            );
+        }
+        if ($itemUid < 1) {
+            return $this->reject('missing-checklist-item', 'No checklist item was specified.', ['workspaceUid' => $workspaceUid]);
+        }
+
+        $this->checklistRepository->removeItem($itemUid);
+
+        return new JsonResponse(['success' => true]);
+    }
+
+    /**
+     * Same rule as GbWeb\ContentFlow\Service\BoardColumnRegistry::canManageChecklist()
+     * - configuring a stage's checklist is workspace policy, not editorial
+     * work, so it is restricted the same way publishing is: workspace owner or
+     * admin. Kept as its own three lines rather than shared with that class,
+     * which builds board columns and has no reason to depend on the ajax
+     * controller or vice versa.
+     */
+    private function canManageChecklist(int $workspaceUid): bool
+    {
+        $backendUser = $this->getBackendUser();
+        if ($backendUser->isAdmin()) {
+            return true;
+        }
+        if ($workspaceUid < 1) {
+            return false;
+        }
+        $access = $backendUser->checkWorkspace($workspaceUid);
+        return is_array($access) && ($access['_ACCESS'] ?? '') === 'owner';
     }
 }

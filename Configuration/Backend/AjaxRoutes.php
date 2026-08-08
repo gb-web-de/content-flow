@@ -80,4 +80,19 @@ return [
         'path' => '/contentflow/task/wizard-submit',
         'target' => TaskAjaxController::class . '::wizardSubmitAction',
     ],
+    // Review checklist: check/uncheck one item for one task.
+    'contentflow_checklist_toggle' => [
+        'path' => '/contentflow/checklist/toggle',
+        'target' => TaskAjaxController::class . '::checklistToggleAction',
+    ],
+    // Review checklist: add an item to a stage's policy (workspace owner only).
+    'contentflow_checklist_add' => [
+        'path' => '/contentflow/checklist/add',
+        'target' => TaskAjaxController::class . '::checklistAddAction',
+    ],
+    // Review checklist: remove an item from a stage's policy (workspace owner only).
+    'contentflow_checklist_remove' => [
+        'path' => '/contentflow/checklist/remove',
+        'target' => TaskAjaxController::class . '::checklistRemoveAction',
+    ],
 ];

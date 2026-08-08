@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GbWeb\ContentFlow\Service;
 
 use GbWeb\ContentFlow\Domain\Model\TaskState;
+use GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceRepository;
@@ -35,6 +36,7 @@ final class BoardColumnRegistry
         private readonly WorkspaceStageRepository $workspaceStageRepository,
         private readonly WorkspaceRepository $workspaceRepository,
         private readonly StagesService $stagesService,
+        private readonly TaskChecklistRepository $checklistRepository,
     ) {
     }
 
@@ -54,7 +56,12 @@ final class BoardColumnRegistry
             $this->column('planned', TaskState::PLANNED, true),
         ];
 
+        $canManageChecklist = $this->canManageChecklist($backendUser, $workspaceUid);
         foreach ($this->getStages($backendUser, $workspaceUid) as $stageUid) {
+            $checklistItems = array_map(
+                static fn (array $item): array => ['uid' => (int)$item['uid'], 'title' => (string)$item['title']],
+                $this->checklistRepository->findItemsForStage($workspaceUid, $stageUid),
+            );
             $columns[] = [
                 'key' => 'stage-' . $stageUid,
                 'label' => $this->stagesService->getStageTitle($stageUid),
@@ -62,6 +69,14 @@ final class BoardColumnRegistry
                 'stageUid' => $stageUid,
                 // Dropping here triggers a core stage transition, never a direct write.
                 'acceptsDrop' => true,
+                // Configuring a stage's checklist is workspace policy, not
+                // editorial work - restricted to whoever owns the workspace
+                // (or admin), same as publishing.
+                'canManageChecklist' => $canManageChecklist,
+                // Pre-encoded: checklist.js's manage modal reads this straight
+                // out of the column's dataset, and Fluid has no JSON format
+                // ViewHelper in this version to do it in the template instead.
+                'checklistItemsJson' => json_encode($checklistItems, JSON_THROW_ON_ERROR),
             ];
         }
 
@@ -70,6 +85,23 @@ final class BoardColumnRegistry
         $columns[] = $this->column('done', TaskState::DONE, false);
 
         return $columns;
+    }
+
+    /**
+     * Whether the current user may add or remove checklist items for stages in
+     * this workspace - workspace policy, not editorial work, so restricted to
+     * whoever owns the workspace (or admin), same as publishing.
+     */
+    private function canManageChecklist(BackendUserAuthentication $backendUser, int $workspaceUid): bool
+    {
+        if ($backendUser->isAdmin()) {
+            return true;
+        }
+        if ($workspaceUid < 1) {
+            return false;
+        }
+        $access = $backendUser->checkWorkspace($workspaceUid);
+        return is_array($access) && ($access['_ACCESS'] ?? '') === 'owner';
     }
 
     /**
