@@ -1,0 +1,21 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:section name="Subject">"{taskTitle}" was assigned to you</f:section>
+
+<p>
+    <f:if condition="{assignerName}">
+        <f:then><strong>{assignerName}</strong> assigned you a task on Content Flow:</f:then>
+        <f:else>You were assigned a task on Content Flow:</f:else>
+    </f:if>
+</p>
+
+<p><strong>{taskTitle}</strong></p>
+<p>{subjectTitle}</p>
+
+<f:if condition="{note}">
+    <p>{note}</p>
+</f:if>
+
+<f:if condition="{editUrl}">
+    <p><a href="{editUrl}" rel="noopener">Open the record</a></p>
+</f:if>
+</html>
