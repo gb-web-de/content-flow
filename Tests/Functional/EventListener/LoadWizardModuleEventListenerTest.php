@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace GbWeb\ContentFlow\Tests\Functional\EventListener;
 
 use GbWeb\ContentFlow\EventListener\LoadWizardModuleEventListener;
+use GbWeb\ContentFlow\Service\AssignableUserProvider;
 use PHPUnit\Framework\Attributes\Test;
-use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
 use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -39,7 +39,7 @@ final class LoadWizardModuleEventListenerTest extends FunctionalTestCase
     public function itQueuesTheWizardModuleOnPageRenderer(): void
     {
         $pageRenderer = $this->get(PageRenderer::class);
-        (new LoadWizardModuleEventListener($pageRenderer, $this->get(ConnectionPool::class)))();
+        (new LoadWizardModuleEventListener($pageRenderer, $this->get(AssignableUserProvider::class)))();
 
         // toArray() wraps each queued item as ['type' => ..., 'payload' => ...];
         // module instructions carry the actual JavaScriptModuleInstruction object

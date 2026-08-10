@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GbWeb\ContentFlow\Controller;
 
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\ContentFlow\Service\AssignableUserProvider;
 use GbWeb\ContentFlow\Service\BoardColumnRegistry;
 use GbWeb\ContentFlow\Service\BoardScopeResolver;
 use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
@@ -40,6 +41,7 @@ final class ContentFlowController extends ActionController
         protected readonly WorkspacePublishGate $workspacePublishGate,
         protected readonly BoardScopeResolver $boardScopeResolver,
         protected readonly WorkspaceService $workspaceService,
+        protected readonly AssignableUserProvider $assignableUserProvider,
     ) {
     }
 
@@ -107,6 +109,26 @@ final class ContentFlowController extends ActionController
             'elementBrowserUrl',
             (string)$this->backendUriBuilder->buildUriFromRoute('wizard_element_browser'),
         );
+        // "+ New task" offers creating a brand new page/record too, via core's own
+        // wizards rather than a bespoke form - db_new_pages is the page-type picker
+        // ("before/after/inside"), db_new is the general new-record table picker.
+        // Both take the current page as the parent to create under; returnUrl sends
+        // core back to this board once the new record's own edit form is closed.
+        $returnUrl = (string)$this->backendUriBuilder->buildUriFromRoute('web_contentflow', ['id' => $pageUid]);
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'newPageUrl',
+            $pageUid > 0
+                ? (string)$this->backendUriBuilder->buildUriFromRoute('db_new_pages', ['id' => $pageUid, 'returnUrl' => $returnUrl])
+                : '',
+        );
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'newRecordUrl',
+            $pageUid > 0
+                ? (string)$this->backendUriBuilder->buildUriFromRoute('db_new', ['id' => $pageUid, 'returnUrl' => $returnUrl])
+                : '',
+        );
         $this->pageRenderer->addInlineSetting(
             'ContentFlow',
             'currentUserId',
@@ -116,6 +138,16 @@ final class ContentFlowController extends ActionController
             'ContentFlow',
             'createTargetTables',
             $this->getCreateTargetTables(),
+        );
+        // Also added by LoadWizardModuleEventListener, for the outer chrome
+        // document - this is a SEPARATE PageRenderer/TYPO3.settings context (the
+        // board's own content iframe), which does not inherit inline settings
+        // added there. Needed here for the assignee picker in the "+ New task"
+        // wizard steps, which run inside this iframe, not the outer chrome.
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'assignableUsers',
+            $this->assignableUserProvider->getAssignableUsers(),
         );
         $this->pageRenderer->addInlineSetting(
             'ContentFlow',
@@ -134,7 +166,10 @@ final class ContentFlowController extends ActionController
         );
         // Read by board/scope.js to restore the toolbar's depth/root controls after
         // a reload, and to know which query params to rebuild the module URL with.
-        $this->pageRenderer->addInlineSetting('ContentFlow', 'depth', $depth);
+        // effectiveDepth, not the raw $depth GET param: when the workspace-root
+        // fallback narrows the query (see buildBoard()), this reflects what was
+        // actually queried instead of a now-stale requested value.
+        $this->pageRenderer->addInlineSetting('ContentFlow', 'depth', $board['effectiveDepth']);
         $this->pageRenderer->addInlineSetting('ContentFlow', 'fromWorkspaceRoot', $fromWorkspaceRoot);
 
         return $moduleTemplate->renderResponse('ContentFlow/Index');
@@ -158,7 +193,7 @@ final class ContentFlowController extends ActionController
     }
 
     /**
-     * @return array{columns: list<array<string, mixed>>, workspaceHasNoRootPages: bool}
+     * @return array{columns: list<array<string, mixed>>, workspaceHasNoRootPages: bool, effectiveDepth: int}
      */
     private function buildBoard(
         BackendUserAuthentication $backendUser,
@@ -169,10 +204,11 @@ final class ContentFlowController extends ActionController
     ): array {
         $columns = $this->boardColumnRegistry->getColumns($backendUser, $workspaceUid);
         if ($pageUid < 1) {
-            return ['columns' => $columns, 'workspaceHasNoRootPages' => false];
+            return ['columns' => $columns, 'workspaceHasNoRootPages' => false, 'effectiveDepth' => $depth];
         }
 
         $workspaceHasNoRootPages = false;
+        $effectiveDepth = $depth;
         if ($fromWorkspaceRoot && $workspaceUid > 0) {
             $pageUids = $this->boardScopeResolver->resolveWorkspaceRootPageUids($workspaceUid, $backendUser);
             $workspaceHasNoRootPages = $pageUids === [];
@@ -180,7 +216,11 @@ final class ContentFlowController extends ActionController
                 // This workspace has no db_mountpoints configured (the common case -
                 // see BoardScopeResolver's docblock) - fall back to "just the
                 // selected page" rather than showing nothing or silently ignoring
-                // the checkbox. Index.html surfaces this fallback explicitly.
+                // the checkbox. Index.html surfaces this fallback explicitly, and
+                // effectiveDepth carries the real depth back to the client so the
+                // (currently hidden) DEPTH select doesn't keep showing a stale value
+                // if "From workspace root" is unchecked again afterwards.
+                $effectiveDepth = 0;
                 $pageUids = $this->boardScopeResolver->resolvePageUids($pageUid, 0, $backendUser);
             }
         } else {
@@ -262,7 +302,7 @@ final class ContentFlowController extends ActionController
             $board[] = $column;
         }
 
-        return ['columns' => $board, 'workspaceHasNoRootPages' => $workspaceHasNoRootPages];
+        return ['columns' => $board, 'workspaceHasNoRootPages' => $workspaceHasNoRootPages, 'effectiveDepth' => $effectiveDepth];
     }
 
     /**

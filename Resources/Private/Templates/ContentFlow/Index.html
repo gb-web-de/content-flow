@@ -167,7 +167,14 @@
 
                                 <div class="contentflow-card-body">
                                     <span class="contentflow-card-meta">
-                                        <span class="contentflow-record-ref">{card.subject_table}:{card.subject_uid}</span>
+                                        <f:if condition="{card.subject_table} == 'pages' && {card.subject_uid} == 0">
+                                            <f:then>
+                                                <span class="contentflow-record-ref contentflow-record-ref--pending" title="This page is created once the ticket moves to a review stage">not yet created</span>
+                                            </f:then>
+                                            <f:else>
+                                                <span class="contentflow-record-ref">{card.subject_table}:{card.subject_uid}</span>
+                                            </f:else>
+                                        </f:if>
                                     </span>
                                     <div class="contentflow-card-badges">
                                         <f:if condition="{card.auto_created}">

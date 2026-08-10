@@ -1,96 +1,20 @@
 /*
- * The "+" flow: pick a record with core's element browser, then collect the
- * task details on one form.
- *
- * Deliberately not TYPO3's MultiStepWizard: reproduced (with zero involvement
- * from this extension or the board's content iframe - a bare top-level
- * `MultiStepWizard.show()` in the browser console crashes identically) that
- * MultiStepWizard's own carousel setup in this TYPO3 version throws
- * `Cannot read properties of null (reading 'addEventListener')` the moment a
- * second slide is involved - a race between Modal's `requestAnimationFrame`-
- * gated `showModal()` and the wizard's own async slide-advance setup, not
- * something this extension can work around short of patching core. The form
- * here is short enough that a wizard added little anyway: one screen, a
- * Cancel and a Create button, built the same way board/checklist.js's manage
- * modal already builds a plain form inside `Modal.advanced()`.
+ * The "+" flow: four entry points (plan a new page, pick an existing page,
+ * pick any record, create a new record via core's own wizard), each ending
+ * up collecting task details through the same native wizard shell the
+ * post-save routing wizard uses (see wizard/task-wizard.js,
+ * Classes/Wizard/TaskWizardProvider.php) - a synthetic pending payload rather
+ * than one read back from the session, since here the record was just picked
+ * interactively and there is nothing to poll for.
  */
-import AjaxRequest from '@typo3/core/ajax/ajax-request.js'
-import Notification from '@typo3/backend/notification.js'
 import Modal from '@typo3/backend/modal.js'
+import Notification from '@typo3/backend/notification.js'
 import { SeverityEnum } from '@typo3/backend/enum/severity.js'
+import { html } from 'lit'
 
-import { buildTaskDetailsForm } from '@gb-web/content-flow/task/task-details-form.js'
+import '@gb-web/content-flow/wizard/task-wizard.js'
 
 const ELEMENT_BROWSER_FIELD_REFERENCE_PREFIX = 'contentflow-create-target'
-
-function addPriorityField(container, settings) {
-  const priorityChoices = [
-    ['1', 'High'],
-    ['2', 'Normal'],
-    ['3', 'Low'],
-  ]
-  const selectedPriority = Number.isInteger(settings.priority) ? String(settings.priority) : '2'
-
-  const field = document.createElement('div')
-  field.className = 'form-group'
-
-  const label = document.createElement('label')
-  label.className = 'form-label'
-  label.textContent = 'Priority'
-
-  const select = document.createElement('select')
-  select.className = 'form-select form-control'
-  priorityChoices.forEach(([value, text]) => {
-    select.add(new Option(text, value, value === selectedPriority, value === selectedPriority))
-  })
-  settings.priority = parseInt(select.value, 10)
-  select.addEventListener('change', () => {
-    settings.priority = parseInt(select.value, 10)
-  })
-
-  field.append(label, select)
-  container.append(field)
-}
-
-/*
- * Start date and due date - a start date moves the task straight into
- * Planned instead of leaving it in Backlog for someone to notice and drag
- * (see TaskAjaxController::createAction()). Both are optional: most tasks
- * still open themselves from editing, unplanned, and that stays true here.
- */
-function addDateFields(container, settings) {
-  const row = document.createElement('div')
-  row.className = 'form-row contentflow-date-fields'
-
-  const startField = document.createElement('div')
-  startField.className = 'form-group'
-  const startLabel = document.createElement('label')
-  startLabel.className = 'form-label'
-  startLabel.textContent = 'Start date'
-  const startInput = document.createElement('input')
-  startInput.type = 'date'
-  startInput.className = 'form-control'
-  startInput.addEventListener('change', () => {
-    settings.startDate = startInput.value
-  })
-  startField.append(startLabel, startInput)
-
-  const dueField = document.createElement('div')
-  dueField.className = 'form-group'
-  const dueLabel = document.createElement('label')
-  dueLabel.className = 'form-label'
-  dueLabel.textContent = 'Due date'
-  const dueInput = document.createElement('input')
-  dueInput.type = 'date'
-  dueInput.className = 'form-control'
-  dueInput.addEventListener('change', () => {
-    settings.dueDate = dueInput.value
-  })
-  dueField.append(dueLabel, dueInput)
-
-  row.append(startField, dueField)
-  container.append(row)
-}
 
 function getAllowedCreateTables() {
   const configuredTables = TYPO3.settings.ContentFlow?.createTargetTables
@@ -126,99 +50,40 @@ function formatRecordLabel(table, uid) {
   return `${table}:${uid}`
 }
 
-function openNewTaskWizard(board, table, uid, recordTitle) {
-  const settings = { table, uid, priority: 2 }
-
-  const form = document.createElement('form')
-  form.className = 'contentflow-create-form'
-  form.addEventListener('submit', (event) => event.preventDefault())
-
-  const fields = buildTaskDetailsForm(settings, {
-    title: recordTitle,
-    description: '',
-    assignee: 'me',
-  })
-  form.append(fields.element)
-  addPriorityField(form, settings)
-  addDateFields(form, settings)
-
-  const modal = Modal.advanced({
+function openNewTaskWizard(table, uid, recordTitle) {
+  Modal.advanced({
     type: Modal.types.default,
     title: 'New task',
-    content: form,
+    content: html`<contentflow-task-wizard
+      .pending=${{ mode: 'create_from_picker', table, uid, recordTitle }}
+    ></contentflow-task-wizard>`,
     severity: SeverityEnum.notice,
-    buttons: [
-      {
-        text: 'Cancel',
-        btnClass: 'btn-default',
-        name: 'cancel',
-        trigger: (event, currentModal) => currentModal.hideModal(),
-      },
-      {
-        text: 'Create',
-        btnClass: 'btn-notice',
-        name: 'create',
-        trigger: async (event, currentModal) => {
-          const title = String(settings.title || '').trim()
-          if (title === '') {
-            Notification.warning('Content Flow', 'A title is required.')
-            fields.titleInput.focus()
-            return
-          }
-
-          const createButton = currentModal.querySelector('button[name="create"]')
-          if (createButton) {
-            createButton.disabled = true
-          }
-
-          try {
-            const result = await createTask(settings.table, settings.uid, {
-              title,
-              description: String(settings.description || '').trim(),
-              priority: settings.priority,
-              assignee: settings.assignee,
-              startDate: settings.startDate || '',
-              dueDate: settings.dueDate || '',
-            })
-
-            if (result.success !== true) {
-              Notification.error('Content Flow', result.message || 'Could not create the task.')
-              if (createButton) {
-                createButton.disabled = false
-              }
-              return
-            }
-
-            currentModal.hideModal()
-            board.announce('Created task ' + title)
-            Notification.success('Content Flow', 'Task created.')
-            window.location.reload()
-          } catch (error) {
-            Notification.error('Content Flow', 'Could not reach the server.')
-            if (createButton) {
-              createButton.disabled = false
-            }
-          }
-        },
-      },
-    ],
+    staticBackdrop: true,
+    buttons: [],
   })
-
-  // Title is required to create the task. Looked up fresh each time rather
-  // than cached once: Modal.advanced() returns before Lit has necessarily
-  // committed its first render, so the button may not exist in the DOM yet
-  // at this point.
-  const updateCreateButton = () => {
-    const createButton = modal.querySelector('button[name="create"]')
-    if (createButton) {
-      createButton.disabled = fields.titleInput.value.trim() === ''
-    }
-  }
-  modal.addEventListener('typo3-modal-shown', updateCreateButton, { once: true })
-  fields.titleInput.addEventListener('input', updateCreateButton)
 }
 
-function openRecordPicker(board) {
+/*
+ * "Neue Seite erstellen": plans a page rather than creating it immediately -
+ * the ticket holds no real subject until it is dragged into a review stage
+ * (Classes/Wizard/TaskWizardProvider.php's create_pending_page mode,
+ * TaskAjaxController::materializePendingPage()).
+ */
+function openPendingPageWizard() {
+  const parentPid = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
+  Modal.advanced({
+    type: Modal.types.default,
+    title: 'New task',
+    content: html`<contentflow-task-wizard
+      .pending=${{ mode: 'create_pending_page', parentPid }}
+    ></contentflow-task-wizard>`,
+    severity: SeverityEnum.notice,
+    staticBackdrop: true,
+    buttons: [],
+  })
+}
+
+function openRecordPicker(allowedTypesOverride) {
   const baseUrl = TYPO3.settings.ContentFlow?.elementBrowserUrl
   if (!baseUrl) {
     Notification.error('Content Flow', 'Element browser is not configured.')
@@ -226,7 +91,7 @@ function openRecordPicker(board) {
   }
 
   const currentPageId = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
-  const allowedTypes = getAllowedCreateTables()
+  const allowedTypes = allowedTypesOverride || getAllowedCreateTables()
   const params = new URLSearchParams({
     mode: 'db',
     allowedTypes: allowedTypes.join(','),
@@ -258,21 +123,105 @@ function openRecordPicker(board) {
     }
 
     modal.hideModal()
-    openNewTaskWizard(board, record.table, record.uid, label || formatRecordLabel(record.table, record.uid))
+    openNewTaskWizard(record.table, record.uid, label || formatRecordLabel(record.table, record.uid))
   })
 }
 
-export async function createTask(table, uid, details = {}) {
-  const url = TYPO3.settings.ajaxUrls.contentflow_task_create
+/*
+ * Opens one of core's own record wizards (db_new) in an iframe, the same
+ * Modal.types.iframe pattern openRecordPicker() already uses. Unlike the
+ * element browser, this wizard emits no `typo3:elementBrowser` event this
+ * extension can listen for once a record is actually created - it ends in
+ * core's own FormEngine inside the same iframe instead. Rather than a fragile
+ * bridge into core internals, closing the modal simply reloads the board:
+ * TaskAutoCreationService::captureEdit() already runs on the record's first
+ * save (a workspace `update` DataHandler operation, which a brand new
+ * record's initial FormEngine save is), so an unplanned task is captured and
+ * its own pending wizard (see wizard.js) surfaces right after the reload -
+ * the same path an edit made anywhere else in the workspace already takes.
+ */
+function openCoreRecordWizard(url, title) {
   if (!url) {
-    return {
-      success: false,
-      message: 'Task creation is not configured.',
-    }
+    Notification.error('Content Flow', 'This wizard is not configured for the current page.')
+    return
   }
 
-  const response = await new AjaxRequest(url).post({ table, uid, ...details })
-  return await response.resolve()
+  const modal = Modal.advanced({
+    type: Modal.types.iframe,
+    title,
+    content: url,
+    size: Modal.sizes.large,
+    severity: SeverityEnum.notice,
+  })
+
+  modal.addEventListener('typo3-modal-hidden', () => {
+    window.location.reload()
+  })
+}
+
+function openEntryChoiceWizard() {
+  const choices = [
+    {
+      label: 'Neue Seite erstellen',
+      description: 'Plan a new page - it is only actually created once this ticket moves to a review stage.',
+      action: () => openPendingPageWizard(),
+    },
+    {
+      label: 'Bestehende Seite bearbeiten',
+      description: 'Pick an existing page from the page tree.',
+      action: () => openRecordPicker(['pages']),
+    },
+    {
+      label: 'Select Record',
+      description: 'Pick any record — page, content element or other.',
+      action: () => openRecordPicker(),
+    },
+    {
+      label: 'Neuen Record erstellen',
+      description: "Create a new record with TYPO3's own record wizard.",
+      action: () => openCoreRecordWizard(TYPO3.settings.ContentFlow?.newRecordUrl, 'Create a new record'),
+    },
+  ]
+
+  const list = document.createElement('div')
+  list.className = 'contentflow-entry-choices'
+
+  let modal
+  choices.forEach(({ label, description, action }) => {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'btn btn-default contentflow-entry-choice'
+
+    const title = document.createElement('span')
+    title.className = 'contentflow-entry-choice-title'
+    title.textContent = label
+
+    const hint = document.createElement('span')
+    hint.className = 'contentflow-entry-choice-hint'
+    hint.textContent = description
+
+    button.append(title, hint)
+    button.addEventListener('click', () => {
+      modal.hideModal()
+      action()
+    })
+    list.append(button)
+  })
+
+  modal = Modal.advanced({
+    type: Modal.types.default,
+    title: 'New task — how do you want to start?',
+    content: list,
+    severity: SeverityEnum.notice,
+    buttons: [
+      {
+        text: 'Cancel',
+        btnClass: 'btn-default',
+        name: 'cancel',
+        trigger: (event, currentModal) => currentModal.hideModal(),
+      },
+    ],
+  })
 }
 
 export function registerCreateButton(board) {
@@ -283,7 +232,6 @@ export function registerCreateButton(board) {
       const bannerPageId = parseInt(button.dataset.contentflowPage || '0', 10)
       if (bannerPageId > 0) {
         openNewTaskWizard(
-          board,
           'pages',
           bannerPageId,
           button.dataset.contentflowPageTitle || ('Page ' + bannerPageId),
@@ -291,7 +239,7 @@ export function registerCreateButton(board) {
         return
       }
 
-      openRecordPicker(board)
+      openEntryChoiceWizard()
     })
   })
 }

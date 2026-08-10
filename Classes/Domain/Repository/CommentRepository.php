@@ -58,6 +58,30 @@ final class CommentRepository
     }
 
     /**
+     * Replace a comment's content in place - the follow-up step to B5's
+     * auto-generated "reopened for editing" comment, letting the editor
+     * expand on why without a second comment row cluttering the timeline.
+     * Scoped by task uid too, so a stale or spoofed comment uid from the
+     * client can only ever touch a comment that already belongs to the task
+     * being acted on.
+     */
+    public function updateContent(int $commentUid, int $taskUid, string $content): void
+    {
+        $this->connectionPool->getConnectionForTable(self::TABLE)->update(
+            self::TABLE,
+            [
+                'content' => $content,
+                'tstamp' => $GLOBALS['EXEC_TIME'],
+            ],
+            [
+                'uid' => $commentUid,
+                'task' => $taskUid,
+                'deleted' => 0,
+            ],
+        );
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function findByTask(int $taskUid): array

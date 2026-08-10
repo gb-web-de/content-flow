@@ -113,6 +113,8 @@ final class ExecuteStageActionRecipientsTest extends FunctionalTestCase
                 $this->get(\TYPO3\CMS\Workspaces\Service\StagesService::class),
             ),
             $this->get(\TYPO3\CMS\Workspaces\Authorization\WorkspacePublishGate::class),
+            $this->get(\GbWeb\ContentFlow\Service\StageTransitionService::class),
+            $this->get(\TYPO3\CMS\Workspaces\Service\StagesService::class),
             $this->get(UriBuilder::class),
             $this->get(ViewFactoryInterface::class),
             new NullLogger(),

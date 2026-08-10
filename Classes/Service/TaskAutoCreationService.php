@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace GbWeb\ContentFlow\Service;
 
 use GbWeb\ContentFlow\Domain\Model\TaskState;
+use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Schema\Capability\TcaSchemaCapability;
 use TYPO3\CMS\Core\Schema\TcaSchemaFactory;
+use TYPO3\CMS\Workspaces\Service\StagesService;
 
 /**
  * Creates or advances a task whenever an editor edits something inside a workspace -
@@ -39,6 +41,8 @@ final class TaskAutoCreationService
         private readonly ReferenceInspector $referenceInspector,
         private readonly ActivityLogger $activityLogger,
         private readonly TcaSchemaFactory $tcaSchemaFactory,
+        private readonly StageTransitionService $stageTransitionService,
+        private readonly CommentRepository $commentRepository,
     ) {
     }
 
@@ -73,23 +77,55 @@ final class TaskAutoCreationService
 
         $stageUid = (int)(BackendUtility::getRecord($table, $versionUid, 't3ver_stage')['t3ver_stage'] ?? 0);
         $beUserId = (int)($dataHandler->BE_USER->user['uid'] ?? 0);
+        $pageUid = $this->derivePid($table, $liveUid);
+
+        // 0. The editor already declared "this page's edits go to this task"
+        // via the Visual Editor's persistent task select
+        // (TaskAjaxController::setActiveTaskForPageAction()) - honour it for
+        // an edit on ANY surface (Visual Editor, Layout, Records), not only
+        // the one the choice was made from. The choice is explicit and
+        // proactive, so it outranks the automatic routing below entirely -
+        // there is nothing left to ask, and no pending wizard to queue.
+        $activeTaskUid = $this->resolveActiveTaskOverride($dataHandler, $pageUid);
+        if ($activeTaskUid !== null) {
+            $homePid = $this->derivePid($table, $liveUid);
+            $shared = $this->referenceInspector->isSharedAcrossPages($table, $liveUid, $homePid);
+            // Re-point like attachAction() does for a manual "select to task"
+            // - an explicit choice may reasonably steal a record away from
+            // whatever task auto-claimed it by default.
+            if ($this->taskRepository->findOpenTaskByMember($table, $liveUid) !== null) {
+                $this->taskRepository->moveMemberToTask($table, $liveUid, $activeTaskUid);
+            } else {
+                $this->taskRepository->addMemberIfUnclaimed(
+                    $activeTaskUid,
+                    $table,
+                    $liveUid,
+                    TaskRepository::ORIGIN_AUTO,
+                    $homePid,
+                    $shared,
+                );
+            }
+            return;
+        }
 
         // 1. Check if record is ALREADY a member of an open task (2nd save bypass)
         $existing = $this->taskRepository->findOpenTaskByMember($table, $liveUid);
         if ($existing !== null) {
             if ((int)($existing['workspace_uid'] ?? 0) === 0) {
                 $this->taskRepository->attachWorkspace((int)$existing['uid'], $workspaceUid, $stageUid);
+            } else {
+                $this->maybeRegressPastEditing($existing, $table, $liveUid, $workspaceUid, $beUserId, $dataHandler);
             }
             return;
         }
 
         // 2. Check if an open task exists for parent page
-        $pageUid = $this->derivePid($table, $liveUid);
         $pageTask = $this->taskRepository->findOpenBySubject('pages', $pageUid);
 
         if ($pageTask !== null && !$this->subjectRegistry->isSubject($table)) {
             $pageTaskUid = (int)$pageTask['uid'];
             $homePid = $this->derivePid($table, $liveUid);
+            $regressed = false;
 
             if ((int)($pageTask['workspace_uid'] ?? 0) === 0) {
                 $this->taskRepository->attachWorkspace($pageTaskUid, $workspaceUid, $stageUid);
@@ -99,6 +135,8 @@ final class TaskAutoCreationService
                     $beUserId,
                     ['table' => $table, 'recordUid' => $liveUid, 'stageUid' => $stageUid],
                 );
+            } else {
+                $regressed = $this->maybeRegressPastEditing($pageTask, $table, $liveUid, $workspaceUid, $beUserId, $dataHandler);
             }
 
             // Claim it onto the page task NOW, not only once the editor answers
@@ -122,6 +160,14 @@ final class TaskAutoCreationService
                 $this->referenceInspector->isSharedAcrossPages($table, $liveUid, $homePid),
             );
 
+            // A regression already claimed this save's one follow-up wizard slot
+            // (see maybeRegressPastEditing()) - the routing question below is a
+            // refinement of where the edit lands, secondary to the fact that the
+            // task's stage itself just silently moved.
+            if ($regressed) {
+                return;
+            }
+
             // Offer the editor a choice: keep it on the page task, or split it off.
             $this->storePendingWizard($dataHandler, [
                 'mode' => 'route_member',
@@ -143,6 +189,7 @@ final class TaskAutoCreationService
         $task = $resolvedTask['task'];
         $taskUid = (int)$task['uid'];
         $workStartedNow = false;
+        $regressed = false;
         if ((int)($task['workspace_uid'] ?? 0) === 0) {
             // Backlog/Planned -> In Progress, now that real work exists.
             $this->taskRepository->attachWorkspace($taskUid, $workspaceUid, $stageUid);
@@ -153,6 +200,8 @@ final class TaskAutoCreationService
                 ['table' => $table, 'recordUid' => $liveUid, 'stageUid' => $stageUid],
             );
             $workStartedNow = true;
+        } else {
+            $regressed = $this->maybeRegressPastEditing($task, $table, $liveUid, $workspaceUid, $beUserId, $dataHandler);
         }
 
         if ($resolvedTask['createdNow'] && !$workStartedNow) {
@@ -162,6 +211,11 @@ final class TaskAutoCreationService
                 $beUserId,
                 ['table' => $table, 'recordUid' => $liveUid, 'stageUid' => $stageUid],
             );
+        }
+
+        // Same one-wizard-per-save rule as the page-task branch above.
+        if ($regressed) {
+            return;
         }
 
         if ($resolvedTask['createdNow']) {
@@ -328,6 +382,104 @@ final class TaskAutoCreationService
             return $uid;
         }
         return (int)(BackendUtility::getRecord($table, $uid, 'pid')['pid'] ?? 0);
+    }
+
+    /**
+     * B5: an edit landing on a task that had already moved past Editing means
+     * work has resumed on it - regress the whole task back to Editing (core
+     * stage 0) rather than leaving the board showing "in review" for
+     * something an editor is visibly still touching. Every one of the task's
+     * pending records moves together, not just the one just edited - the
+     * board shows one stage per task, and letting that diverge from what
+     * core actually holds per-record is a state it cannot represent.
+     *
+     * Applied immediately with an auto-generated comment: this runs from a
+     * DataHandler hook, after the save already completed, so it cannot block
+     * on a human-authored comment the way a synchronous validation could
+     * (see the class docblock). The pending-wizard mechanism - the same one
+     * `route_member`/`configure_auto_task` use - instead offers the editor a
+     * follow-up step to edit or expand that default text.
+     *
+     * @param array<string, mixed> $task
+     * @return bool whether the task actually regressed and queued a wizard
+     */
+    private function maybeRegressPastEditing(
+        array $task,
+        string $table,
+        int $liveUid,
+        int $workspaceUid,
+        int $beUserId,
+        DataHandler $dataHandler,
+    ): bool {
+        $state = TaskState::tryFrom((string)$task['state']);
+        if ($state !== TaskState::REVIEW && $state !== TaskState::READY) {
+            return false;
+        }
+
+        $taskUid = (int)$task['uid'];
+        $versionsByTable = $this->memberSynchronizer->findPendingVersionsByTable($taskUid, $workspaceUid);
+        if ($versionsByTable === []) {
+            return false;
+        }
+
+        $comment = sprintf('Automatically reopened for editing - %s:%d was modified.', $table, $liveUid);
+
+        $refusal = $this->stageTransitionService->transition(
+            $task,
+            $versionsByTable,
+            StagesService::STAGE_EDIT_ID,
+            $beUserId,
+            $comment,
+        );
+        if ($refusal !== null) {
+            return false;
+        }
+
+        // transition() does not hand back the comment uid it just wrote - it
+        // is built for the controller's fire-and-forget use, which never
+        // needed one. Reading it straight back out is simpler than widening
+        // that return type for this one caller.
+        $comments = $this->commentRepository->findByTask($taskUid);
+        $lastComment = end($comments);
+        $commentUid = $lastComment !== false ? (int)$lastComment['uid'] : 0;
+
+        $this->storePendingWizard($dataHandler, [
+            'mode' => 'regression_comment',
+            'taskUid' => $taskUid,
+            'commentUid' => $commentUid,
+            'table' => $table,
+            'uid' => $liveUid,
+            'defaultComment' => $comment,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * The task an editor explicitly picked for this page via the Visual
+     * Editor's task select, if any still applies. Session-wide rather than
+     * scoped to one edit, so it survives across saves on the same page - but
+     * it must still be re-validated on every call: the task may have closed,
+     * or the stored choice may be left over from a different page entirely.
+     *
+     * @return int|null the task uid to claim onto, or null when no override applies
+     */
+    private function resolveActiveTaskOverride(DataHandler $dataHandler, int $pageUid): ?int
+    {
+        $active = $dataHandler->BE_USER->getSessionData('content_flow_active_task');
+        if (!is_array($active) || (int)($active['pageUid'] ?? 0) !== $pageUid) {
+            return null;
+        }
+        $taskUid = (int)($active['taskUid'] ?? 0);
+        if ($taskUid < 1) {
+            return null;
+        }
+        $task = $this->taskRepository->findByUid($taskUid);
+        if ($task === null || (int)$task['closed'] === 1) {
+            return null;
+        }
+
+        return $taskUid;
     }
 
     /**
