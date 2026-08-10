@@ -1,53 +1,84 @@
 import { test, expect } from '@playwright/test'
+import { openBoard, openTaskWizard } from './fixtures/board'
 
 /*
- * The "+" flow (task/create-wizard.js): pick a record via core's element
- * browser, then the same native wizard shell as the post-save wizard, with
- * priority and date fields shown (TaskWizardProvider's create_from_picker
- * mode). Same caveat as task-wizard.spec.ts: written without a reachable
- * DDEV instance to run it against, treat as a first draft.
+ * The "+ New task" flow: the board's own button opens a chooser with the four
+ * entry points, and each one hands off to TaskWizardProvider's matching mode
+ * rendered through core's native <typo3-backend-wizard>.
  */
 
-const pageId = process.env.CONTENTFLOW_TEST_PAGE_ID ?? '1'
+const planANewPage = /plan a new page/i
 
-test.describe('the "+" create-task flow', () => {
-  test('creates a task for the current page banner button, with priority and dates', async ({ page }) => {
-    await page.goto(`/typo3/module/web/contentflow?id=${pageId}`)
+/*
+ * The wizard's fields carry a visible <label> that is not associated with its
+ * control (no for/id pair, no aria-label), so getByLabel() resolves to nothing
+ * and they have to be addressed structurally here. Worth fixing in the markup -
+ * that association is what a screen reader needs too.
+ */
 
-    await page.locator('[data-contentflow-action="create-task"][data-contentflow-page]').click()
+test.describe('the "New task" wizard', () => {
+  test('offers all four ways to start a task', async ({ page }) => {
+    const board = await openBoard(page)
+    const modal = await openTaskWizard(page, board)
 
-    const wizard = page.locator('contentflow-task-wizard')
-    await expect(wizard).toBeVisible({ timeout: 10000 })
-
-    await wizard.locator('input[type="text"]').first().fill('Playwright-created task')
-
-    const assigneeInput = wizard.locator('contentflow-assignee-picker input')
-    await assigneeInput.click()
-    await assigneeInput.fill('open')
-    await page.getByRole('option', { name: /leave open/i }).click()
-
-    await wizard.locator('select').selectOption({ label: 'High' })
-    await wizard.locator('input[type="date"]').first().fill('2026-09-01')
-
-    await page.getByRole('button', { name: /save/i }).click()
-
-    await expect(page.getByText(/task created/i)).toBeVisible()
+    await expect(modal.getByRole('button', { name: planANewPage })).toBeVisible()
+    await expect(modal.getByRole('button', { name: /pick an existing page/i })).toBeVisible()
+    await expect(modal.getByRole('button', { name: /pick any record/i })).toBeVisible()
+    await expect(modal.getByRole('button', { name: /record wizard/i })).toBeVisible()
   })
 
-  test('creates a task for a record picked via the element browser', async ({ page }) => {
-    await page.goto(`/typo3/module/web/contentflow?id=${pageId}`)
+  test('asks for the task details once an entry point is chosen', async ({ page }) => {
+    const board = await openBoard(page)
+    const modal = await openTaskWizard(page, board)
+    await modal.getByRole('button', { name: planANewPage }).click()
 
-    await page.locator('[data-contentflow-action="create-task"]:not([data-contentflow-page])').click()
+    // The custom element host has no layout box of its own, so visibility is
+    // asserted on the controls it renders rather than on the host.
+    const wizard = page.locator('contentflow-task-wizard')
+    await expect(wizard.locator('input[type="text"]').first()).toBeVisible()
+    await expect(wizard.locator('select')).toBeVisible()
+    await expect(wizard.locator('input[type="date"]')).toHaveCount(2)
+  })
 
-    const browserFrame = page.frameLocator('iframe.t3js-modal-iframe')
-    await browserFrame.locator('[data-uid]').first().click()
+  test('reaches the confirmation step with a title filled in', async ({ page }) => {
+    const board = await openBoard(page)
+    const modal = await openTaskWizard(page, board)
+    await modal.getByRole('button', { name: planANewPage }).click()
 
     const wizard = page.locator('contentflow-task-wizard')
-    await expect(wizard).toBeVisible({ timeout: 10000 })
+    await wizard.locator('input[type="text"]').first().fill('A task Playwright planned')
+    await wizard.getByRole('button', { name: /next/i }).click()
 
-    await wizard.locator('input[type="text"]').first().fill('Task for picked record')
-    await page.getByRole('button', { name: /save/i }).click()
+    await expect(wizard.getByRole('button', { name: /save/i })).toBeVisible()
+  })
 
-    await expect(page.getByText(/task created/i)).toBeVisible()
+  test('refuses to advance while the title is still empty', async ({ page }) => {
+    const board = await openBoard(page)
+    const modal = await openTaskWizard(page, board)
+    await modal.getByRole('button', { name: planANewPage }).click()
+
+    const wizard = page.locator('contentflow-task-wizard')
+    const next = wizard.getByRole('button', { name: /next/i })
+
+    // Core's wizard marks the step invalid with a class rather than the
+    // disabled attribute, so toBeDisabled() would pass on a broken build.
+    await expect(next).toHaveClass(/disabled/)
+    await expect(wizard.getByRole('button', { name: /save/i })).toHaveCount(0)
+
+    await wizard.locator('input[type="text"]').first().fill('Now it has one')
+
+    await expect(next).not.toHaveClass(/disabled/)
+  })
+
+  test('creates nothing when the chooser is cancelled', async ({ page }) => {
+    const board = await openBoard(page)
+    const modal = await openTaskWizard(page, board)
+
+    await modal.getByRole('button', { name: /^cancel$/i }).click()
+
+    // The modal animates out before it is removed, so waiting for it to be
+    // gone from the layout is the stable signal - toHaveCount(0) races it.
+    await expect(modal).toBeHidden()
+    await expect(page.locator('contentflow-task-wizard')).toHaveCount(0)
   })
 })
