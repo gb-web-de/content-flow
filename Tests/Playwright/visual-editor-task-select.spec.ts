@@ -52,12 +52,21 @@ test.describe('the Visual Editor task select', () => {
   })
 
   test('marks every claimed content element consistently, or none at all', async ({ page }) => {
-    await openVisualEditor(page).goto()
+    const moduleFrame = await openVisualEditor(page).goto()
     const contentFrame = visualEditorContentFrame(page)
 
     // Wait for the frontend document to have rendered at least one element,
     // otherwise an empty page passes this by saying nothing.
     await expect(contentFrame.locator('ve-content-element').first()).toBeAttached({ timeout: 20000 })
+
+    // How many task options does the toolbar offer? If there are tasks on this
+    // page the markers must actually appear - zero markers while the select
+    // lists tasks is the document-mix-up regression the whole suite is here
+    // to catch.
+    const taskOptions = await moduleFrame
+      .locator('.contentflow-ve-task-select select option[data-task]')
+      .count()
+    const taskCount = Math.max(taskOptions - 2, 0)
 
     /*
      * The invariant that holds whether or not this page has tasks: a bubble
@@ -66,17 +75,34 @@ test.describe('the Visual Editor task select', () => {
      * marker that carries only some of them is the failure mode worth catching
      * - it renders, so it looks fine, and it tells the editor nothing.
      */
-    const inconsistent = await contentFrame.locator('ve-content-element').evaluateAll((elements) => elements
-      .filter((element) => {
+    const { inconsistent, marked } = await contentFrame.locator('ve-content-element').evaluateAll((elements) => {
+      let inconsistent = 0
+      let marked = 0
+
+      for (const element of elements) {
         const hasBubble = element.querySelector(':scope > .contentflow-task-bubble') !== null
         const hasOutline = element.classList.contains('contentflow-task-claimed')
         const hasHue = element.style.getPropertyValue('--contentflow-task-hue') !== ''
 
-        return hasBubble !== hasOutline || hasBubble !== hasHue
-      })
-      .length)
+        if (hasBubble !== hasOutline || hasBubble !== hasHue) {
+          inconsistent++
+        }
+        if (hasBubble || hasOutline || hasHue) {
+          marked++
+        }
+      }
+
+      return { inconsistent, marked }
+    })
 
     expect(inconsistent).toBe(0)
+
+    // If the toolbar lists tasks for this page, at least one content element
+    // must carry a marker. Zero markers while tasks exist means the frontend
+    // document never received the claiming data - the silent regression.
+    if (taskCount > 0) {
+      expect(marked).toBeGreaterThan(0)
+    }
   })
 
   test('names the task a marker belongs to, without a click', async ({ page }) => {
