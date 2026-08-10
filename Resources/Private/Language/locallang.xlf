@@ -72,7 +72,7 @@
                 <source>Create a new page</source>
             </trans-unit>
             <trans-unit id="entry.newPage.description" xml:space="preserve">
-                <source>Plan a new page - it is only actually created once this ticket moves to a review stage.</source>
+                <source>Plan a new page - it is only actually created once this ticket moves into Editing.</source>
             </trans-unit>
             <trans-unit id="entry.existingPage.label" xml:space="preserve">
                 <source>Edit an existing page</source>
@@ -262,6 +262,62 @@
             </trans-unit>
             <trans-unit id="wizard.error.stepFallback" xml:space="preserve">
                 <source>Something went wrong. (CF-1027)</source>
+            </trans-unit>
+
+            <!--
+                The Visual Editor's task select and its markers
+                (Resources/Public/JavaScript/task/visual-editor-task-select.js).
+                Read through the same `content_flow.messages` domain as the
+                wizard above; the two server-side messages at the end are the
+                ones TaskAjaxController's own Visual Editor actions can return.
+            -->
+            <trans-unit id="ve.select.label" xml:space="preserve">
+                <source>Content Flow task</source>
+            </trans-unit>
+            <trans-unit id="ve.select.placeholder" xml:space="preserve">
+                <source>Task</source>
+            </trans-unit>
+            <trans-unit id="ve.select.none" xml:space="preserve">
+                <source>No task</source>
+            </trans-unit>
+            <trans-unit id="ve.select.create" xml:space="preserve">
+                <source>+ Create new task</source>
+            </trans-unit>
+            <trans-unit id="ve.marker.claimedBy" xml:space="preserve">
+                <source>Belongs to task:</source>
+            </trans-unit>
+            <trans-unit id="ve.notification.title" xml:space="preserve">
+                <source>Content Flow</source>
+            </trans-unit>
+            <trans-unit id="ve.notification.taskActive" xml:space="preserve">
+                <source>This task is now active for this page.</source>
+            </trans-unit>
+            <trans-unit id="ve.comment.prompt" xml:space="preserve">
+                <source>Reopened for editing - add a note?</source>
+            </trans-unit>
+            <trans-unit id="ve.comment.save" xml:space="preserve">
+                <source>Save note</source>
+            </trans-unit>
+            <trans-unit id="ve.comment.reopened" xml:space="preserve">
+                <source>Reopened for editing from the Visual Editor task selector.</source>
+            </trans-unit>
+            <trans-unit id="ve.error.selectFailed" xml:space="preserve">
+                <source>Could not select this task. (CF-1028)</source>
+            </trans-unit>
+            <trans-unit id="ve.error.createFailed" xml:space="preserve">
+                <source>Could not create a task for this page. (CF-1029)</source>
+            </trans-unit>
+            <trans-unit id="ve.error.commentFailed" xml:space="preserve">
+                <source>Could not save the note. (CF-1030)</source>
+            </trans-unit>
+            <trans-unit id="ve.error.server" xml:space="preserve">
+                <source>Could not reach the server. (CF-1031)</source>
+            </trans-unit>
+            <trans-unit id="ve.error.noPageGiven" xml:space="preserve">
+                <source>No page was specified. (CF-1032)</source>
+            </trans-unit>
+            <trans-unit id="ve.error.noWorkspaceSelected" xml:space="preserve">
+                <source>Switch into a workspace before selecting a task to work on. (CF-1033)</source>
             </trans-unit>
         </body>
     </file>
