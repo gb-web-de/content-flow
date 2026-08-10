@@ -6,10 +6,11 @@
  * inline rather than reaching for shadow-DOM isolation.
  */
 import { LitElement, html } from 'lit'
+import labels from '~labels/content_flow.messages'
 
 const BASE_CHOICES = [
-  { value: 'me', label: 'Assign to me' },
-  { value: 'open', label: 'Leave open for someone to take' },
+  { value: 'me', label: labels.get('assignee.me') },
+  { value: 'open', label: labels.get('assignee.open') },
 ]
 
 export class ContentFlowAssigneePicker extends LitElement {
@@ -122,7 +123,7 @@ export class ContentFlowAssigneePicker extends LitElement {
               >${option.label}</li>
             `,
           )}
-          ${options.length === 0 ? html`<li class="contentflow-assignee-options-empty">No matches</li>` : ''}
+          ${options.length === 0 ? html`<li class="contentflow-assignee-options-empty">${labels.get('assignee.noMatches')}</li>` : ''}
         </ul>
       </div>
     `

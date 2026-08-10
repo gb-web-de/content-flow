@@ -36,6 +36,145 @@
             </trans-unit>
 
             <!--
+                Everything from here to the error block is read by the wizard's
+                own JavaScript rather than by PHP: the step modules and the
+                modals that host them import this file as the
+                `content_flow.messages` translation domain
+                (`~labels/content_flow.messages`, resolved by core's
+                TranslationDomainMapper from the file's own path). Note that
+                LabelProvider.get() throws on a key it does not know, so a typo
+                here empties the wizard rather than printing a blank - the
+                functional test over these keys exists for that reason.
+            -->
+            <trans-unit id="modal.newTask" xml:space="preserve">
+                <source>New task</source>
+            </trans-unit>
+            <trans-unit id="modal.routeEdit" xml:space="preserve">
+                <source>Route this edit</source>
+            </trans-unit>
+            <trans-unit id="modal.reopened" xml:space="preserve">
+                <source>Reopened for editing</source>
+            </trans-unit>
+            <trans-unit id="modal.finishDetails" xml:space="preserve">
+                <source>Finish task details</source>
+            </trans-unit>
+            <trans-unit id="modal.confirmButton" xml:space="preserve">
+                <source>Save</source>
+            </trans-unit>
+
+            <trans-unit id="entry.title" xml:space="preserve">
+                <source>New task - how do you want to start?</source>
+            </trans-unit>
+            <trans-unit id="entry.cancel" xml:space="preserve">
+                <source>Cancel</source>
+            </trans-unit>
+            <trans-unit id="entry.newPage.label" xml:space="preserve">
+                <source>Create a new page</source>
+            </trans-unit>
+            <trans-unit id="entry.newPage.description" xml:space="preserve">
+                <source>Plan a new page - it is only actually created once this ticket moves to a review stage.</source>
+            </trans-unit>
+            <trans-unit id="entry.existingPage.label" xml:space="preserve">
+                <source>Edit an existing page</source>
+            </trans-unit>
+            <trans-unit id="entry.existingPage.description" xml:space="preserve">
+                <source>Pick an existing page from the page tree.</source>
+            </trans-unit>
+            <trans-unit id="entry.record.label" xml:space="preserve">
+                <source>Select a record</source>
+            </trans-unit>
+            <trans-unit id="entry.record.description" xml:space="preserve">
+                <source>Pick any record - page, content element or other.</source>
+            </trans-unit>
+            <trans-unit id="entry.newRecord.label" xml:space="preserve">
+                <source>Create a new record</source>
+            </trans-unit>
+            <trans-unit id="entry.newRecord.description" xml:space="preserve">
+                <source>Create a new record with TYPO3's own record wizard.</source>
+            </trans-unit>
+            <trans-unit id="entry.recordPicker.title" xml:space="preserve">
+                <source>Select a page, content element or record</source>
+            </trans-unit>
+
+            <trans-unit id="step.taskDetails.title" xml:space="preserve">
+                <source>Task details</source>
+            </trans-unit>
+            <trans-unit id="step.taskDetails.field.title" xml:space="preserve">
+                <source>Title</source>
+            </trans-unit>
+            <trans-unit id="step.taskDetails.field.description" xml:space="preserve">
+                <source>Description</source>
+            </trans-unit>
+            <trans-unit id="step.taskDetails.field.description.placeholder" xml:space="preserve">
+                <source>Optional description</source>
+            </trans-unit>
+            <trans-unit id="step.taskDetails.field.assignment" xml:space="preserve">
+                <source>Assignment</source>
+            </trans-unit>
+            <trans-unit id="step.taskDetails.field.priority" xml:space="preserve">
+                <source>Priority</source>
+            </trans-unit>
+            <trans-unit id="step.taskDetails.field.startDate" xml:space="preserve">
+                <source>Start date</source>
+            </trans-unit>
+            <trans-unit id="step.taskDetails.field.dueDate" xml:space="preserve">
+                <source>Due date</source>
+            </trans-unit>
+            <trans-unit id="step.taskDetails.priority.high" xml:space="preserve">
+                <source>High</source>
+            </trans-unit>
+            <trans-unit id="step.taskDetails.priority.normal" xml:space="preserve">
+                <source>Normal</source>
+            </trans-unit>
+            <trans-unit id="step.taskDetails.priority.low" xml:space="preserve">
+                <source>Low</source>
+            </trans-unit>
+
+            <trans-unit id="step.destination.title" xml:space="preserve">
+                <source>Task destination</source>
+            </trans-unit>
+            <trans-unit id="step.destination.attach" xml:space="preserve">
+                <source>Add it to the existing page task ("%s")</source>
+            </trans-unit>
+            <trans-unit id="step.destination.attach.summary" xml:space="preserve">
+                <source>Add it to "%s"</source>
+            </trans-unit>
+            <trans-unit id="step.destination.create" xml:space="preserve">
+                <source>Create a separate task for this record</source>
+            </trans-unit>
+
+            <trans-unit id="step.stage.title" xml:space="preserve">
+                <source>Stage</source>
+            </trans-unit>
+            <trans-unit id="step.stage.inProgress" xml:space="preserve">
+                <source>Keep in progress (more edits coming)</source>
+            </trans-unit>
+            <trans-unit id="step.stage.inProgress.summary" xml:space="preserve">
+                <source>Keep in progress</source>
+            </trans-unit>
+            <trans-unit id="step.stage.review" xml:space="preserve">
+                <source>Move directly to review</source>
+            </trans-unit>
+
+            <trans-unit id="step.comment.title" xml:space="preserve">
+                <source>Comment</source>
+            </trans-unit>
+
+            <trans-unit id="step.error.title" xml:space="preserve">
+                <source>Error</source>
+            </trans-unit>
+
+            <trans-unit id="assignee.me" xml:space="preserve">
+                <source>Assign to me</source>
+            </trans-unit>
+            <trans-unit id="assignee.open" xml:space="preserve">
+                <source>Leave open for someone to take</source>
+            </trans-unit>
+            <trans-unit id="assignee.noMatches" xml:space="preserve">
+                <source>No matches</source>
+            </trans-unit>
+
+            <!--
                 Every message below is shown to an editor who cannot read the
                 code, so each carries a code of its own: it is what a bug report
                 can name and what a support answer can be looked up by. The code
@@ -109,6 +248,20 @@
             </trans-unit>
             <trans-unit id="wizard.error.noLiveEditing" xml:space="preserve">
                 <source>"%s" records cannot be edited directly on the Live workspace. (CF-1023)</source>
+            </trans-unit>
+
+            <!-- Raised by the wizard's JavaScript rather than by the provider. -->
+            <trans-unit id="wizard.error.elementBrowserMissing" xml:space="preserve">
+                <source>The element browser is not configured. (CF-1024)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.recordUnidentified" xml:space="preserve">
+                <source>The selected record could not be identified. (CF-1025)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.recordWizardMissing" xml:space="preserve">
+                <source>This wizard is not configured for the current page. (CF-1026)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.stepFallback" xml:space="preserve">
+                <source>Something went wrong. (CF-1027)</source>
             </trans-unit>
         </body>
     </file>

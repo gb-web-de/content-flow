@@ -18,8 +18,9 @@ import AjaxRequest from '@typo3/core/ajax/ajax-request.js'
 import { html } from 'lit'
 import Modal from '@typo3/backend/modal.js'
 import { SeverityEnum } from '@typo3/backend/enum/severity.js'
+import labels from '~labels/content_flow.messages'
 
-import '@gb-web/content-flow/wizard/task-wizard.js'
+import { WIZARD_MODAL_SIZE } from '@gb-web/content-flow/wizard/task-wizard.js'
 import { observeVisualEditorTaskSelect } from '@gb-web/content-flow/task/visual-editor-task-select.js'
 
 class ContentFlowWizard {
@@ -66,15 +67,16 @@ class ContentFlowWizard {
 
   openWizard(pending) {
     const titles = {
-      route_member: 'Route this edit',
-      regression_comment: 'Reopened for editing',
+      route_member: labels.get('modal.routeEdit'),
+      regression_comment: labels.get('modal.reopened'),
     }
 
     Modal.advanced({
       type: Modal.types.default,
-      title: titles[pending.mode] || 'Finish task details',
+      title: titles[pending.mode] || labels.get('modal.finishDetails'),
       content: html`<contentflow-task-wizard .pending=${pending}></contentflow-task-wizard>`,
       severity: SeverityEnum.notice,
+      size: WIZARD_MODAL_SIZE,
       staticBackdrop: true,
       buttons: [],
     })

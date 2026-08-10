@@ -85,6 +85,62 @@ Launch button
 - `DoktypeStep` can preselect a configured doktype, auto-advance on a single allowed choice, and warn when a prefilled doktype is not allowed.
 - `PageWizardSubmissionService` flattens `fields` from the store into the POST payload before calling `wizard_submit`.
 
+## Hosting a Wizard in a Modal
+
+`backend.css` gives the wizard a modal-specific layout:
+
+```css
+.modal-body typo3-backend-wizard { position: absolute; inset: 0 }
+.modal-body typo3-backend-wizard .wizard { position: absolute; inset: 0 }
+```
+
+Out of flow, the wizard contributes no height of its own, so the modal has to be
+told how big it is. `openPageWizardModal()` in
+`page-wizard/helper/wizard-helper.ts` is the reference:
+
+```js
+Modal.advanced({
+  title: labels.get('newPage'),
+  content: html`<typo3-backend-page-wizard .configuration=${configuration}></typo3-backend-page-wizard>`,
+  severity: SeverityEnum.notice,
+  size: { width: Size.medium, height: Size.large },
+  staticBackdrop: true,
+  buttons: [],
+})
+```
+
+Drop `size` and the modal shrinks to roughly 30px of body: the header and the
+progress bar are all that is left, the step markup is present in the DOM but
+clipped away, and the whole thing reads as "the wizard has no form". A custom
+host element between `.modal-body` and `typo3-backend-wizard` does not change
+this - the descendant selector still matches and `.modal-body` is still the
+positioned ancestor.
+
+Because the controls are clipped rather than hidden, they keep a bounding box.
+A visibility assertion passes on a broken build; assert instead that a field's
+box is contained in the box of `.wizard-content`.
+
+## Labels in Step Modules
+
+Core's own steps read their strings from a translation domain rather than
+writing them into the module:
+
+```js
+import labels from '~labels/backend.wizards.general'
+labels.get('wizard.buttons.next')
+```
+
+Extensions get the same thing for free. `TranslationDomainMapper` derives the
+domain from the label file's path, so `EXT:my_ext/Resources/Private/Language/`
+`locallang.xlf` is `my_ext.messages`, with nothing to register - the `~labels/`
+importmap prefix comes from the `backend` dependency the extension already
+declares. `LabelProvider.get(key, ['arg'])` fills `%s` / `%d` the way `sL()`'s
+callers do.
+
+`LabelProvider.get()` throws on a key it does not know. In a dynamic step that
+rejects the module import and leaves the editor an empty wizard, so the keys the
+modules ask for are worth a test of their own.
+
 ## Implementation Checklist
 
 1. Choose the wizard identifier and keep it stable everywhere.
@@ -106,3 +162,5 @@ Launch button
 - FormEngine fields render but behave incorrectly: verify injected JS modules and labels from the step builder.
 - Submit fails or creates the record in the wrong place: verify payload flattening, `position` data, and the negative-`pid` convention for "after".
 - Finisher shows success but the backend UI looks stale: verify the page-tree refresh event or redirect behavior.
+- Modal shows the wizard's header and buttons but no step: verify the modal was opened with an explicit `size`.
+- Step module import rejects with "Label is not defined": verify the key against the extension's label file.

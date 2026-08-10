@@ -12,9 +12,14 @@ import Notification from '@typo3/backend/notification.js'
 import { SeverityEnum } from '@typo3/backend/enum/severity.js'
 import { html } from 'lit'
 
-import '@gb-web/content-flow/wizard/task-wizard.js'
+import labels from '~labels/content_flow.messages'
+
+import { WIZARD_MODAL_SIZE } from '@gb-web/content-flow/wizard/task-wizard.js'
 
 const ELEMENT_BROWSER_FIELD_REFERENCE_PREFIX = 'contentflow-create-target'
+
+// The extension's name, not a sentence - it stays out of the label file.
+const NOTIFICATION_TITLE = 'Content Flow'
 
 function getAllowedCreateTables() {
   const configuredTables = TYPO3.settings.ContentFlow?.createTargetTables
@@ -53,18 +58,19 @@ function formatRecordLabel(table, uid) {
 function openNewTaskWizard(table, uid, recordTitle) {
   Modal.advanced({
     type: Modal.types.default,
-    title: 'New task',
+    title: labels.get('modal.newTask'),
     content: html`<contentflow-task-wizard
       .pending=${{ mode: 'create_from_picker', table, uid, recordTitle }}
     ></contentflow-task-wizard>`,
     severity: SeverityEnum.notice,
+    size: WIZARD_MODAL_SIZE,
     staticBackdrop: true,
     buttons: [],
   })
 }
 
 /*
- * "Neue Seite erstellen": plans a page rather than creating it immediately -
+ * "Create a new page": plans a page rather than creating it immediately -
  * the ticket holds no real subject until it is dragged into a review stage
  * (Classes/Wizard/TaskWizardProvider.php's create_pending_page mode,
  * TaskAjaxController::materializePendingPage()).
@@ -73,11 +79,12 @@ function openPendingPageWizard() {
   const parentPid = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
   Modal.advanced({
     type: Modal.types.default,
-    title: 'New task',
+    title: labels.get('modal.newTask'),
     content: html`<contentflow-task-wizard
       .pending=${{ mode: 'create_pending_page', parentPid }}
     ></contentflow-task-wizard>`,
     severity: SeverityEnum.notice,
+    size: WIZARD_MODAL_SIZE,
     staticBackdrop: true,
     buttons: [],
   })
@@ -86,7 +93,7 @@ function openPendingPageWizard() {
 function openRecordPicker(allowedTypesOverride) {
   const baseUrl = TYPO3.settings.ContentFlow?.elementBrowserUrl
   if (!baseUrl) {
-    Notification.error('Content Flow', 'Element browser is not configured.')
+    Notification.error(NOTIFICATION_TITLE, labels.get('wizard.error.elementBrowserMissing'))
     return
   }
 
@@ -104,7 +111,7 @@ function openRecordPicker(allowedTypesOverride) {
 
   const modal = Modal.advanced({
     type: Modal.types.iframe,
-    title: 'Select a page, content element or record',
+    title: labels.get('entry.recordPicker.title'),
     content: baseUrl + (baseUrl.includes('?') ? '&' : '?') + params.toString(),
     size: Modal.sizes.large,
     severity: SeverityEnum.notice,
@@ -118,7 +125,7 @@ function openRecordPicker(allowedTypesOverride) {
 
     const record = parseSelectedRecord(value)
     if (record === null) {
-      Notification.error('Content Flow', 'The selected record could not be identified.')
+      Notification.error(NOTIFICATION_TITLE, labels.get('wizard.error.recordUnidentified'))
       return
     }
 
@@ -142,7 +149,7 @@ function openRecordPicker(allowedTypesOverride) {
  */
 function openCoreRecordWizard(url, title) {
   if (!url) {
-    Notification.error('Content Flow', 'This wizard is not configured for the current page.')
+    Notification.error(NOTIFICATION_TITLE, labels.get('wizard.error.recordWizardMissing'))
     return
   }
 
@@ -162,24 +169,24 @@ function openCoreRecordWizard(url, title) {
 function openEntryChoiceWizard() {
   const choices = [
     {
-      label: 'Neue Seite erstellen',
-      description: 'Plan a new page - it is only actually created once this ticket moves to a review stage.',
+      label: labels.get('entry.newPage.label'),
+      description: labels.get('entry.newPage.description'),
       action: () => openPendingPageWizard(),
     },
     {
-      label: 'Bestehende Seite bearbeiten',
-      description: 'Pick an existing page from the page tree.',
+      label: labels.get('entry.existingPage.label'),
+      description: labels.get('entry.existingPage.description'),
       action: () => openRecordPicker(['pages']),
     },
     {
-      label: 'Select Record',
-      description: 'Pick any record — page, content element or other.',
+      label: labels.get('entry.record.label'),
+      description: labels.get('entry.record.description'),
       action: () => openRecordPicker(),
     },
     {
-      label: 'Neuen Record erstellen',
-      description: "Create a new record with TYPO3's own record wizard.",
-      action: () => openCoreRecordWizard(TYPO3.settings.ContentFlow?.newRecordUrl, 'Create a new record'),
+      label: labels.get('entry.newRecord.label'),
+      description: labels.get('entry.newRecord.description'),
+      action: () => openCoreRecordWizard(TYPO3.settings.ContentFlow?.newRecordUrl, labels.get('entry.newRecord.label')),
     },
   ]
 
@@ -210,12 +217,12 @@ function openEntryChoiceWizard() {
 
   modal = Modal.advanced({
     type: Modal.types.default,
-    title: 'New task — how do you want to start?',
+    title: labels.get('entry.title'),
     content: list,
     severity: SeverityEnum.notice,
     buttons: [
       {
-        text: 'Cancel',
+        text: labels.get('entry.cancel'),
         btnClass: 'btn-default',
         name: 'cancel',
         trigger: (event, currentModal) => currentModal.hideModal(),

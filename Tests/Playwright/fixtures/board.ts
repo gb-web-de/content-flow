@@ -12,7 +12,14 @@ export const boardPageId = process.env.CONTENTFLOW_TEST_PAGE_ID ?? '1'
 export async function openBoard(page: Page, pageId: string = boardPageId): Promise<Frame> {
   await page.goto(`/typo3/module/web/contentflow?id=${pageId}`)
 
-  const frame = page.frame({ name: 'list_frame' })
+  /*
+   * page.frame() is a synchronous look at the frames attached at that instant,
+   * and the backend chrome builds its content iframe after its own document
+   * has loaded - so asking straight after goto() returns null often enough to
+   * fail a random spec per run. Wait for the element, then take its frame.
+   */
+  const iframe = await page.waitForSelector('iframe[name="list_frame"]', { state: 'attached' })
+  const frame = await iframe.contentFrame()
   if (frame === null) {
     throw new Error('The backend content iframe (list_frame) never appeared.')
   }
