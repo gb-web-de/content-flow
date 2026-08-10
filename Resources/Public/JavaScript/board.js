@@ -34,6 +34,18 @@ import { registerPublishButtons } from '@gb-web/content-flow/task/publish.js';
 import { registerMemberActions } from '@gb-web/content-flow/task/member-actions.js';
 import { registerChecklistManagement, registerChecklistToggle } from '@gb-web/content-flow/board/checklist.js';
 
+/*
+ * Core's own "Editing" stage (StagesService::STAGE_EDIT_ID), the one a record
+ * sits in as soon as a workspace version exists.
+ */
+const EDITING_STAGE_UID = 0;
+
+/*
+ * A ticket planned with "Neue Seite erstellen" carries no subject yet, which
+ * the card spells as `pages:0` (Index.html's data-contentflow-record).
+ */
+const PENDING_PAGE_RECORD = 'pages:0';
+
 class ContentFlowBoard {
   constructor() {
     this.selection = new Set();
@@ -126,7 +138,10 @@ class ContentFlowBoard {
 
     if (targetStage !== null) {
       if (currentWorkspaceUid < 1) {
-        return false;
+        // A ticket planned as "a new page" has nothing versioned yet, but
+        // Editing is exactly where it stops being a plan: TYPO3's page wizard
+        // creates the page there. Every other stage still needs a real one.
+        return this.isPendingPageCard(card) && targetStage === EDITING_STAGE_UID;
       }
       return currentStage !== targetStage;
     }
@@ -136,6 +151,10 @@ class ContentFlowBoard {
     }
 
     return currentState !== targetState;
+  }
+
+  isPendingPageCard(card) {
+    return (card?.dataset.contentflowRecord || '') === PENDING_PAGE_RECORD;
   }
 
   getDropRejectionMessage(card, column) {
@@ -153,6 +172,9 @@ class ContentFlowBoard {
     const targetStage = this.parseStageUid(column.dataset.contentflowStage);
 
     if (targetStage !== null && currentWorkspaceUid < 1) {
+      if (this.isPendingPageCard(card)) {
+        return 'This ticket is still only a plan. Drop it into Editing - TYPO3\'s page wizard creates the page there.';
+      }
       return 'This task has no workspace version yet. Edit it first so TYPO3 can create one.';
     }
     if (targetStage === null && currentWorkspaceUid > 0) {
@@ -175,6 +197,15 @@ class ContentFlowBoard {
     const cardTitle = card?.dataset.contentflowTitle || 'Task';
 
     if (targetStageUid !== null) {
+      // A ticket that has no page yet cannot change a stage - there is nothing
+      // versioned to move. Its drop into Editing means "create the page now",
+      // and the server answers that with the page wizard rather than a
+      // transition (TaskAjaxController::requestPageWizard()).
+      if (this.isPendingPageCard(card)) {
+        await this.moveTaskToColumn(taskUid, targetState, targetStageUid, columnTitle, cardTitle);
+        return;
+      }
+
       await this.openStageTransitionModal(taskUid, targetStageUid, columnTitle, cardTitle);
       return;
     }
@@ -200,11 +231,70 @@ class ContentFlowBoard {
         return;
       }
 
+      // The move is not finished server-side: this ticket has no page yet, and
+      // TYPO3's own wizard is where one gets created. The ticket reaches
+      // Editing when the page does (PendingPageClaimService).
+      if (result.requiresPageWizard === true) {
+        await this.openPageWizard(result, cardTitle);
+        return;
+      }
+
       this.announce(`Moved ${cardTitle} to ${columnTitle}.`);
       Notification.success('Content Flow', `${cardTitle} moved to ${columnTitle}.`);
       window.location.reload();
     } catch (error) {
       Notification.error('Content Flow', await this.extractErrorMessage(error, 'Could not move the task.'));
+    }
+  }
+
+  /*
+   * TYPO3's own page-creation dialog, the same one the page tree opens - not a
+   * Content Flow rebuild of it. Core owns the position step, the page-type step
+   * and whatever fields that type requires, and its provider creates the page;
+   * this extension only says where to start and then waits for the DataHandler
+   * hook to link the result to the ticket.
+   *
+   * The import goes to the top frame for the same reason the stage dialog's
+   * does: the modal is built in the parent's realm, so <typo3-backend-page-
+   * wizard> has to be defined there, not in this iframe.
+   */
+  async openPageWizard(result, cardTitle) {
+    try {
+      await topLevelModuleImport('@typo3/backend/page-wizard/page-wizard.js');
+      const { openPageWizardModal } = await import('@typo3/backend/page-wizard/helper/wizard-helper.js');
+
+      await openPageWizardModal({ positionData: result.positionData });
+      this.announce(`Creating the page for ${cardTitle}.`);
+      this.dropPageWizardClaimWhenClosed();
+    } catch (error) {
+      Notification.error('Content Flow', 'Could not open TYPO3\'s page wizard.');
+      await this.cancelPageWizard();
+    }
+  }
+
+  /*
+   * Core's wizard redirects to the new page on success, so a modal that merely
+   * closes almost always means "cancelled". Telling the server so keeps the
+   * ticket from adopting whatever page the editor creates next; if a page WAS
+   * created, the claim is already spent and this call changes nothing.
+   */
+  dropPageWizardClaimWhenClosed() {
+    const modal = top.document.querySelector('typo3-backend-modal');
+    if (!modal) {
+      return;
+    }
+    modal.addEventListener('typo3-modal-hidden', () => this.cancelPageWizard(), { once: true });
+  }
+
+  async cancelPageWizard() {
+    const url = TYPO3.settings.ajaxUrls.contentflow_task_cancel_page_wizard;
+    if (!url) {
+      return;
+    }
+    try {
+      await this.postJson(url, {});
+    } catch (error) {
+      // The claim expires on its own - see PendingPageHandoff.
     }
   }
 

@@ -12,6 +12,7 @@ use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use GbWeb\ContentFlow\Notification\AssignmentNotificationService;
 use GbWeb\ContentFlow\Service\ActiveTaskSession;
 use GbWeb\ContentFlow\Service\ActivityLogger;
+use GbWeb\ContentFlow\Service\PendingPageHandoff;
 use GbWeb\ContentFlow\Service\ReferenceInspector;
 use GbWeb\ContentFlow\Service\StageTransitionService;
 use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
@@ -29,7 +30,6 @@ use TYPO3\CMS\Core\Http\JsonResponse;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\StringUtility;
 use TYPO3\CMS\Core\View\ViewFactoryData;
 use TYPO3\CMS\Core\View\ViewFactoryInterface;
 use TYPO3\CMS\Workspaces\Authorization\WorkspacePublishGate;
@@ -50,6 +50,7 @@ final class TaskAjaxController
         private readonly ReferenceInspector $referenceInspector,
         private readonly ActivityLogger $activityLogger,
         private readonly ActiveTaskSession $activeTaskSession,
+        private readonly PendingPageHandoff $pendingPageHandoff,
         private readonly AssignmentNotificationService $assignmentNotificationService,
         private readonly WorkspaceIntegrationService $workspaceService,
         private readonly WorkspacePublishGate $workspacePublishGate,
@@ -131,10 +132,10 @@ final class TaskAjaxController
      * "Neue Seite erstellen" on the "+ New task" wizard: plans a page that does
      * not exist yet, rather than opening core's page-creation wizard immediately.
      * The page itself is only created once an editor drags this ticket into
-     * Editing, where a workspace version starts to exist - see
-     * moveStageAction()'s materializePendingPage(). Until then it is a
-     * title-only ticket moving freely between Backlog and Planned like any
-     * other, just without a real subject record behind it yet.
+     * Editing, and it is TYPO3's own page wizard that creates it - see
+     * moveStageAction()'s requestPageWizard() and PendingPageHandoff. Until
+     * then it is a title-only ticket moving freely between Backlog and Planned
+     * like any other, just without a real subject record behind it yet.
      */
     public function createPendingPageAction(ServerRequestInterface $request): ResponseInterface
     {
@@ -441,12 +442,12 @@ final class TaskAjaxController
                 );
             }
             if ($state->hasVersion()) {
-                $materialized = $this->materializePendingPage($task);
-                if ($materialized instanceof ResponseInterface) {
-                    return $materialized;
-                }
-                $task = $materialized;
-                $isPendingPage = false;
+                // The page is created by TYPO3's own page wizard, not silently
+                // here: position, page type and the type's required fields are
+                // an editor's decision, and core already asks for them properly.
+                // The move itself is completed by the DataHandler hook once that
+                // wizard creates the page - see PendingPageHandoff.
+                return $this->requestPageWizard($task);
             }
         }
 
@@ -1004,17 +1005,24 @@ final class TaskAjaxController
     }
 
     /**
-     * Turns a pending page ("Neue Seite erstellen", see createPendingPageAction())
-     * into a real one, in the current workspace - the ticket's own intended
-     * parent (subject_pid) is where it lands, and its title becomes the page
-     * title. Called only from moveStageAction(), once, right before the normal
-     * stage-transition flow runs on the now-real subject.
+     * A pending page ("Neue Seite erstellen", see createPendingPageAction())
+     * becomes real through TYPO3's own page wizard, which this answer asks the
+     * browser to open - prefilled with the parent the ticket was planned under.
+     *
+     * Content Flow used to create the page itself here, with the ticket title
+     * and nothing else. That skipped every decision core asks about: where the
+     * page goes, which page type it is, and whatever that type declares
+     * required. The wizard is where those belong, and it is the same dialog an
+     * editor already knows from the page tree.
+     *
+     * The move is therefore not finished when this returns. It completes when
+     * the wizard creates the page and the DataHandler hook claims it for this
+     * ticket (PendingPageClaimService), which is also what lifts the ticket
+     * into Editing.
      *
      * @param array<string, mixed> $task
-     * @return array<string, mixed>|ResponseInterface the refreshed task row, or
-     *         an error response
      */
-    private function materializePendingPage(array $task): array|ResponseInterface
+    private function requestPageWizard(array $task): ResponseInterface
     {
         $taskUid = (int)$task['uid'];
         $parentPid = (int)$task['subject_pid'];
@@ -1042,41 +1050,34 @@ final class TaskAjaxController
             );
         }
 
-        $placeholder = StringUtility::getUniqueId('NEW');
-        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
-        $dataHandler->start([
-            'pages' => [
-                $placeholder => [
-                    'pid' => $parentPid,
-                    'title' => (string)$task['title'],
-                ],
+        $this->pendingPageHandoff->remember($this->getBackendUser(), $taskUid, $parentPid);
+
+        return new JsonResponse([
+            'success' => true,
+            'requiresPageWizard' => true,
+            'taskUid' => $taskUid,
+            // The shape core's own callers pass to openPageWizardModal() - see
+            // context-menu-actions.js, which opens the same dialog from the page
+            // tree.
+            'positionData' => [
+                'pageUid' => $parentPid,
+                'insertPosition' => 'inside',
             ],
-        ], []);
-        $dataHandler->process_datamap();
-        $newPageUid = (int)($dataHandler->substNEWwithIDs[$placeholder] ?? 0);
-        if ($newPageUid < 1) {
-            return $this->reject(
-                'pending-page-create-failed',
-                'Could not create the new page.',
-                ['taskUid' => $taskUid, 'errors' => $dataHandler->errorLog],
-            );
-        }
-
-        $this->taskRepository->attachCreatedSubject($taskUid, $newPageUid);
-        // Editing (stage 0) is where a brand new workspace record already sits by
-        // default - this just makes the task's own bookkeeping match reality, the
-        // same way TaskAutoCreationService::captureEdit() does for an
-        // auto-created task's first edit.
-        $this->taskRepository->attachWorkspace($taskUid, $workspaceUid, 0);
-
-        $this->activityLogger->log($taskUid, ActivityLogger::EVENT_WORK_STARTED, (int)($this->getBackendUser()->user['uid'] ?? 0), [
-            'table' => 'pages',
-            'recordUid' => $newPageUid,
-            'parentPid' => $parentPid,
+            'title' => (string)$task['title'],
         ]);
+    }
 
-        $refreshed = $this->taskRepository->findByUid($taskUid);
-        return $refreshed ?? $task;
+    /**
+     * The editor closed the page wizard without creating anything. Drops the
+     * claim, so the next page they create anywhere is not adopted by this
+     * ticket - PendingPageHandoff's own expiry is the backstop for a browser
+     * that never says so.
+     */
+    public function cancelPageWizardAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $this->pendingPageHandoff->forget($this->getBackendUser());
+
+        return new JsonResponse(['success' => true]);
     }
 
     private function mayCreatePageUnder(int $parentPid): bool

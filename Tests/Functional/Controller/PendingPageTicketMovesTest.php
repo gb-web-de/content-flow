@@ -7,11 +7,15 @@ namespace GbWeb\ContentFlow\Tests\Functional\Controller;
 use GbWeb\ContentFlow\Controller\TaskAjaxController;
 use GbWeb\ContentFlow\Domain\Model\TaskState;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\ContentFlow\Service\PendingPageHandoff;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Http\ServerRequest;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Utility\StringUtility;
 use TYPO3\CMS\Workspaces\Service\StagesService;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
@@ -117,10 +121,14 @@ final class PendingPageTicketMovesTest extends FunctionalTestCase
     }
 
     /**
-     * "Seite soll erst beim Wechsel von Planned zu Editing angelegt werden."
+     * "Seite soll erst beim Wechsel von Planned zu Editing angelegt werden ...
+     * mit dem PageWizard von TYPO3."
+     *
+     * The move therefore does not create anything by itself any more. It asks
+     * for core's page wizard and notes which ticket is waiting for the result.
      */
     #[Test]
-    public function thePageIsCreatedOnTheWayIntoEditing(): void
+    public function theMoveIntoEditingAsksForCoresPageWizard(): void
     {
         $taskUid = $this->createPendingTicket(['state' => TaskState::PLANNED->value]);
 
@@ -131,22 +139,86 @@ final class PendingPageTicketMovesTest extends FunctionalTestCase
         ])));
 
         self::assertTrue($payload['success']);
+        self::assertTrue($payload['requiresPageWizard']);
+        // The shape core's own openPageWizardModal() callers pass.
+        self::assertSame(2, (int)$payload['positionData']['pageUid'], 'prefilled with the planned parent');
+        self::assertSame('inside', $payload['positionData']['insertPosition']);
+
+        self::assertSame(
+            $taskUid,
+            $this->get(PendingPageHandoff::class)->resolve($GLOBALS['BE_USER']),
+            'the ticket must be on record as waiting for a page',
+        );
 
         $task = $this->get(TaskRepository::class)->findByUid($taskUid);
-        self::assertGreaterThan(0, (int)$task['subject_uid'], 'the page must exist now');
+        self::assertSame(0, (int)$task['subject_uid'], 'nothing is created before the wizard runs');
+        self::assertSame(TaskState::PLANNED->value, $task['state'], 'and the ticket has not moved yet');
+    }
 
-        // Read the way the backend reads it. The record is created inside the
-        // workspace, and a raw connection opened by the test does not see it.
-        $page = BackendUtility::getRecord('pages', (int)$task['subject_uid']);
+    /**
+     * The other half: whatever core's wizard creates is claimed by the waiting
+     * ticket through the DataHandler hook, because core hands no uid back to a
+     * third package - it redirects the browser instead.
+     */
+    #[Test]
+    public function thePageTheWizardCreatesIsClaimedByTheWaitingTicket(): void
+    {
+        $taskUid = $this->createPendingTicket(['state' => TaskState::PLANNED->value]);
+        $this->subject()->moveStageAction($this->moveRequest([
+            'task' => $taskUid,
+            'state' => TaskState::IN_PROGRESS->value,
+            'stageUid' => StagesService::STAGE_EDIT_ID,
+        ]));
+
+        // Exactly what core's PageWizardProvider::handleSubmit() does with the
+        // wizard's form data: one new page, through DataHandler.
+        $newPageUid = $this->createPageThroughDataHandler(2, 'Trail guide');
+
+        $task = $this->get(TaskRepository::class)->findByUid($taskUid);
+        self::assertSame($newPageUid, (int)$task['subject_uid'], 'the ticket now points at the created page');
+        self::assertSame(1, (int)$task['workspace_uid']);
+        self::assertSame(StagesService::STAGE_EDIT_ID, (int)$task['stage_uid']);
+        self::assertSame(TaskState::IN_PROGRESS->value, $task['state']);
+
+        $page = BackendUtility::getRecord('pages', $newPageUid);
         self::assertIsArray($page);
-        self::assertSame('Trail guide', $page['title']);
-        self::assertSame(2, (int)$page['pid'], 'under the parent the ticket was planned below');
         self::assertSame(1, (int)$page['t3ver_wsid'], 'created in the workspace, not on live');
-        self::assertSame(
-            StagesService::STAGE_EDIT_ID,
-            (int)$page['t3ver_stage'],
-            'a brand new workspace record starts in Editing',
-        );
+    }
+
+    /**
+     * A cancelled wizard must not leave a claim behind that adopts the next
+     * page the editor creates for something else entirely.
+     */
+    #[Test]
+    public function aPageCreatedAfterTheWizardWasCancelledStaysUnclaimed(): void
+    {
+        $taskUid = $this->createPendingTicket(['state' => TaskState::PLANNED->value]);
+        $this->subject()->moveStageAction($this->moveRequest([
+            'task' => $taskUid,
+            'state' => TaskState::IN_PROGRESS->value,
+            'stageUid' => StagesService::STAGE_EDIT_ID,
+        ]));
+
+        $this->subject()->cancelPageWizardAction($this->moveRequest([]));
+
+        $newPageUid = $this->createPageThroughDataHandler(2, 'Something else');
+
+        $task = $this->get(TaskRepository::class)->findByUid($taskUid);
+        self::assertSame(0, (int)$task['subject_uid'], 'the ticket must not have taken this page');
+        self::assertNotSame($newPageUid, (int)$task['subject_uid']);
+    }
+
+    private function createPageThroughDataHandler(int $parentPageUid, string $title): int
+    {
+        $placeholder = StringUtility::getUniqueId('NEW');
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start(['pages' => [$placeholder => ['pid' => $parentPageUid, 'title' => $title, 'doktype' => 1]]], []);
+        $dataHandler->process_datamap();
+
+        $uid = (int)($dataHandler->substNEWwithIDs[$placeholder] ?? 0);
+        self::assertGreaterThan(0, $uid, 'the page itself must have been created');
+
+        return $uid;
     }
 
     #[Test]

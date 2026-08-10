@@ -21,6 +21,11 @@ return [
         'path' => '/contentflow/task/create-pending-page',
         'target' => TaskAjaxController::class . '::createPendingPageAction',
     ],
+    // Page wizard closed without creating a page: drop the ticket's claim on it.
+    'contentflow_task_cancel_page_wizard' => [
+        'path' => '/contentflow/task/cancel-page-wizard',
+        'target' => TaskAjaxController::class . '::cancelPageWizardAction',
+    ],
     // "Select to task": move selected records onto a task.
     'contentflow_task_attach' => [
         'path' => '/contentflow/task/attach',
