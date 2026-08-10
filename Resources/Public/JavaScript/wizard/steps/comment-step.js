@@ -14,12 +14,13 @@
  * case there.
  */
 import { html } from 'lit'
+import labels from '~labels/content_flow.messages'
 
 export class CommentStep {
   constructor(context, configurationData = {}) {
     this.context = context
     this.key = 'comment'
-    this.title = 'Comment'
+    this.title = labels.get('step.comment.title')
     this.autoAdvance = false
     this.value = configurationData.defaultComment || ''
   }

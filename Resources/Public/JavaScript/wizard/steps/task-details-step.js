@@ -10,20 +10,21 @@
  * mutating a plain object gives Lit nothing to react to on its own.
  */
 import { html } from 'lit'
+import labels from '~labels/content_flow.messages'
 
 import '@gb-web/content-flow/components/assignee-picker.js'
 
 const PRIORITY_CHOICES = [
-  ['1', 'High'],
-  ['2', 'Normal'],
-  ['3', 'Low'],
+  ['1', labels.get('step.taskDetails.priority.high')],
+  ['2', labels.get('step.taskDetails.priority.normal')],
+  ['3', labels.get('step.taskDetails.priority.low')],
 ]
 
 export class TaskDetailsStep {
   constructor(context, configurationData = {}) {
     this.context = context
     this.key = 'taskDetails'
-    this.title = 'Task details'
+    this.title = labels.get('step.taskDetails.title')
     this.autoAdvance = false
     this.showExtraFields = Boolean(configurationData.showExtraFields)
 
@@ -54,14 +55,14 @@ export class TaskDetailsStep {
       ? TYPO3.settings.ContentFlow.assignableUsers
       : []
     const assigneeLabel = this.assignee === 'me'
-      ? 'Assign to me'
+      ? labels.get('assignee.me')
       : this.assignee === 'open'
-        ? 'Leave open for someone to take'
+        ? labels.get('assignee.open')
         : (assignableUsers.find((user) => String(user.uid) === this.assignee)?.name ?? this.assignee)
 
     return [
-      { label: 'Title', value: this.titleValue },
-      { label: 'Assignment', value: assigneeLabel },
+      { label: labels.get('step.taskDetails.field.title'), value: this.titleValue },
+      { label: labels.get('step.taskDetails.field.assignment'), value: assigneeLabel },
     ]
   }
 
@@ -72,7 +73,7 @@ export class TaskDetailsStep {
 
     return html`
       <div class="form-group">
-        <label class="form-label">Title</label>
+        <label class="form-label">${labels.get('step.taskDetails.field.title')}</label>
         <input
           type="text"
           class="form-control"
@@ -84,17 +85,17 @@ export class TaskDetailsStep {
         >
       </div>
       <div class="form-group">
-        <label class="form-label">Description</label>
+        <label class="form-label">${labels.get('step.taskDetails.field.description')}</label>
         <textarea
           class="form-control"
           rows="3"
-          placeholder="Optional description"
+          placeholder=${labels.get('step.taskDetails.field.description.placeholder')}
           .value=${this.description}
           @input=${(event) => { this.description = event.target.value }}
         ></textarea>
       </div>
       <div class="form-group">
-        <label class="form-label">Assignment</label>
+        <label class="form-label">${labels.get('step.taskDetails.field.assignment')}</label>
         <contentflow-assignee-picker
           .users=${assignableUsers}
           .value=${this.assignee}
@@ -109,7 +110,7 @@ export class TaskDetailsStep {
     const selectedPriority = String(this.priority)
     return html`
       <div class="form-group">
-        <label class="form-label">Priority</label>
+        <label class="form-label">${labels.get('step.taskDetails.field.priority')}</label>
         <select
           class="form-select form-control"
           @change=${(event) => { this.priority = parseInt(event.target.value, 10) }}
@@ -121,7 +122,7 @@ export class TaskDetailsStep {
       </div>
       <div class="form-row contentflow-date-fields">
         <div class="form-group">
-          <label class="form-label">Start date</label>
+          <label class="form-label">${labels.get('step.taskDetails.field.startDate')}</label>
           <input
             type="date"
             class="form-control"
@@ -130,7 +131,7 @@ export class TaskDetailsStep {
           >
         </div>
         <div class="form-group">
-          <label class="form-label">Due date</label>
+          <label class="form-label">${labels.get('step.taskDetails.field.dueDate')}</label>
           <input
             type="date"
             class="form-control"

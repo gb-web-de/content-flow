@@ -40,6 +40,36 @@ test.describe('the "New task" wizard', () => {
     await expect(wizard.locator('input[type="date"]')).toHaveCount(2)
   })
 
+  /*
+   * backend.css takes the wizard out of flow inside a modal
+   * (`.modal-body typo3-backend-wizard { position: absolute; inset: 0 }`), so a
+   * modal that is left to size itself to its content collapses to a ~30px
+   * sliver and clips the entire form away - the editor sees a header, a
+   * progress bar and nothing else. Every Modal.advanced() hosting the wizard
+   * therefore has to pass WIZARD_MODAL_SIZE, exactly as core's own
+   * openPageWizardModal() does.
+   *
+   * The clipped controls keep a bounding box of their own, so toBeVisible()
+   * passes on a broken build and the test above would not have caught this.
+   * Containment inside the scroll container is what actually has to hold.
+   */
+  test('gives the step enough room to be seen, not just rendered', async ({ page }) => {
+    const board = await openBoard(page)
+    const modal = await openTaskWizard(page, board)
+    await modal.getByRole('button', { name: planANewPage }).click()
+
+    const wizard = page.locator('contentflow-task-wizard')
+    const field = wizard.locator('input[type="text"]').first()
+    await expect(field).toBeVisible()
+
+    const contentBox = await wizard.locator('.wizard-content').boundingBox()
+    const fieldBox = await field.boundingBox()
+
+    expect(contentBox).not.toBeNull()
+    expect(fieldBox).not.toBeNull()
+    expect(fieldBox!.y + fieldBox!.height).toBeLessThanOrEqual(contentBox!.y + contentBox!.height)
+  })
+
   test('reaches the confirmation step with a title filled in', async ({ page }) => {
     const board = await openBoard(page)
     const modal = await openTaskWizard(page, board)

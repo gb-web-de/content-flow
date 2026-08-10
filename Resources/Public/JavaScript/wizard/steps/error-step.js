@@ -6,14 +6,15 @@
  * screen.
  */
 import { html } from 'lit'
+import labels from '~labels/content_flow.messages'
 
 export class ErrorStep {
   constructor(context, configurationData = {}) {
     this.context = context
     this.key = 'error'
-    this.title = 'Error'
+    this.title = labels.get('step.error.title')
     this.autoAdvance = false
-    this.message = configurationData.message || 'Something went wrong.'
+    this.message = configurationData.message || labels.get('wizard.error.stepFallback')
   }
 
   isComplete() {
@@ -21,7 +22,7 @@ export class ErrorStep {
   }
 
   render() {
-    return html`<typo3-backend-alert severity="2" heading="Error" message=${this.message} show-icon></typo3-backend-alert>`
+    return html`<typo3-backend-alert severity="2" heading=${this.title} message=${this.message} show-icon></typo3-backend-alert>`
   }
 }
 

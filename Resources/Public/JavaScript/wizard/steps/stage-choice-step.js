@@ -4,12 +4,13 @@
  * route-choice-step.js.
  */
 import { html } from 'lit'
+import labels from '~labels/content_flow.messages'
 
 export class StageChoiceStep {
   constructor(context) {
     this.context = context
     this.key = 'stage'
-    this.title = 'Stage'
+    this.title = labels.get('step.stage.title')
     this.autoAdvance = false
     this.value = context.getStoreData(this.key) || 'in_progress'
   }
@@ -25,7 +26,7 @@ export class StageChoiceStep {
   getSummaryData() {
     return [{
       label: this.title,
-      value: this.value === 'review' ? 'Move directly to review' : 'Keep in progress',
+      value: this.value === 'review' ? labels.get('step.stage.review') : labels.get('step.stage.inProgress.summary'),
     }]
   }
 
@@ -36,8 +37,8 @@ export class StageChoiceStep {
 
   render() {
     const choices = [
-      ['in_progress', 'Keep in progress (more edits coming)'],
-      ['review', 'Move directly to review'],
+      ['in_progress', labels.get('step.stage.inProgress')],
+      ['review', labels.get('step.stage.review')],
     ]
 
     return html`

@@ -5,14 +5,15 @@
  * custom element.
  */
 import { html } from 'lit'
+import labels from '~labels/content_flow.messages'
 
 export class RouteChoiceStep {
   constructor(context, configurationData = {}) {
     this.context = context
     this.key = 'destination'
-    this.title = 'Task destination'
+    this.title = labels.get('step.destination.title')
     this.autoAdvance = false
-    this.pageTaskTitle = configurationData.pageTaskTitle || 'Untitled task'
+    this.pageTaskTitle = configurationData.pageTaskTitle || labels.get('task.untitled')
     this.value = context.getStoreData(this.key) || 'attach_to_page_task'
   }
 
@@ -27,7 +28,9 @@ export class RouteChoiceStep {
   getSummaryData() {
     return [{
       label: this.title,
-      value: this.value === 'create_new_task' ? 'Create a separate task for this record' : `Add it to "${this.pageTaskTitle}"`,
+      value: this.value === 'create_new_task'
+        ? labels.get('step.destination.create')
+        : labels.get('step.destination.attach.summary', [this.pageTaskTitle]),
     }]
   }
 
@@ -38,8 +41,8 @@ export class RouteChoiceStep {
 
   render() {
     const choices = [
-      ['attach_to_page_task', `Add it to the existing page task ("${this.pageTaskTitle}")`],
-      ['create_new_task', 'Create a separate task for this record'],
+      ['attach_to_page_task', labels.get('step.destination.attach', [this.pageTaskTitle])],
+      ['create_new_task', labels.get('step.destination.create')],
     ]
 
     return html`

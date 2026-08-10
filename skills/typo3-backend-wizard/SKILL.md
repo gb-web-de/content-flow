@@ -45,10 +45,24 @@ Implement wizard changes by following TYPO3's native provider, step, and finishe
 - Verify FormEngine module initialization before patching custom field behavior.
 - Verify submission payload shape and backend `handleSubmit()` expectations before changing finishers.
 
+## Host the Wizard in a Modal
+
+- Pass an explicit `size: { width, height }` to every `Modal.advanced()` that hosts a wizard, as `openPageWizardModal()` does. This is load-bearing, not cosmetic.
+- Never let the modal size itself to the wizard's content: `backend.css` sets `.modal-body typo3-backend-wizard { position: absolute; inset: 0 }`, so the wizard contributes no height and the modal collapses to a sliver.
+- Expect a collapsed modal to look like a header, a progress bar and nothing else - the step markup is in the DOM and even keeps a bounding box, it is only clipped.
+- Assert containment inside `.wizard-content`, not `toBeVisible()`, when a test has to guard this - clipped controls still pass a visibility check.
+
+## Localize Step Labels
+
+- Read editor-facing strings in step modules from a translation domain, `import labels from '~labels/<extension_key>.messages'`, rather than writing them into the JavaScript.
+- Note that core derives the domain from the label file's own path, so `Resources/Private/Language/locallang.xlf` is `<extension_key>.messages` with nothing to register.
+- Remember that `LabelProvider.get()` throws on an unknown key, which rejects the dynamic step import and empties the wizard - cover the keys the modules ask for.
+
 ## Common Pitfalls
 
 - Dynamic steps never load because the provider identifier, AJAX `mode`, and frontend loader string do not match.
 - The wizard renders blank because the PHP step module path does not match a default-exporting TypeScript step class.
+- The wizard shows its chrome but no form because its modal was opened without an explicit size.
 - Values disappear on confirm because a step never writes to the store in `beforeAdvance()`.
 - Summary or finisher appears twice because a custom wizard duplicates behavior already appended by `wizard.ts`.
 - Backend permissions, labels, or record handling drift because custom forms bypass FormEngine or DataHandler.
