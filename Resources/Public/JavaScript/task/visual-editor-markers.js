@@ -68,10 +68,16 @@ const MARKER_STYLES = `
   outline-color: hsl(var(${HUE_PROPERTY}, 0), 70%, 45%);
   background-color: hsl(var(${HUE_PROPERTY}, 0), 70%, 45%, .08);
 }
+/*
+ * Right-hand corner, not the left one: a rendered page carries its own content
+ * at the start of a line - headings, first words, images - and a dot placed
+ * over that reads as part of the design. The right edge is where the eye finds
+ * a status mark and where nothing of the page usually is.
+ */
 .${BUBBLE_CLASS} {
   position: absolute;
   top: 4px;
-  left: 4px;
+  right: 4px;
   z-index: 11;
   width: 14px;
   height: 14px;
@@ -94,7 +100,9 @@ const MARKER_STYLES = `
   content: attr(data-contentflow-label);
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  /* Anchored right so the label opens inwards - anchored left it would run off
+     the page edge, the bubble now sitting in the right-hand corner. */
+  right: 0;
   display: none;
   z-index: 12;
   padding: .25em .5em;
@@ -325,6 +333,20 @@ export class TaskMarkers {
       swatch.style.setProperty(HUE_PROPERTY, String(entry.hue))
       swatch.title = tooltipFor(entry).replace('\n', ' - ')
       swatch.setAttribute('aria-label', entry.title + ' - ' + labels.get('ve.marker.openTicket'))
+
+      // The colour alone said nothing until it was hovered. The title next to
+      // it turns the row of dots into a readable list of what is going on on
+      // this page - and which of it is yours, the ring being the same "this one
+      // is mine" mark the bubbles use. Long titles are cut by CSS, with the
+      // full text plus stage and assignee still in the tooltip above.
+      const dot = this.doc.createElement('span')
+      dot.className = 'contentflow-ve-legend-dot'
+
+      const title = this.doc.createElement('span')
+      title.className = 'contentflow-ve-legend-title'
+      title.textContent = entry.title
+
+      swatch.append(dot, title)
       swatch.addEventListener('click', () => this.openTicket(entry.taskUid))
       // Hovering a swatch answers "which parts of this page are that task?" -
       // the question the legend exists to raise in the first place.
