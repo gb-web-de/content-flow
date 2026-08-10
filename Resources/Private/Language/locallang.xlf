@@ -286,6 +286,21 @@
             <trans-unit id="ve.marker.claimedBy" xml:space="preserve">
                 <source>Belongs to task:</source>
             </trans-unit>
+            <trans-unit id="ve.marker.yourTask" xml:space="preserve">
+                <source>Part of the task you are working on:</source>
+            </trans-unit>
+            <trans-unit id="ve.marker.openTicket" xml:space="preserve">
+                <source>Open this task</source>
+            </trans-unit>
+            <trans-unit id="ve.marker.assignedTo" xml:space="preserve">
+                <source>Assigned to</source>
+            </trans-unit>
+            <trans-unit id="ve.marker.unassigned" xml:space="preserve">
+                <source>Unassigned</source>
+            </trans-unit>
+            <trans-unit id="ve.legend.label" xml:space="preserve">
+                <source>Tasks on this page</source>
+            </trans-unit>
             <trans-unit id="ve.notification.title" xml:space="preserve">
                 <source>Content Flow</source>
             </trans-unit>
@@ -318,6 +333,23 @@
             </trans-unit>
             <trans-unit id="ve.error.noWorkspaceSelected" xml:space="preserve">
                 <source>Switch into a workspace before selecting a task to work on. (CF-1033)</source>
+            </trans-unit>
+            <trans-unit id="ve.error.pageNotFound" xml:space="preserve">
+                <source>This page no longer exists. (CF-1034)</source>
+            </trans-unit>
+            <trans-unit id="ve.error.noPageAccess" xml:space="preserve">
+                <source>You do not have access to this page. (CF-1035)</source>
+            </trans-unit>
+
+            <!--
+                The comment TaskAutoCreationService writes when an edit drags a
+                task back out of review. Its Visual Editor counterpart is
+                `ve.comment.reopened` above - both are editor-facing history, so
+                neither belongs in a PHP string literal.
+                %1$s is the table, %2$d the record uid.
+            -->
+            <trans-unit id="autoCreation.comment.reopened" xml:space="preserve">
+                <source>Automatically reopened for editing - %1$s:%2$d was modified.</source>
             </trans-unit>
         </body>
     </file>
