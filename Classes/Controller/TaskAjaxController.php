@@ -12,6 +12,7 @@ use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use GbWeb\ContentFlow\Notification\AssignmentNotificationService;
 use GbWeb\ContentFlow\Service\ActivityLogger;
 use GbWeb\ContentFlow\Service\ReferenceInspector;
+use GbWeb\ContentFlow\Service\StageTransitionService;
 use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
 use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
 use GbWeb\ContentFlow\Service\WorkspaceIntegrationService;
@@ -24,12 +25,15 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Http\HtmlResponse;
 use TYPO3\CMS\Core\Http\JsonResponse;
+use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Utility\StringUtility;
 use TYPO3\CMS\Core\View\ViewFactoryData;
 use TYPO3\CMS\Core\View\ViewFactoryInterface;
 use TYPO3\CMS\Workspaces\Authorization\WorkspacePublishGate;
 use TYPO3\CMS\Workspaces\Preview\PreviewUriBuilder;
+use TYPO3\CMS\Workspaces\Service\StagesService;
 
 /**
  * Write and detail endpoints for the board and workspace popups.
@@ -47,6 +51,8 @@ final class TaskAjaxController
         private readonly AssignmentNotificationService $assignmentNotificationService,
         private readonly WorkspaceIntegrationService $workspaceService,
         private readonly WorkspacePublishGate $workspacePublishGate,
+        private readonly StageTransitionService $stageTransitionService,
+        private readonly StagesService $stagesService,
         private readonly UriBuilder $uriBuilder,
         private readonly ViewFactoryInterface $viewFactory,
         private readonly LoggerInterface $logger,
@@ -117,6 +123,60 @@ final class TaskAjaxController
             'task' => $taskUid,
             'claimed' => $claimed,
         ]);
+    }
+
+    /**
+     * "Neue Seite erstellen" on the "+ New task" wizard: plans a page that does
+     * not exist yet, rather than opening core's page-creation wizard immediately.
+     * The page itself is only created once an editor drags this ticket into a
+     * review stage - see moveStageAction()'s materializePendingPage(). Until
+     * then it is a title-only ticket in Backlog/Planned like any other, just
+     * without a real subject record behind it yet.
+     */
+    public function createPendingPageAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $parentPid = (int)($body['parentPid'] ?? 0);
+        if ($parentPid < 1) {
+            return $this->reject(
+                'missing-parent-page',
+                'No parent page was specified to create the new page under.',
+                [],
+            );
+        }
+        if (!$this->mayCreatePageUnder($parentPid)) {
+            return $this->reject(
+                'no-permission',
+                'You are not allowed to create a new page here.',
+                ['parentPid' => $parentPid],
+            );
+        }
+
+        $title = trim((string)($body['title'] ?? ''));
+        if ($title === '') {
+            return $this->reject('task-title-required', 'A title is required.', []);
+        }
+        $description = trim((string)($body['description'] ?? ''));
+        $priority = TaskPriority::fromRequest($body['priority'] ?? null);
+        $assignee = $this->resolveRequestedAssignee($body['assignee'] ?? 'me');
+        $startDate = $this->parseDate($body['startDate'] ?? null);
+        $dueDate = $this->parseDate($body['dueDate'] ?? null);
+
+        $task = $this->taskRepository->createPendingPageTask($parentPid, [
+            'title' => $title,
+            'description' => $description,
+            'state' => $startDate > 0 ? TaskState::PLANNED->value : TaskState::BACKLOG->value,
+            'priority' => $priority->value,
+            'assignee' => $assignee,
+            'start_date' => $startDate,
+            'due_date' => $dueDate,
+            'auto_created' => 0,
+        ]);
+        $taskUid = (int)$task['uid'];
+
+        $this->notifyAssignment($taskUid, $title, 'pages', 0, $assignee);
+
+        return new JsonResponse(['success' => true, 'task' => $taskUid]);
     }
 
     /**
@@ -347,6 +407,29 @@ final class TaskAjaxController
             return $task;
         }
 
+        $state = TaskState::tryFrom($targetState);
+
+        // A pending page ("Neue Seite erstellen" - see createPendingPageAction())
+        // has no real subject yet, so assertMayEdit() below would always reject
+        // it (subject_uid 0). It only ever gets one chance to become real: being
+        // dragged into a review stage, which is what actually creates the page.
+        // Backlog/Planned/Done are all no-ops for it - there is nothing to write
+        // anywhere yet - so those are rejected rather than silently doing nothing.
+        if ((string)$task['subject_table'] === 'pages' && (int)$task['subject_uid'] === 0) {
+            if ($state === null || !$state->hasVersion()) {
+                return $this->reject(
+                    'pending-page-needs-review-stage',
+                    'This ticket has no page yet - move it to a review stage to create it.',
+                    ['taskUid' => $taskUid],
+                );
+            }
+            $materialized = $this->materializePendingPage($task);
+            if ($materialized instanceof ResponseInterface) {
+                return $materialized;
+            }
+            $task = $materialized;
+        }
+
         $error = $this->assertMayEdit((string)$task['subject_table'], (int)$task['subject_uid']);
         if ($error !== null) {
             return $this->error($error);
@@ -357,7 +440,6 @@ final class TaskAjaxController
         // live there. Only Content Flow's own columns (Backlog / Planned), which
         // exist precisely because core has no state for "not versioned yet", are
         // written directly.
-        $state = TaskState::tryFrom($targetState);
         if ($state !== null && $state->hasVersion()) {
             return $this->executeStageAction($request);
         }
@@ -442,6 +524,193 @@ final class TaskAjaxController
     }
 
     /**
+     * Every open task touching a page, across every stage from Backlog
+     * through the stage just before Done - feeds the Visual Editor's
+     * persistent "Task" select (B4). Picking one there is a proactive,
+     * before-the-fact declaration of where an edit should land, which is
+     * what setActiveTaskForPageAction() records - this action only lists the
+     * choices. See TaskRepository::findAllOpenForPage().
+     */
+    public function listOpenTasksForPageAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $pageUid = (int)($request->getQueryParams()['pageUid'] ?? 0);
+
+        $tasks = array_map(
+            fn (array $task): array => [
+                'uid' => (int)$task['uid'],
+                'title' => (string)$task['title'],
+                'state' => (string)$task['state'],
+                'stageLabel' => $this->stageLabelFor($task),
+            ],
+            $this->taskRepository->findAllOpenForPage($pageUid),
+        );
+
+        return new JsonResponse(['success' => true, 'tasks' => $tasks]);
+    }
+
+    /**
+     * A human-readable name for wherever a task currently sits - a core stage
+     * title for anything with a workspace version (StagesService::
+     * getStageTitle() already handles Editing/Ready to publish/custom stages
+     * uniformly, by stage uid alone), or this extension's own column label
+     * for Backlog/Planned, which core has no notion of at all.
+     *
+     * @param array<string, mixed> $task
+     */
+    private function stageLabelFor(array $task): string
+    {
+        $state = TaskState::tryFrom((string)$task['state']);
+        if ($state !== null && $state->hasVersion()) {
+            return $this->stagesService->getStageTitle((int)$task['stage_uid']);
+        }
+
+        return match ($state) {
+            TaskState::BACKLOG => $this->getLanguageService()->sL(
+                'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:column.backlog'
+            ) ?: 'Backlog',
+            TaskState::PLANNED => $this->getLanguageService()->sL(
+                'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:column.planned'
+            ) ?: 'Planned',
+            default => ucfirst((string)$task['state']),
+        };
+    }
+
+    /**
+     * B4: declare which open task an editor is about to work on, for a given
+     * page - the Visual Editor's persistent "Task" select, chosen before any
+     * edit happens rather than routed after the fact. Two things follow from
+     * that:
+     *
+     * - Backlog/Planned -> Editing, and Review/Ready regressed back to
+     *   Editing with an auto-generated comment - the same transitions
+     *   TaskAutoCreationService::maybeRegressPastEditing() makes reactively
+     *   on an edit, just made explicit by picking the task instead of
+     *   waiting for the first keystroke to imply it.
+     * - The choice is remembered in session (`content_flow_active_task`) so
+     *   TaskAutoCreationService::captureEdit() can claim whatever gets
+     *   edited next straight onto it, for any surface (Visual Editor,
+     *   Layout, Records) - not only the module this request came from.
+     *
+     * Never itself creates a task - "+ Create new task" in the select reuses
+     * createAction() (table=pages) first and calls this action with the
+     * resulting uid, the same as any other existing-task choice.
+     */
+    public function setActiveTaskForPageAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $pageUid = (int)($body['pageUid'] ?? 0);
+        $taskUid = (int)($body['taskUid'] ?? 0);
+
+        if ($pageUid < 1) {
+            return $this->reject('missing-page-uid', 'No page was specified.', ['taskUid' => $taskUid]);
+        }
+
+        $task = $this->findOpenTaskOrError($taskUid, 'make it the active task');
+        if ($task instanceof ResponseInterface) {
+            return $task;
+        }
+
+        $beUser = $this->getBackendUser();
+        $beUserId = (int)($beUser->user['uid'] ?? 0);
+        $workspaceUid = (int)$beUser->workspace;
+
+        $transitioned = false;
+        $comment = '';
+        $commentUid = 0;
+
+        if ((int)$task['workspace_uid'] === 0) {
+            if ($workspaceUid < 1) {
+                return $this->reject(
+                    'no-workspace-selected',
+                    'Switch into a workspace before selecting a task to work on.',
+                    ['taskUid' => $taskUid],
+                );
+            }
+            // Backlog/Planned -> Editing, mirroring what a first captured
+            // edit already does today (TaskAutoCreationService::
+            // captureEdit()) - just triggered by intent instead of by the
+            // edit itself.
+            $this->taskRepository->attachWorkspace($taskUid, $workspaceUid, StagesService::STAGE_EDIT_ID);
+            $this->activityLogger->log($taskUid, ActivityLogger::EVENT_WORK_STARTED, $beUserId, [
+                'pageUid' => $pageUid,
+                'selectedInVisualEditor' => true,
+            ]);
+            $transitioned = true;
+            $task = $this->taskRepository->findByUid($taskUid) ?? $task;
+        } else {
+            $state = TaskState::tryFrom((string)$task['state']);
+            if ($state === TaskState::REVIEW || $state === TaskState::READY) {
+                $versionsByTable = $this->memberSynchronizer->findPendingVersionsByTable($taskUid, (int)$task['workspace_uid']);
+                if ($versionsByTable !== []) {
+                    $comment = 'Reopened for editing from the Visual Editor task selector.';
+                    $refusal = $this->stageTransitionService->transition(
+                        $task,
+                        $versionsByTable,
+                        StagesService::STAGE_EDIT_ID,
+                        $beUserId,
+                        $comment,
+                    );
+                    if ($refusal === null) {
+                        $transitioned = true;
+                        $task = $this->taskRepository->findByUid($taskUid) ?? $task;
+                        $comments = $this->commentRepository->findByTask($taskUid);
+                        $lastComment = end($comments);
+                        $commentUid = $lastComment !== false ? (int)$lastComment['uid'] : 0;
+                    } else {
+                        $comment = '';
+                    }
+                }
+            }
+        }
+
+        $beUser->setAndSaveSessionData('content_flow_active_task', [
+            'pageUid' => $pageUid,
+            'taskUid' => $taskUid,
+        ]);
+
+        return new JsonResponse([
+            'success' => true,
+            'taskUid' => $taskUid,
+            'state' => (string)$task['state'],
+            'stageLabel' => $this->stageLabelFor($task),
+            'transitioned' => $transitioned,
+            'comment' => $comment,
+            'commentUid' => $commentUid,
+        ]);
+    }
+
+    /**
+     * B4's hover markers: for every open task touching a page, which records
+     * it already claims - so the Visual Editor can mark an editable field
+     * that belongs to a *different* task than the one currently active,
+     * before an editor accidentally edits into it. Excludes closed/Done
+     * tasks for the same reason findAllOpenForPage() does: nothing to warn
+     * about once work is finished.
+     */
+    public function listMemberTaskMarkersForPageAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $pageUid = (int)($request->getQueryParams()['pageUid'] ?? 0);
+
+        $tasks = $this->taskRepository->findAllOpenForPage($pageUid);
+
+        $taskList = [];
+        $members = [];
+        foreach ($tasks as $task) {
+            $taskUid = (int)$task['uid'];
+            $taskList[] = ['uid' => $taskUid, 'title' => (string)$task['title']];
+            foreach ($this->taskRepository->findMembers($taskUid) as $member) {
+                $members[] = [
+                    'table' => (string)$member['record_table'],
+                    'uid' => (int)$member['record_uid'],
+                    'taskUid' => $taskUid,
+                ];
+            }
+        }
+
+        return new JsonResponse(['success' => true, 'tasks' => $taskList, 'members' => $members]);
+    }
+
+    /**
      * Execute stage change with stage comments and recipients.
      */
     public function executeStageAction(ServerRequestInterface $request): ResponseInterface
@@ -491,7 +760,21 @@ final class TaskAjaxController
             $additionalRecipients,
         );
 
-        $refusal = $this->askCoreToSetStage($versionsByTable, $targetStageUid, $comment, $recipients);
+        // Read before the transition moves the task on: a soft warning about
+        // the stage being LEFT, not the one being entered - see
+        // TaskChecklistRepository::countIncomplete(). Never blocks the move;
+        // core is already the one true gate for whether this transition is
+        // allowed at all.
+        $incompleteChecklistItems = $this->checklistRepository->countIncomplete($taskUid, $workspaceUid, (int)$task['stage_uid']);
+
+        $refusal = $this->stageTransitionService->transition(
+            $task,
+            $versionsByTable,
+            $targetStageUid,
+            (int)($this->getBackendUser()->user['uid'] ?? 0),
+            $comment,
+            $recipients,
+        );
         if ($refusal !== null) {
             // Core refused. Our own state must not drift away from what core did,
             // so nothing is written on this path. Logged at warning, not notice -
@@ -510,56 +793,11 @@ final class TaskAjaxController
             ], 400);
         }
 
-        // Read before recordStageChange() moves the task on: a soft warning
-        // about the stage being LEFT, not the one being entered - see
-        // TaskChecklistRepository::countIncomplete(). Never blocks the move;
-        // core is already the one true gate for whether this transition is
-        // allowed at all.
-        $incompleteChecklistItems = $this->checklistRepository->countIncomplete($taskUid, $workspaceUid, (int)$task['stage_uid']);
-
-        $this->recordStageChange($task, $targetStageUid, $comment, $recipients, $versionsByTable);
-
         return new JsonResponse([
             'success' => true,
             'stageUid' => $targetStageUid,
             'incompleteChecklistItems' => $incompleteChecklistItems,
         ]);
-    }
-
-    /**
-     * Hand the move to TYPO3 and report back whether it was refused.
-     *
-     * EXT:workspaces' version_setStage() is what checks
-     * workspaceCannotEditOfflineVersion(), hasPermissionToUpdate() and
-     * workspaceCheckStageForCurrent(), writes t3ver_stage, records the transition
-     * in sys_history and queues the stage notification mails. Writing our own table
-     * directly - which this action used to do - skipped every one of those.
-     *
-     * @param array<string, list<int>> $versionsByTable
-     * @param list<mixed> $recipients
-     * @return string|null the refusal reason, or null when core accepted
-     */
-    private function askCoreToSetStage(array $versionsByTable, int $stageUid, string $comment, array $recipients): ?string
-    {
-        $cmd = [];
-        foreach ($versionsByTable as $table => $versionUids) {
-            foreach ($versionUids as $versionUid) {
-                $cmd[$table][$versionUid]['version'] = [
-                    'action' => 'setStage',
-                    'stageId' => $stageUid,
-                    'comment' => $comment,
-                    'notificationAlternativeRecipients' => $recipients,
-                ];
-            }
-        }
-
-        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
-        $dataHandler->start([], $cmd);
-        $dataHandler->process_cmdmap();
-
-        return $dataHandler->errorLog === []
-            ? null
-            : implode(' ', array_map('strval', $dataHandler->errorLog));
     }
 
     /**
@@ -678,60 +916,92 @@ final class TaskAjaxController
     }
 
     /**
-     * Mirror what core just decided.
-     *
-     * The task row is a read cache for the board; the activity entry is the durable
-     * record, because sys_history - where core wrote the same transition - is
-     * garbage-collected after 30 days.
+     * Turns a pending page ("Neue Seite erstellen", see createPendingPageAction())
+     * into a real one, in the current workspace - the ticket's own intended
+     * parent (subject_pid) is where it lands, and its title becomes the page
+     * title. Called only from moveStageAction(), once, right before the normal
+     * stage-transition flow runs on the now-real subject.
      *
      * @param array<string, mixed> $task
-     * @param list<mixed> $recipients
-     * @param array<string, list<int>> $versionsByTable
+     * @return array<string, mixed>|ResponseInterface the refreshed task row, or
+     *         an error response
      */
-    private function recordStageChange(
-        array $task,
-        int $targetStageUid,
-        string $comment,
-        array $recipients,
-        array $versionsByTable,
-    ): void {
+    private function materializePendingPage(array $task): array|ResponseInterface
+    {
         $taskUid = (int)$task['uid'];
-        $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
-        $targetState = TaskState::fromStageId($targetStageUid);
-
-        $this->taskRepository->moveToColumn($taskUid, $targetState->value, $targetStageUid);
-
-        $activityUid = $this->activityLogger->log($taskUid, ActivityLogger::EVENT_STAGE_CHANGED, $beUserId, [
-            'from_state' => $task['state'],
-            'from_stage' => (int)$task['stage_uid'],
-            'to_state' => $targetState->value,
-            'to_stage' => $targetStageUid,
-            'recipients' => $recipients,
-        ], $this->findLatestStageHistoryUid($versionsByTable));
-
-        if ($comment !== '') {
-            $this->commentRepository->add($taskUid, $comment, $beUserId, $activityUid);
+        $parentPid = (int)$task['subject_pid'];
+        if ($parentPid < 1) {
+            return $this->reject(
+                'pending-page-no-parent',
+                'This ticket has no parent page to create the new page under.',
+                ['taskUid' => $taskUid],
+            );
         }
+        if (!$this->mayCreatePageUnder($parentPid)) {
+            return $this->reject(
+                'no-permission',
+                'You are not allowed to create a new page here.',
+                ['taskUid' => $taskUid, 'parentPid' => $parentPid],
+            );
+        }
+
+        $workspaceUid = (int)$this->getBackendUser()->workspace;
+        if ($workspaceUid < 1) {
+            return $this->reject(
+                'no-workspace-selected',
+                'Switch into a workspace before moving this ticket to a review stage.',
+                ['taskUid' => $taskUid],
+            );
+        }
+
+        $placeholder = StringUtility::getUniqueId('NEW');
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([
+            'pages' => [
+                $placeholder => [
+                    'pid' => $parentPid,
+                    'title' => (string)$task['title'],
+                ],
+            ],
+        ], []);
+        $dataHandler->process_datamap();
+        $newPageUid = (int)($dataHandler->substNEWwithIDs[$placeholder] ?? 0);
+        if ($newPageUid < 1) {
+            return $this->reject(
+                'pending-page-create-failed',
+                'Could not create the new page.',
+                ['taskUid' => $taskUid, 'errors' => $dataHandler->errorLog],
+            );
+        }
+
+        $this->taskRepository->attachCreatedSubject($taskUid, $newPageUid);
+        // Editing (stage 0) is where a brand new workspace record already sits by
+        // default - this just makes the task's own bookkeeping match reality, the
+        // same way TaskAutoCreationService::captureEdit() does for an
+        // auto-created task's first edit.
+        $this->taskRepository->attachWorkspace($taskUid, $workspaceUid, 0);
+
+        $this->activityLogger->log($taskUid, ActivityLogger::EVENT_WORK_STARTED, (int)($this->getBackendUser()->user['uid'] ?? 0), [
+            'table' => 'pages',
+            'recordUid' => $newPageUid,
+            'parentPid' => $parentPid,
+        ]);
+
+        $refreshed = $this->taskRepository->findByUid($taskUid);
+        return $refreshed ?? $task;
     }
 
-    /**
-     * The sys_history row core just wrote for this transition, so the activity
-     * entry can point at core's full detail for as long as it exists.
-     *
-     * @param array<string, list<int>> $versionsByTable
-     */
-    private function findLatestStageHistoryUid(array $versionsByTable): int
+    private function mayCreatePageUnder(int $parentPid): bool
     {
-        foreach ($versionsByTable as $table => $versionUids) {
-            foreach ($versionUids as $versionUid) {
-                $changes = $this->activityLogger->findStageChanges($table, $versionUid);
-                if ($changes !== []) {
-                    return (int)$changes[0]['uid'];
-                }
-            }
+        $backendUser = $this->getBackendUser();
+        if ($backendUser->isAdmin()) {
+            return true;
         }
-
-        return 0;
+        $parentPage = BackendUtility::getRecord('pages', $parentPid);
+        if ($parentPage === null) {
+            return false;
+        }
+        return $backendUser->doesUserHaveAccess($parentPage, Permission::PAGE_NEW);
     }
 
     /**
@@ -857,8 +1127,8 @@ final class TaskAjaxController
     /**
      * 'open' means deliberately unassigned so someone can take the task later.
      * 'me' and anything else that is not a valid be_user uid collapse to the
-     * current editor. A specific uid - offered by task-details-form.js's
-     * "assign to someone else" group, backed by the same be_users list
+     * current editor. A specific uid - offered by the assignee picker in
+     * wizard/steps/task-details-step.js, backed by the same be_users list
      * LoadWizardModuleEventListener exposes - is honoured once verified to be
      * a real, non-deleted user: never trust a client-supplied uid without
      * looking it up.
@@ -1009,6 +1279,11 @@ final class TaskAjaxController
         return $GLOBALS['BE_USER'];
     }
 
+    private function getLanguageService(): LanguageService
+    {
+        return $GLOBALS['LANG'];
+    }
+
     /**
      * The ticket view: everything about one task in one place.
      *
@@ -1060,129 +1335,6 @@ final class TaskAjaxController
             return new JsonResponse(['success' => true, 'pending' => $pending]);
         }
         return new JsonResponse(['success' => true, 'pending' => null]);
-    }
-
-    /**
-     * Submit choice from the Post-Save Task Routing Wizard.
-     */
-    public function wizardSubmitAction(ServerRequestInterface $request): ResponseInterface
-    {
-        $body = $this->getBody($request);
-        $actionType = (string)($body['actionType'] ?? 'configure_auto_task');
-        $table = (string)($body['table'] ?? '');
-        $uid = (int)($body['uid'] ?? 0);
-
-        $error = $this->assertMayEdit($table, $uid);
-        if ($error !== null) {
-            return $this->error($error);
-        }
-
-        $title = trim((string)($body['title'] ?? ''));
-        $description = trim((string)($body['description'] ?? ''));
-        $assignee = $this->resolveRequestedAssignee($body['assignee'] ?? 'me');
-        if ($actionType === 'attach_to_page_task') {
-            $pageTaskUid = (int)($body['pageTaskUid'] ?? 0);
-            if ($pageTaskUid < 1) {
-                return $this->reject(
-                    'missing-page-task-id',
-                    'No page task was specified to attach this element to.',
-                    ['table' => $table, 'uid' => $uid],
-                );
-            }
-            $this->taskRepository->moveMemberToTask($table, $uid, $pageTaskUid);
-            return new JsonResponse(['success' => true, 'action' => 'attached']);
-        }
-
-        if ($actionType === 'configure_auto_task') {
-            if ($title === '') {
-                return $this->reject(
-                    'task-title-required',
-                    'A title is required to keep this task.',
-                    ['table' => $table, 'uid' => $uid],
-                );
-            }
-            $taskUid = (int)($body['taskUid'] ?? 0);
-            $task = $this->findOpenTaskOrError($taskUid, 'update it');
-            if ($task instanceof ResponseInterface) {
-                return $task;
-            }
-            $previousAssignee = (int)$task['assignee'];
-
-            $this->taskRepository->updateDetails($taskUid, $title, $description, $assignee);
-
-            // Only when it actually changed - re-submitting the same wizard
-            // with the same assignee must not re-notify. Links to the task's
-            // own subject, not $table/$uid - those are the record that was
-            // being edited, which for a page-bound content element is not
-            // necessarily the same thing (see TaskAutoCreationService::resolveTask()).
-            if ($assignee !== $previousAssignee) {
-                $this->notifyAssignment($taskUid, $title, (string)$task['subject_table'], (int)$task['subject_uid'], $assignee);
-            }
-
-            return new JsonResponse(['success' => true, 'task' => $taskUid, 'action' => 'configured']);
-        }
-
-        if ($actionType !== 'create_new_task') {
-            return $this->reject(
-                'unknown-wizard-action',
-                sprintf('The wizard action "%s" is not supported.', $actionType),
-                ['actionType' => $actionType, 'table' => $table, 'uid' => $uid],
-            );
-        }
-
-        if ($title === '') {
-            return $this->reject(
-                'task-title-required',
-                'A title is required to create a new task.',
-                ['table' => $table, 'uid' => $uid],
-            );
-        }
-
-        // detachIntoOwnTask() only re-points an existing membership row - it never
-        // inserts one. Normally TaskAutoCreationService::resolveTask() has already
-        // claimed this record onto the page task by the time the wizard runs (see
-        // its comment on why), so this should always find something. But this
-        // action is reachable independently of that flow, and without this guard
-        // a miss here would silently create a task with zero members instead of
-        // failing - the same check detachAction() already makes before calling
-        // the same repository method.
-        if ($this->taskRepository->findOpenTaskByMember($table, $uid) === null) {
-            return $this->reject(
-                'record-not-in-open-task',
-                'This record does not belong to an open task, so there is nothing to split into a new one.',
-                ['table' => $table, 'uid' => $uid],
-            );
-        }
-
-        $stageChoice = (string)($body['stageChoice'] ?? 'in_progress');
-        $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
-        $workspaceUid = (int)($this->getBackendUser()->workspace);
-
-        $targetState = $stageChoice === 'review' ? TaskState::REVIEW->value : TaskState::IN_PROGRESS->value;
-
-        $task = $this->taskRepository->detachIntoOwnTask($table, $uid, [
-            'title' => $title,
-            'description' => $description,
-            'subject_pid' => $this->derivePid($table, $uid),
-            'state' => $targetState,
-            'workspace_uid' => $workspaceUid,
-            'assignee' => $assignee,
-            'auto_created' => 0,
-        ]);
-
-        $this->activityLogger->log((int)$task['uid'], ActivityLogger::EVENT_TASK_CREATED, $beUserId, [
-            'subjectTable' => $table,
-            'subjectUid' => $uid,
-            'stageChoice' => $stageChoice,
-            'wizard' => true,
-        ]);
-
-        // Always a fresh task here - detachIntoOwnTask() has no idempotent
-        // "already existed" path the way findOrCreateOpenForSubject() does, so
-        // unlike createAction() there is nothing to guard against.
-        $this->notifyAssignment((int)$task['uid'], $title, $table, $uid, $assignee);
-
-        return new JsonResponse(['success' => true, 'task' => (int)$task['uid'], 'action' => 'created']);
     }
 
     /**

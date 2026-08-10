@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GbWeb\ContentFlow\Service;
 
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
@@ -114,8 +115,26 @@ final class TaskMemberSynchronizer
         } catch (\Doctrine\DBAL\Exception) {
             return 0;
         }
+        if ($uid) {
+            return (int)$uid;
+        }
 
-        return (int)($uid ?: 0);
+        // A placeholder-less new record (created directly inside the workspace,
+        // e.g. ContentFlow's own "materialize a pending page" flow on a ticket
+        // that had no subject yet) has no separate live counterpart to carry a
+        // t3ver_oid pointing back here - the member row's own record_uid already
+        // IS the pending version. Same distinction TaskAutoCreationService::
+        // resolveLiveAndVersion() makes on the capture side.
+        $record = BackendUtility::getRecord($table, $liveUid, 'uid,t3ver_oid,t3ver_wsid');
+        if (
+            $record !== null
+            && (int)($record['t3ver_oid'] ?? -1) === 0
+            && (int)($record['t3ver_wsid'] ?? 0) === $workspaceUid
+        ) {
+            return $liveUid;
+        }
+
+        return 0;
     }
 
     /**

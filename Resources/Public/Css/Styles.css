@@ -36,6 +36,7 @@
 .contentflow-filters {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
 }
 
@@ -75,11 +76,82 @@
 }
 
 .contentflow-filters .input-group {
-    width: 260px;
+    display: flex;
+    align-items: stretch;
+    /* flex-shrink: 0, not just a width - .contentflow-filters is a
+       non-wrapping-per-item flex row (only the row itself wraps) sharing
+       space with three selects that each carry their own min-width below;
+       without an equally protected basis here, this was the one item with no
+       floor, and flexbox crushed it down to ~itself the icon whenever the
+       row ran out of room instead of respecting 260px. Confirmed live: this
+       is what actually caused the invisible/unusable input, not the missing
+       flex/border rules alone. */
+    flex: 0 0 260px;
+    border: 1px solid var(--contentflow-card-border);
+    border-radius: var(--contentflow-card-radius);
+    overflow: hidden;
+    background: var(--contentflow-card-bg);
+}
+
+.contentflow-filters .input-group-addon {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    opacity: 0.6;
+}
+
+.contentflow-filters .input-group .form-control {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: none;
+    background: transparent;
+}
+
+.contentflow-filters .input-group .form-control:focus {
+    outline: none;
+    box-shadow: none;
 }
 
 .contentflow-filters select {
     min-width: 140px;
+}
+
+.contentflow-entry-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.contentflow-entry-choice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 10px 14px;
+    text-align: left;
+    border: 1px solid var(--contentflow-card-border);
+    border-radius: var(--contentflow-card-radius);
+    background: var(--contentflow-card-bg);
+}
+
+.contentflow-entry-choice:hover,
+.contentflow-entry-choice:focus-visible {
+    border-color: var(--contentflow-accent);
+    background: var(--contentflow-col-bg);
+}
+
+.contentflow-entry-choice-title {
+    font-weight: 600;
+}
+
+.contentflow-entry-choice-hint {
+    font-size: 12px;
+    opacity: 0.75;
+}
+
+.contentflow-record-ref--pending {
+    font-style: italic;
+    opacity: 0.7;
 }
 
 .contentflow-board {
@@ -766,4 +838,45 @@
 
 .contentflow-comment-form textarea {
     width: 100%;
+}
+
+.contentflow-assignee-picker {
+    position: relative;
+}
+
+.contentflow-assignee-options {
+    position: absolute;
+    z-index: 1050;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin: 2px 0 0;
+    padding: 4px 0;
+    list-style: none;
+    background: var(--typo3-surface-base, #ffffff);
+    border: 1px solid var(--typo3-component-border-color, #cccccc);
+    border-radius: var(--typo3-component-border-radius, 4px);
+    max-height: 240px;
+    overflow-y: auto;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.contentflow-assignee-options[hidden] {
+    display: none;
+}
+
+.contentflow-assignee-options li {
+    padding: 4px 12px;
+    cursor: pointer;
+}
+
+.contentflow-assignee-options li.is-highlighted,
+.contentflow-assignee-options li[aria-selected="true"],
+.contentflow-assignee-options li:hover {
+    background: var(--typo3-state-info-bg, #e3f2fd);
+}
+
+.contentflow-assignee-options-empty {
+    opacity: 0.65;
+    cursor: default !important;
 }

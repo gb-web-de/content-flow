@@ -16,6 +16,11 @@ return [
         'path' => '/contentflow/task/create',
         'target' => TaskAjaxController::class . '::createAction',
     ],
+    // "+" button, "Neue Seite erstellen": plan a page that does not exist yet.
+    'contentflow_task_create_pending_page' => [
+        'path' => '/contentflow/task/create-pending-page',
+        'target' => TaskAjaxController::class . '::createPendingPageAction',
+    ],
     // "Select to task": move selected records onto a task.
     'contentflow_task_attach' => [
         'path' => '/contentflow/task/attach',
@@ -51,6 +56,21 @@ return [
         'path' => '/contentflow/task/details',
         'target' => TaskAjaxController::class . '::detailsAction',
     ],
+    // Visual Editor task select: every open task touching a page.
+    'contentflow_task_list_open_for_page' => [
+        'path' => '/contentflow/task/list-open-for-page',
+        'target' => TaskAjaxController::class . '::listOpenTasksForPageAction',
+    ],
+    // Visual Editor task select: declare the active task for a page before editing.
+    'contentflow_task_set_active_for_page' => [
+        'path' => '/contentflow/task/set-active-for-page',
+        'target' => TaskAjaxController::class . '::setActiveTaskForPageAction',
+    ],
+    // Visual Editor hover markers: which task already claims which record on a page.
+    'contentflow_task_list_member_markers' => [
+        'path' => '/contentflow/task/list-member-markers',
+        'target' => TaskAjaxController::class . '::listMemberTaskMarkersForPageAction',
+    ],
     // Post a standalone comment on a task.
     'contentflow_task_comment' => [
         'path' => '/contentflow/task/comment',
@@ -71,14 +91,12 @@ return [
         'path' => '/contentflow/task/publish',
         'target' => TaskAjaxController::class . '::publishTaskAction',
     ],
-    // Post-Save Task Routing Wizard session check and submission.
+    // Post-Save Task Routing Wizard session check - submission itself goes
+    // through TYPO3 core's generic wizard_submit route (mode=contentflow_task_wizard),
+    // see Classes/Wizard/TaskWizardProvider.php.
     'contentflow_task_wizard_pending' => [
         'path' => '/contentflow/task/wizard-pending',
         'target' => TaskAjaxController::class . '::getPendingWizardAction',
-    ],
-    'contentflow_task_wizard_submit' => [
-        'path' => '/contentflow/task/wizard-submit',
-        'target' => TaskAjaxController::class . '::wizardSubmitAction',
     ],
     // Review checklist: check/uncheck one item for one task.
     'contentflow_checklist_toggle' => [

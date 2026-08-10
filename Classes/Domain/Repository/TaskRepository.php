@@ -181,6 +181,62 @@ final class TaskRepository
     }
 
     /**
+     * A task for a page that does not exist yet - "Neue Seite erstellen" on the
+     * "+ New task" wizard. `subject_uid` stays 0 until an editor drags the ticket
+     * into a review stage (see TaskAjaxController::moveStageAction()'s
+     * materializePendingPage()), which is what actually creates the page.
+     *
+     * Deliberately NOT findOrCreateOpenForSubject(): there is no real subject to
+     * dedupe against yet, and there never should be - each "Neue Seite erstellen"
+     * click is its own new, distinct ticket, not something to find-or-reuse. No
+     * member row either, for the same reason findOrCreateOpenForSubject() adds
+     * one for the subject itself: there is nothing to claim yet.
+     *
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    public function createPendingPageTask(int $parentPid, array $values): array
+    {
+        $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
+        $connection->insert(self::TABLE, array_merge($values, [
+            'subject_table' => 'pages',
+            'subject_uid' => 0,
+            'subject_pid' => $parentPid,
+            'crdate' => $GLOBALS['EXEC_TIME'],
+            'tstamp' => $GLOBALS['EXEC_TIME'],
+        ]));
+        $taskUid = (int)$connection->lastInsertId();
+
+        $created = $this->findByUid($taskUid);
+        if ($created === null) {
+            throw new \RuntimeException(
+                sprintf('Content Flow pending-page task vanished right after insert (uid %d)', $taskUid),
+                1786300000,
+            );
+        }
+        return $created;
+    }
+
+    /**
+     * Give a pending-page task (see createPendingPageTask()) its real subject,
+     * once the page it was waiting for has actually been created. Claims the new
+     * page as the task's own member too, mirroring what
+     * findOrCreateOpenForSubject() does for a subject that exists from the start.
+     */
+    public function attachCreatedSubject(int $taskUid, int $subjectUid): void
+    {
+        $this->connectionPool->getConnectionForTable(self::TABLE)->update(
+            self::TABLE,
+            [
+                'subject_uid' => $subjectUid,
+                'tstamp' => $GLOBALS['EXEC_TIME'],
+            ],
+            ['uid' => $taskUid],
+        );
+        $this->addMember($taskUid, 'pages', $subjectUid, self::ORIGIN_SUBJECT, $subjectUid);
+    }
+
+    /**
      * Claim a record for a task. Throws UniqueConstraintViolationException when the
      * record already belongs to another open task - callers decide whether that is
      * an error or simply "leave it where the editor put it".
@@ -292,6 +348,70 @@ final class TaskRepository
                 $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
             )
+            ->executeQuery()
+            ->fetchAllAssociative();
+    }
+
+    /**
+     * Every open task touching a page - its own subject task (or a subject
+     * task for a page-like record that lives on it) plus any task whose
+     * membership reaches onto it, e.g. a detached content element's own task.
+     * Excludes Done: this feeds the Visual Editor's task picker
+     * (ContentFlowController docs: "Backlog through the stage just before
+     * Done"), where the point is choosing among tasks still in flight.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findAllOpenForPage(int $pageUid): array
+    {
+        if ($pageUid < 1) {
+            return [];
+        }
+
+        $subjectQueryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $subjectQueryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+        $subjectTaskUids = $subjectQueryBuilder
+            ->select('uid')
+            ->from(self::TABLE)
+            ->where(
+                $subjectQueryBuilder->expr()->eq('subject_pid', $subjectQueryBuilder->createNamedParameter($pageUid, Connection::PARAM_INT)),
+                $subjectQueryBuilder->expr()->eq('closed', $subjectQueryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $subjectQueryBuilder->expr()->eq('deleted', $subjectQueryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+            )
+            ->executeQuery()
+            ->fetchFirstColumn();
+
+        $itemQueryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE_ITEM);
+        $itemQueryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+        $memberTaskUids = $itemQueryBuilder
+            ->select('task')
+            ->from(self::TABLE_ITEM)
+            ->where(
+                $itemQueryBuilder->expr()->eq('pid', $itemQueryBuilder->createNamedParameter($pageUid, Connection::PARAM_INT)),
+                $itemQueryBuilder->expr()->eq('closed', $itemQueryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $itemQueryBuilder->expr()->eq('deleted', $itemQueryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+            )
+            ->executeQuery()
+            ->fetchFirstColumn();
+
+        $taskUids = array_values(array_unique(array_map('intval', array_merge($subjectTaskUids, $memberTaskUids))));
+        if ($taskUids === []) {
+            return [];
+        }
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
+        $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+
+        return $queryBuilder
+            ->select('*')
+            ->from(self::TABLE)
+            ->where(
+                $queryBuilder->expr()->in('uid', $queryBuilder->createNamedParameter($taskUids, Connection::PARAM_INT_ARRAY)),
+                $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->neq('state', $queryBuilder->createNamedParameter(TaskState::DONE->value)),
+            )
+            ->orderBy('tstamp', 'DESC')
             ->executeQuery()
             ->fetchAllAssociative();
     }

@@ -14,3 +14,9 @@ Tests/Functional/*/typo3temp/
 .ddev/.sshimageBuild/
 .idea/
 .DS_Store
+
+# Playwright dev tooling (package.json/playwright.config.ts are the only
+# parts of this that get committed).
+node_modules/
+playwright-report/
+test-results/
