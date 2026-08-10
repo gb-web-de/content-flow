@@ -436,6 +436,19 @@ Audited against the code on 2026-08-07, not written from memory.
   wrapper writes the version uid onto the element while a membership row holds
   the live one.
 
+- **Pending pages are created by TYPO3's own page wizard.** A ticket planned as
+  "a new page" carries no subject until it is dropped into Editing; the board
+  then opens core's page-creation dialog (`openPageWizardModal()`, the same one
+  the page tree uses) prefilled with the planned parent, and core's own
+  `PageWizardProvider` creates the page with its position, page type and
+  required fields. Content Flow neither rebuilds nor wraps that wizard: core's
+  provider identifier is fixed in core's JavaScript and it reports success as a
+  redirect, handing no uid back. The two halves are joined at the other end
+  instead - `PendingPageHandoff` notes which ticket is waiting, and the
+  DataHandler hook claims the created page for it (`PendingPageClaimService`),
+  which is also what lifts the ticket into Editing. The note expires, and a
+  cancelled wizard drops it, so a ticket cannot adopt an unrelated page.
+
 **Not implemented**
 
 - **TCA for `tx_contentflow_task` / `_task_item` / `_comment` / `_activity`.** Only
