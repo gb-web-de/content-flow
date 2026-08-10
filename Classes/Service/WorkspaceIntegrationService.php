@@ -451,7 +451,13 @@ final class WorkspaceIntegrationService
         return $recipient;
     }
 
-    private function resolveUserName(int $beUserId): string
+    /**
+     * A backend user's display name, or a stand-in when there is nobody to
+     * name. Public because TaskAjaxController needs the same answer for the
+     * Visual Editor's task markers, and a second copy of this fallback chain
+     * is exactly the kind of thing that drifts apart.
+     */
+    public function resolveUserName(int $beUserId): string
     {
         if ($beUserId < 1) {
             return 'System';

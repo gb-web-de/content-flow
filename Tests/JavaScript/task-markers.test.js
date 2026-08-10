@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
+  claimFor,
   claimsByIdentifier,
   elementIdentifiers,
   foreignTaskUidFor,
   hueForTaskUid,
+  legendEntries,
 } from '../../Resources/Public/JavaScript/task/task-markers.js'
 
 /*
@@ -93,6 +95,63 @@ describe('foreignTaskUidFor', () => {
     const element = contentElement({ table: 'tt_content', uid: 99 })
 
     expect(foreignTaskUidFor(element, claims, 7)).toBeNull()
+  })
+})
+
+describe('claimFor', () => {
+  const claims = claimsByIdentifier([
+    { taskUid: 7, table: 'tt_content', uid: 12, identifiers: ['tt_content:12', 'tt_content:345'] },
+  ])
+
+  /*
+   * foreignTaskUidFor() answers null for "mine" and for "nobody's" alike, which
+   * is all its one caller needed. The markers now say something about both, so
+   * the two have to be distinguishable - that is the whole reason this function
+   * exists next to it.
+   */
+  it('tells the editor\'s own task apart from an unclaimed element', () => {
+    const mine = contentElement({ table: 'tt_content', uid: 12 })
+    const nobodys = contentElement({ table: 'tt_content', uid: 99 })
+
+    expect(claimFor(mine, claims, 7)).toEqual({ taskUid: 7, isActive: true })
+    expect(claimFor(nobodys, claims, 7)).toBeNull()
+  })
+
+  it('reports a foreign claim as inactive', () => {
+    const element = contentElement({ table: 'tt_content', uid: 345 })
+
+    expect(claimFor(element, claims, 9)).toEqual({ taskUid: 7, isActive: false })
+  })
+})
+
+describe('legendEntries', () => {
+  it('gives every task the same hue its markers carry', () => {
+    const [entry] = legendEntries([{ uid: 7, title: 'Rewrite the intro' }], 0)
+
+    expect(entry.hue).toBe(hueForTaskUid(7))
+  })
+
+  it('flags the active task and fills in what the server left out', () => {
+    const entries = legendEntries(
+      [
+        { uid: 7, title: 'Rewrite the intro', stageLabel: 'Editing', assigneeName: 'Ada' },
+        { uid: 8, title: 'Fix the footer' },
+      ],
+      8,
+    )
+
+    expect(entries[0]).toMatchObject({
+      taskUid: 7,
+      stageLabel: 'Editing',
+      assigneeName: 'Ada',
+      isActive: false,
+    })
+    expect(entries[1]).toMatchObject({ taskUid: 8, stageLabel: '', assigneeName: '', isActive: true })
+  })
+
+  it('survives a page with no tasks at all', () => {
+    expect(legendEntries([], 0)).toEqual([])
+    expect(legendEntries(undefined, 0)).toEqual([])
   })
 })
 

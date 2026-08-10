@@ -80,21 +80,65 @@ export function claimsByIdentifier(members) {
 }
 
 /**
- * The task claiming this element, but only when it is a *different* one than
- * the editor is working on. The active task's own records are the whole point
- * of the current session - marking those would be noise, not a warning.
+ * The task claiming this element, and whether that is the one the editor
+ * declared they are working on.
  *
- * @returns {number|null} the foreign task uid, or null
+ * The distinction is the whole point: "mine" and "unclaimed" look identical to
+ * an editor unless they are told apart, and the first thing you want to know
+ * when a page is split across three tasks is which parts you have already
+ * taken. Both cases get a marker; they get *different* markers.
+ *
+ * @returns {{taskUid: number, isActive: boolean}|null} null when unclaimed
  */
-export function foreignTaskUidFor(element, claims, activeTaskUid) {
+export function claimFor(element, claims, activeTaskUid) {
   for (const value of elementIdentifiers(element)) {
     const taskUid = claims.get(value)
     if (taskUid === undefined) {
       continue
     }
 
-    return taskUid === Number(activeTaskUid) ? null : taskUid
+    return { taskUid, isActive: taskUid === Number(activeTaskUid) }
   }
 
   return null
+}
+
+/**
+ * The task claiming this element, but only when it is a *different* one than
+ * the editor is working on - the warning case on its own.
+ *
+ * @returns {number|null} the foreign task uid, or null
+ */
+export function foreignTaskUidFor(element, claims, activeTaskUid) {
+  const claim = claimFor(element, claims, activeTaskUid)
+
+  return claim === null || claim.isActive ? null : claim.taskUid
+}
+
+/**
+ * The toolbar legend's rows: every task touching this page, in the order the
+ * server sent them, each with the colour its markers carry.
+ *
+ * Kept here rather than in the DOM module because "which tasks get a swatch and
+ * what does each one say" is a decision worth testing without a browser, and
+ * because the legend and the markers agreeing on a task's hue is the property
+ * that makes the legend mean anything at all.
+ *
+ * @param tasks {Array<{uid: number, title: string, stageLabel?: string, assigneeName?: string}>}
+ * @param activeTaskUid {number}
+ * @returns {Array<{taskUid: number, title: string, stageLabel: string, assigneeName: string, hue: number, isActive: boolean}>}
+ */
+export function legendEntries(tasks, activeTaskUid) {
+  return (tasks ?? []).map((task) => {
+    const taskUid = Number(task.uid)
+
+    return {
+      taskUid,
+      title: String(task.title ?? ''),
+      stageLabel: String(task.stageLabel ?? ''),
+      assigneeName: String(task.assigneeName ?? ''),
+      hue: hueForTaskUid(taskUid),
+      isActive: taskUid === Number(activeTaskUid),
+    }
+  })
 }

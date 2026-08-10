@@ -560,6 +560,15 @@ final class TaskAjaxController
     {
         $pageUid = (int)($request->getQueryParams()['pageUid'] ?? 0);
 
+        // The page uid arrives from the request, so it is the client's claim
+        // rather than a fact. Without this an editor could enumerate the task
+        // titles, states and stages of any page in the installation, including
+        // ones outside their own DB mounts, just by counting up uids.
+        $error = $this->assertMayReadPage($pageUid);
+        if ($error !== null) {
+            return $this->error($error);
+        }
+
         $tasks = array_map(
             fn (array $task): array => [
                 'uid' => (int)$task['uid'],
@@ -647,6 +656,18 @@ final class TaskAjaxController
             return $this->reject('missing-page-uid', $this->veLabel('ve.error.noPageGiven'), ['taskUid' => $taskUid]);
         }
 
+        // This action writes: it attaches a workspace (Backlog/Planned ->
+        // Editing) and can run a real stage transition with a comment attached
+        // to the acting user. It was gated on "the task is open" alone, which
+        // let any backend user drag an arbitrary task out of review and sign a
+        // comment with someone else's workflow. Both the page the declaration
+        // is made for and the task's own subject have to be editable by this
+        // user - the same pair moveStageAction() already checks before a move.
+        $error = $this->assertMayEdit('pages', $pageUid);
+        if ($error !== null) {
+            return $this->error($error);
+        }
+
         if ($taskUid === 0) {
             $this->activeTaskSession->forget($this->getBackendUser());
 
@@ -664,6 +685,19 @@ final class TaskAjaxController
         $task = $this->findOpenTaskOrError($taskUid, 'make it the active task');
         if ($task instanceof ResponseInterface) {
             return $task;
+        }
+
+        // Skipped for a ticket that still has no page, exactly as
+        // moveStageAction() does: there is no record to hold a permission on
+        // yet. Such a ticket cannot be picked here in practice anyway - the
+        // select only lists tasks that touch a real page - but the check has to
+        // survive a request that did not come from the select.
+        $isPendingPage = (string)$task['subject_table'] === 'pages' && (int)$task['subject_uid'] === 0;
+        if (!$isPendingPage) {
+            $error = $this->assertMayEdit((string)$task['subject_table'], (int)$task['subject_uid']);
+            if ($error !== null) {
+                return $this->error($error);
+            }
         }
 
         $beUser = $this->getBackendUser();
@@ -754,6 +788,16 @@ final class TaskAjaxController
     public function listMemberTaskMarkersForPageAction(ServerRequestInterface $request): ResponseInterface
     {
         $pageUid = (int)($request->getQueryParams()['pageUid'] ?? 0);
+
+        // Same reasoning as listOpenTasksForPageAction(): the page uid is the
+        // client's claim. This response additionally names the table and uid of
+        // every record each task has claimed, so leaving it ungated hands out a
+        // map of another editor's pending work for the asking.
+        $error = $this->assertMayReadPage($pageUid);
+        if ($error !== null) {
+            return $this->error($error);
+        }
+
         $workspaceUid = (int)$this->getBackendUser()->workspace;
 
         $tasks = $this->taskRepository->findAllOpenForPage($pageUid);
@@ -762,7 +806,18 @@ final class TaskAjaxController
         $members = [];
         foreach ($tasks as $task) {
             $taskUid = (int)$task['uid'];
-            $taskList[] = ['uid' => $taskUid, 'title' => (string)$task['title']];
+            // The marker tooltip and the toolbar legend both name a task in
+            // full - who has it and where it sits - so the client never has to
+            // ask a second endpoint just to label a coloured dot.
+            $assigneeUid = (int)($task['assignee'] ?? 0);
+            $taskList[] = [
+                'uid' => $taskUid,
+                'title' => (string)$task['title'],
+                'stageLabel' => $this->stageLabelFor($task),
+                'assigneeName' => $assigneeUid > 0
+                    ? $this->workspaceService->resolveUserName($assigneeUid)
+                    : '',
+            ];
             foreach ($this->taskRepository->findMembers($taskUid) as $member) {
                 $table = (string)$member['record_table'];
                 $liveUid = (int)$member['record_uid'];
@@ -1091,6 +1146,45 @@ final class TaskAjaxController
             return false;
         }
         return $backendUser->doesUserHaveAccess($parentPage, Permission::PAGE_NEW);
+    }
+
+    /**
+     * The read counterpart to assertMayEdit(): may this user be told what is
+     * going on for a page at all.
+     *
+     * Deliberately weaker than assertMayEdit(), which is the write gate. These
+     * are listing endpoints feeding the Visual Editor's task select and its
+     * markers, and assertMayEdit() additionally refuses the Live workspace -
+     * applied here it would leave an editor who opened the Visual Editor
+     * outside a workspace staring at a silently empty select rather than an
+     * honest "no tasks on this page". Read access to the page is the right bar
+     * for "which tasks touch this page".
+     *
+     * @return TaskActionError|null the failure, or null when allowed
+     */
+    private function assertMayReadPage(int $pageUid): ?TaskActionError
+    {
+        if ($pageUid < 1) {
+            return new TaskActionError('missing-page-uid', $this->veLabel('ve.error.noPageGiven'), []);
+        }
+
+        $page = BackendUtility::getRecord('pages', $pageUid);
+        if ($page === null) {
+            return new TaskActionError(
+                'page-not-found',
+                $this->veLabel('ve.error.pageNotFound'),
+                ['pageUid' => $pageUid],
+            );
+        }
+        if (!$this->getBackendUser()->doesUserHaveAccess($page, Permission::PAGE_SHOW)) {
+            return new TaskActionError(
+                'no-page-show-permission',
+                $this->veLabel('ve.error.noPageAccess'),
+                ['pageUid' => $pageUid],
+            );
+        }
+
+        return null;
     }
 
     /**

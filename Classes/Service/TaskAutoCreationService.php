@@ -9,6 +9,7 @@ use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
+use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Schema\Capability\TcaSchemaCapability;
 use TYPO3\CMS\Core\Schema\TcaSchemaFactory;
 use TYPO3\CMS\Workspaces\Service\StagesService;
@@ -106,6 +107,25 @@ final class TaskAutoCreationService
                     $shared,
                 );
             }
+
+            // The declaration moved the task when it was made
+            // (setActiveTaskForPageAction()), but a declaration outlives the
+            // moment: the task can be sent to review by anyone while the editor
+            // still holds it, and then keeps collecting edits from that same
+            // session. Applying the ordinary rules on every captured edit is
+            // what keeps "an edit means the task is being edited" true for the
+            // whole life of the choice, not only its first second.
+            $activeTask = $this->taskRepository->findByUid($activeTaskUid);
+            if ($activeTask !== null) {
+                if ((int)($activeTask['workspace_uid'] ?? 0) === 0) {
+                    $this->taskRepository->attachWorkspace($activeTaskUid, $workspaceUid, $stageUid);
+                } else {
+                    // No-ops for anything that is not Review/Ready, so this is
+                    // a call rather than a second copy of that condition.
+                    $this->maybeRegressPastEditing($activeTask, $table, $liveUid, $workspaceUid, $beUserId, $dataHandler);
+                }
+            }
+
             return;
         }
 
@@ -423,7 +443,7 @@ final class TaskAutoCreationService
             return false;
         }
 
-        $comment = sprintf('Automatically reopened for editing - %s:%d was modified.', $table, $liveUid);
+        $comment = sprintf($this->reopenCommentFormat(), $table, $liveUid);
 
         $refusal = $this->stageTransitionService->transition(
             $task,
@@ -454,6 +474,30 @@ final class TaskAutoCreationService
         ]);
 
         return true;
+    }
+
+    /**
+     * The sprintf format for the comment a regression writes into the task's
+     * history, through the same `content_flow.messages` domain the wizard and
+     * the Visual Editor actions use (`ve.comment.reopened` is its hand-picked
+     * counterpart). `%1$s` is the table, `%2$d` the record uid.
+     *
+     * Falls back to the English source rather than letting sprintf() run on an
+     * empty string: this text is persisted into a comment an editor will read
+     * later, and a blank one is worse than an untranslated one. A DataHandler
+     * hook can also run from a context that never set up $GLOBALS['LANG'] - the
+     * scheduler, a CLI import - which is the other way sL() has nothing to say.
+     */
+    private function reopenCommentFormat(): string
+    {
+        $languageService = $GLOBALS['LANG'] ?? null;
+        $format = $languageService instanceof LanguageService
+            ? $languageService->sL('content_flow.messages:autoCreation.comment.reopened')
+            : '';
+
+        return $format !== ''
+            ? $format
+            : 'Automatically reopened for editing - %1$s:%2$d was modified.';
     }
 
     /**

@@ -1,6 +1,8 @@
 /*
- * B4: the Visual Editor's persistent task select, plus the markers that flag
- * content already claimed by a *different* task.
+ * B4: the Visual Editor's persistent task select - the toolbar control and the
+ * server conversation behind it. The markers it drives live in
+ * task/visual-editor-markers.js; the identity rules they rest on live in
+ * task/task-markers.js.
  *
  * Three documents are involved, and getting them mixed up is why the markers
  * did nothing at all until this was corrected:
@@ -33,21 +35,20 @@
 import AjaxRequest from '@typo3/core/ajax/ajax-request.js'
 import Notification from '@typo3/backend/notification.js'
 import labels from '~labels/content_flow.messages'
-import { claimsByIdentifier, foreignTaskUidFor, hueForTaskUid } from '@gb-web/content-flow/task/task-markers.js'
+import { claimsByIdentifier } from '@gb-web/content-flow/task/task-markers.js'
+import { TaskMarkers } from '@gb-web/content-flow/task/visual-editor-markers.js'
 
-const CONTENT_ELEMENT_SELECTOR = 've-content-element'
-const CONTENT_FRAME_SELECTOR = 'iframe.visual-editor-iframe'
-const BUBBLE_CLASS = 'contentflow-task-bubble'
-const MARKER_STYLE_ID = 'contentflow-ve-markers'
 const TOOLBAR_STYLE_ID = 'contentflow-ve-toolbar'
 const CREATE_VALUE = '__create__'
 const NONE_VALUE = '__none__'
 
 /*
- * Neither document here is reached by Styles.css: it is added to the outer
- * backend chrome by LoadWizardModuleEventListener, and EXT:visual_editor's
- * module renders in its own iframe document that no AfterBackendPageRenderEvent
- * fires for. So both stylesheets travel with this module.
+ * This document is not reached by Styles.css: it is added to the outer backend
+ * chrome by LoadWizardModuleEventListener, and EXT:visual_editor's module
+ * renders in its own iframe document that no AfterBackendPageRenderEvent fires
+ * for. So the toolbar's stylesheet travels with this module. (The frontend
+ * document's own stylesheet lives in visual-editor-markers.js, for the same
+ * reason one level further down.)
  */
 const TOOLBAR_STYLES = `
 .contentflow-ve-task-select {
@@ -57,6 +58,28 @@ const TOOLBAR_STYLES = `
 }
 .contentflow-ve-task-select select {
   width: auto;
+}
+.contentflow-ve-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-right: .5em;
+}
+.contentflow-ve-legend:empty {
+  display: none;
+}
+.contentflow-ve-legend-swatch {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+  cursor: pointer;
+}
+.contentflow-ve-legend-swatch.contentflow-task-claimed-active {
+  background: transparent;
+  border-color: hsl(var(--contentflow-task-hue, 0), 70%, 45%);
 }
 .contentflow-ve-comment-popover {
   position: absolute;
@@ -74,56 +97,6 @@ const TOOLBAR_STYLES = `
 }
 .contentflow-ve-comment-popover button {
   margin-top: .35em;
-}
-`
-
-/*
- * Injected into the frontend document rather than shipped in Styles.css:
- * that file is loaded into backend documents (LoadWizardModuleEventListener,
- * PageModuleEventListener) and never reaches this iframe. EXT:visual_editor
- * relaxes style-src to 'unsafe-inline' for edit mode (PolicyMutatedEventListener),
- * so a plain <style> element is allowed here.
- *
- * ve-content-element is `display: block; position: relative` in its own :host
- * styles, so an absolutely positioned light-DOM child anchors to the element
- * itself. The bubble is a real button so the task title is reachable by
- * keyboard, not only by hovering.
- */
-const MARKER_STYLES = `
-.${BUBBLE_CLASS} {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  z-index: 11;
-  width: 14px;
-  height: 14px;
-  padding: 0;
-  border: 2px solid #fff;
-  border-radius: 50%;
-  background: hsl(var(--contentflow-task-hue, 0), 70%, 45%);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
-  cursor: help;
-}
-.${BUBBLE_CLASS}::after {
-  content: attr(data-contentflow-label);
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  display: none;
-  z-index: 12;
-  padding: .25em .5em;
-  border-radius: 3px;
-  background: #1a1a1a;
-  color: #fff;
-  font-family: sans-serif;
-  font-size: 12px;
-  line-height: 1.4;
-  white-space: nowrap;
-  pointer-events: none;
-}
-.${BUBBLE_CLASS}:hover::after,
-.${BUBBLE_CLASS}:focus-visible::after {
-  display: block;
 }
 `
 
@@ -155,16 +128,31 @@ class VisualEditorTaskSelect {
     this.doc = doc
     this.pageUid = pageUid
     this.activeTaskUid = 0
-    this.claims = new Map()
-    this.taskTitles = new Map()
     this.select = null
+    this.markers = new TaskMarkers(doc)
     this.dismissCommentPopover = null
+    this.remounting = false
   }
 
   async mount() {
+    if (!this.insertToolbar()) {
+      return
+    }
+    this.watchToolbar()
+
+    await this.reloadTasks()
+    await this.reloadMarkers()
+  }
+
+  /**
+   * Build the select and the legend and put them in the toolbar.
+   *
+   * @returns {boolean} whether there was a toolbar to put them in
+   */
+  insertToolbar() {
     const anchor = this.doc.querySelector('ve-auto-save-toggle')
     if (!anchor?.parentElement) {
-      return
+      return false
     }
 
     injectStyles(this.doc, TOOLBAR_STYLE_ID, TOOLBAR_STYLES)
@@ -187,11 +175,48 @@ class VisualEditorTaskSelect {
     anchor.parentElement.insertBefore(wrapper, anchor)
     this.select = select
 
+    const legend = this.doc.createElement('span')
+    legend.className = 'contentflow-ve-legend'
+    anchor.parentElement.insertBefore(legend, anchor)
+    this.markers.mountLegend(legend)
+
     select.addEventListener('change', () => this.onChange())
 
-    await this.reloadTasks()
-    await this.reloadMarkers()
-    this.observeContentFrames()
+    return true
+  }
+
+  /*
+   * EXT:visual_editor throws the whole doc header away and puts a freshly
+   * fetched one in its place - `updateModuleState()` in Backend/page-changed.js
+   * replaces every `.module-docheader, .js-replaceable` element with markup it
+   * just re-requested from the server. That runs on the `pageChanged` message
+   * the frontend iframe sends once it has loaded, which is *after* this module
+   * mounted, so the select an editor saw appear vanished a second later. It
+   * runs again on every language switch and every navigation inside the editor.
+   *
+   * Nothing announces it, so the disappearance is the signal: when the select
+   * is no longer in the document, build it again. Re-inserting rather than
+   * re-creating the whole controller keeps the marker observers - which live on
+   * the frontend documents, untouched by all this - from being stacked up a
+   * second time per replacement.
+   */
+  watchToolbar() {
+    const view = this.doc.defaultView
+    const observer = new view.MutationObserver(() => {
+      if (this.select?.isConnected || this.remounting) {
+        return
+      }
+      this.remounting = true
+      view.requestAnimationFrame(async () => {
+        this.remounting = false
+        if (this.select?.isConnected || !this.insertToolbar()) {
+          return
+        }
+        await this.reloadTasks()
+        await this.reloadMarkers()
+      })
+    })
+    observer.observe(this.doc.body, { childList: true, subtree: true })
   }
 
   async reloadTasks() {
@@ -317,21 +342,21 @@ class VisualEditorTaskSelect {
 
       await this.reloadTasks()
       this.select.value = String(result.task)
-      this.select.disabled = false
-      await this.onChange()
     } catch (error) {
       Notification.error(labels.get('ve.notification.title'), labels.get('ve.error.server'))
+      return
     } finally {
       this.select.disabled = false
     }
+
+    // Outside the try/finally: onChange() manages `disabled` itself, and
+    // running it while the finally above still owed an unlock left the select
+    // dead until the next render.
+    await this.onChange()
   }
 
   offerCommentEdit(taskUid, commentUid, defaultComment) {
-    this.doc.querySelector('.contentflow-ve-comment-popover')?.remove()
-    if (this.dismissCommentPopover) {
-      this.doc.removeEventListener('click', this.dismissCommentPopover, true)
-      this.dismissCommentPopover = null
-    }
+    this.closeCommentPopover()
 
     const popover = this.doc.createElement('div')
     popover.className = 'contentflow-ve-comment-popover'
@@ -365,7 +390,7 @@ class VisualEditorTaskSelect {
           })
         const result = await response.resolve()
         if (result.success === true) {
-          popover.remove()
+          this.closeCommentPopover()
         } else {
           Notification.error(
             labels.get('ve.notification.title'),
@@ -387,12 +412,25 @@ class VisualEditorTaskSelect {
 
     const dismiss = (event) => {
       if (!popover.contains(event.target) && event.target !== this.select) {
-        popover.remove()
-        this.doc.removeEventListener('click', dismiss, true)
+        this.closeCommentPopover()
       }
     }
     this.dismissCommentPopover = dismiss
     view.setTimeout(() => this.doc.addEventListener('click', dismiss, true), 0)
+  }
+
+  /*
+   * One way out for all three closers (a new popover, a saved note, a click
+   * elsewhere). The listener used to be removed while `dismissCommentPopover`
+   * kept pointing at the dead closure, so opening a second popover tried to
+   * detach a handler that was no longer attached and left the real one behind.
+   */
+  closeCommentPopover() {
+    this.doc.querySelector('.contentflow-ve-comment-popover')?.remove()
+    if (this.dismissCommentPopover) {
+      this.doc.removeEventListener('click', this.dismissCommentPopover, true)
+      this.dismissCommentPopover = null
+    }
   }
 
   async reloadMarkers() {
@@ -408,136 +446,68 @@ class VisualEditorTaskSelect {
         return
       }
 
-      this.taskTitles = new Map((result.tasks || []).map((task) => [Number(task.uid), task.title]))
-      this.claims = claimsByIdentifier(result.members || [])
+      this.markers.update(claimsByIdentifier(result.members || []), result.tasks || [], this.activeTaskUid)
     } catch (error) {
       // Silent - the markers are a warning, not a load-bearing mechanism.
-      return
     }
-
-    this.markAllFrames()
-  }
-
-  contentFrames() {
-    return [...this.doc.querySelectorAll(CONTENT_FRAME_SELECTOR)]
-  }
-
-  /*
-   * The frontend document loads later than the module document around it, and
-   * EXT:visual_editor reloads it after every save (reload-all-child-frames.js),
-   * which throws away everything marked into it. One `load` listener per frame
-   * covers both.
-   */
-  observeContentFrames() {
-    this.contentFrames().forEach((frame) => {
-      if (frame.dataset.contentflowObserved !== '1') {
-        frame.dataset.contentflowObserved = '1'
-        frame.addEventListener('load', () => this.markFrame(frame))
-      }
-      this.markFrame(frame)
-    })
-  }
-
-  markAllFrames() {
-    this.contentFrames().forEach((frame) => this.markFrame(frame))
-  }
-
-  markFrame(frame) {
-    const doc = frame.contentDocument
-    if (!doc?.body) {
-      return
-    }
-
-    injectStyles(doc, MARKER_STYLE_ID, MARKER_STYLES)
-    this.markElements(doc)
-    this.observeMutations(doc)
-  }
-
-  markElements(doc) {
-    doc.querySelectorAll(CONTENT_ELEMENT_SELECTOR).forEach((element) => {
-      const taskUid = foreignTaskUidFor(element, this.claims, this.activeTaskUid)
-      const existing = element.querySelector(':scope > .' + BUBBLE_CLASS)
-
-      if (taskUid === null) {
-        existing?.remove()
-        return
-      }
-
-      const title = this.taskTitles.get(taskUid) || '#' + taskUid
-      const bubble = existing ?? this.createBubble(doc)
-      bubble.style.setProperty('--contentflow-task-hue', String(hueForTaskUid(taskUid)))
-      bubble.dataset.contentflowLabel = title
-      bubble.setAttribute('aria-label', labels.get('ve.marker.claimedBy') + ' ' + title)
-      if (!existing) {
-        element.append(bubble)
-      }
-    })
-  }
-
-  createBubble(doc) {
-    const bubble = doc.createElement('button')
-    bubble.type = 'button'
-    bubble.className = BUBBLE_CLASS
-    // The bubble sits inside editable content: it must not be typed over, and a
-    // click on it must not reach EXT:visual_editor's own element handlers.
-    bubble.contentEditable = 'false'
-    bubble.draggable = false
-    bubble.addEventListener('click', (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-    })
-
-    return bubble
-  }
-
-  /*
-   * EXT:visual_editor re-renders content elements in place (a save, a move, a
-   * language sync), which drops the bubbles again without reloading the frame.
-   */
-  observeMutations(doc) {
-    if (doc.body.dataset.contentflowObserved === '1') {
-      return
-    }
-    doc.body.dataset.contentflowObserved = '1'
-
-    const observer = new doc.defaultView.MutationObserver((mutations) => {
-      // Ignore the bubbles' own insertion and removal, or marking would trigger
-      // marking.
-      const relevant = mutations.some((mutation) => [...mutation.addedNodes, ...mutation.removedNodes].some(
-        (node) => node.nodeType === 1 && !node.classList?.contains(BUBBLE_CLASS),
-      ))
-      if (relevant) {
-        this.markElements(doc)
-      }
-    })
-    observer.observe(doc.body, { childList: true, subtree: true })
   }
 }
 
+const IFRAME_SELECTOR = 'iframe#typo3-contentIframe'
+
+function tryMount(iframe) {
+  const doc = iframe.contentDocument
+  if (!isVisualEditorDocument(doc) || doc.querySelector('.contentflow-ve-task-select')) {
+    return
+  }
+  const pageUid = pageUidFromIframe(iframe)
+  if (!pageUid) {
+    return
+  }
+  new VisualEditorTaskSelect(doc, pageUid).mount()
+}
+
 /*
- * `#typo3-contentIframe` is a persistent element in the backend chrome that
- * TYPO3 reuses across module navigation, so one `load` listener attached
- * once catches every future navigation into (and out of) Visual Editor -
- * no need to re-discover the iframe per module switch.
+ * `#typo3-contentIframe` is persistent once it exists - TYPO3 reuses it across
+ * module navigation - so one `load` listener catches every future navigation
+ * into (and out of) Visual Editor, and the iframe never has to be rediscovered
+ * per module switch.
+ *
+ * It does not, however, exist when this runs. The backend chrome creates the
+ * content iframe on demand, after its own DOMContentLoaded, which is exactly
+ * when wizard.js calls this. Looking once and giving up meant the select was
+ * never inserted at all on a direct load of the Visual Editor module - the case
+ * an editor actually hits, since a bookmark or a page-tree click both land
+ * there that way. The mount only ever appeared when something else caused a
+ * second pass. Hence: wait for the element rather than assume it.
  */
+function attach(iframe) {
+  if (iframe.dataset.contentflowVeObserved === '1') {
+    return
+  }
+  iframe.dataset.contentflowVeObserved = '1'
+  iframe.addEventListener('load', () => tryMount(iframe))
+  // The iframe may already have finished loading by the time we get here, in
+  // which case no further `load` event is coming.
+  tryMount(iframe)
+}
+
 export function observeVisualEditorTaskSelect() {
-  const iframe = document.querySelector('iframe#typo3-contentIframe')
-  if (!iframe) {
+  const existing = document.querySelector(IFRAME_SELECTOR)
+  if (existing) {
+    attach(existing)
     return
   }
 
-  const tryMount = () => {
-    const doc = iframe.contentDocument
-    if (!isVisualEditorDocument(doc) || doc.querySelector('.contentflow-ve-task-select')) {
-      return
+  const observer = new MutationObserver(() => {
+    const iframe = document.querySelector(IFRAME_SELECTOR)
+    if (iframe) {
+      // One iframe, reused from here on, so the observer has done its job -
+      // and a childList observer over the whole backend chrome is not something
+      // to leave running for every modal and notification that opens.
+      observer.disconnect()
+      attach(iframe)
     }
-    const pageUid = pageUidFromIframe(iframe)
-    if (!pageUid) {
-      return
-    }
-    new VisualEditorTaskSelect(doc, pageUid).mount()
-  }
-
-  iframe.addEventListener('load', tryMount)
-  tryMount()
+  })
+  observer.observe(document.body, { childList: true, subtree: true })
 }
