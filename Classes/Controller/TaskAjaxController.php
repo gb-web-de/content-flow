@@ -10,6 +10,7 @@ use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
 use GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use GbWeb\ContentFlow\Notification\AssignmentNotificationService;
+use GbWeb\ContentFlow\Service\ActiveTaskSession;
 use GbWeb\ContentFlow\Service\ActivityLogger;
 use GbWeb\ContentFlow\Service\ReferenceInspector;
 use GbWeb\ContentFlow\Service\StageTransitionService;
@@ -48,6 +49,7 @@ final class TaskAjaxController
         private readonly TaskMemberSynchronizer $memberSynchronizer,
         private readonly ReferenceInspector $referenceInspector,
         private readonly ActivityLogger $activityLogger,
+        private readonly ActiveTaskSession $activeTaskSession,
         private readonly AssignmentNotificationService $assignmentNotificationService,
         private readonly WorkspaceIntegrationService $workspaceService,
         private readonly WorkspacePublishGate $workspacePublishGate,
@@ -128,10 +130,11 @@ final class TaskAjaxController
     /**
      * "Neue Seite erstellen" on the "+ New task" wizard: plans a page that does
      * not exist yet, rather than opening core's page-creation wizard immediately.
-     * The page itself is only created once an editor drags this ticket into a
-     * review stage - see moveStageAction()'s materializePendingPage(). Until
-     * then it is a title-only ticket in Backlog/Planned like any other, just
-     * without a real subject record behind it yet.
+     * The page itself is only created once an editor drags this ticket into
+     * Editing, where a workspace version starts to exist - see
+     * moveStageAction()'s materializePendingPage(). Until then it is a
+     * title-only ticket moving freely between Backlog and Planned like any
+     * other, just without a real subject record behind it yet.
      */
     public function createPendingPageAction(ServerRequestInterface $request): ResponseInterface
     {
@@ -410,29 +413,50 @@ final class TaskAjaxController
         $state = TaskState::tryFrom($targetState);
 
         // A pending page ("Neue Seite erstellen" - see createPendingPageAction())
-        // has no real subject yet, so assertMayEdit() below would always reject
-        // it (subject_uid 0). It only ever gets one chance to become real: being
-        // dragged into a review stage, which is what actually creates the page.
-        // Backlog/Planned/Done are all no-ops for it - there is nothing to write
-        // anywhere yet - so those are rejected rather than silently doing nothing.
-        if ((string)$task['subject_table'] === 'pages' && (int)$task['subject_uid'] === 0) {
-            if ($state === null || !$state->hasVersion()) {
+        // has no real subject yet, so assertMayEdit() below would reject it on
+        // subject_uid 0 alone. The page is created the moment the ticket reaches
+        // a stage that needs one - the first of those is Editing, where a
+        // workspace version starts to exist.
+        //
+        // Backlog and Planned are *not* such a stage: moving between them is
+        // planning, writes nothing but this extension's own column, and needs no
+        // page. Rejecting that move used to tell an editor their entirely
+        // correct drag was wrong ("move it to a review stage to create it"),
+        // which is what this distinction is for.
+        $isPendingPage = (string)$task['subject_table'] === 'pages' && (int)$task['subject_uid'] === 0;
+
+        if ($isPendingPage) {
+            if ($state === null) {
                 return $this->reject(
-                    'pending-page-needs-review-stage',
-                    'This ticket has no page yet - move it to a review stage to create it.',
+                    'unknown-target-column',
+                    'This ticket cannot be moved to that column.',
+                    ['taskUid' => $taskUid, 'targetState' => $targetState],
+                );
+            }
+            if ($state === TaskState::DONE) {
+                return $this->reject(
+                    'pending-page-cannot-be-done',
+                    'This ticket never became a page, so there is nothing to finish. Start work on it first.',
                     ['taskUid' => $taskUid],
                 );
             }
-            $materialized = $this->materializePendingPage($task);
-            if ($materialized instanceof ResponseInterface) {
-                return $materialized;
+            if ($state->hasVersion()) {
+                $materialized = $this->materializePendingPage($task);
+                if ($materialized instanceof ResponseInterface) {
+                    return $materialized;
+                }
+                $task = $materialized;
+                $isPendingPage = false;
             }
-            $task = $materialized;
         }
 
-        $error = $this->assertMayEdit((string)$task['subject_table'], (int)$task['subject_uid']);
-        if ($error !== null) {
-            return $this->error($error);
+        // Skipped for a ticket that still has no page: there is no record to
+        // hold a permission on, and the move about to happen writes none.
+        if (!$isPendingPage) {
+            $error = $this->assertMayEdit((string)$task['subject_table'], (int)$task['subject_uid']);
+            if ($error !== null) {
+                return $this->error($error);
+            }
         }
 
         // A drop onto a core stage column is a workspace stage transition and must
@@ -545,7 +569,19 @@ final class TaskAjaxController
             $this->taskRepository->findAllOpenForPage($pageUid),
         );
 
-        return new JsonResponse(['success' => true, 'tasks' => $tasks]);
+        // The choice an editor made earlier still routes every save on this page
+        // (TaskAutoCreationService::captureEdit()), so the select has to be able
+        // to show it after a reload. Without this the select came back on its
+        // placeholder while the server kept routing to a task nobody could see -
+        // and the markers below, which key off "which task is active", treated
+        // the active task's own records as foreign.
+        $activeTaskUid = $this->activeTaskSession->resolve($this->getBackendUser(), $pageUid);
+
+        return new JsonResponse([
+            'success' => true,
+            'tasks' => $tasks,
+            'activeTaskUid' => $activeTaskUid ?? 0,
+        ]);
     }
 
     /**
@@ -594,6 +630,11 @@ final class TaskAjaxController
      * Never itself creates a task - "+ Create new task" in the select reuses
      * createAction() (table=pages) first and calls this action with the
      * resulting uid, the same as any other existing-task choice.
+     *
+     * `taskUid = 0` is the way back out: it drops the declaration and moves
+     * nothing. A choice that could be made but never unmade would be a trap,
+     * because it keeps routing saves on this page long after the editor has
+     * stopped thinking about it.
      */
     public function setActiveTaskForPageAction(ServerRequestInterface $request): ResponseInterface
     {
@@ -602,7 +643,21 @@ final class TaskAjaxController
         $taskUid = (int)($body['taskUid'] ?? 0);
 
         if ($pageUid < 1) {
-            return $this->reject('missing-page-uid', 'No page was specified.', ['taskUid' => $taskUid]);
+            return $this->reject('missing-page-uid', $this->veLabel('ve.error.noPageGiven'), ['taskUid' => $taskUid]);
+        }
+
+        if ($taskUid === 0) {
+            $this->activeTaskSession->forget($this->getBackendUser());
+
+            return new JsonResponse([
+                'success' => true,
+                'taskUid' => 0,
+                'state' => '',
+                'stageLabel' => '',
+                'transitioned' => false,
+                'comment' => '',
+                'commentUid' => 0,
+            ]);
         }
 
         $task = $this->findOpenTaskOrError($taskUid, 'make it the active task');
@@ -622,7 +677,7 @@ final class TaskAjaxController
             if ($workspaceUid < 1) {
                 return $this->reject(
                     'no-workspace-selected',
-                    'Switch into a workspace before selecting a task to work on.',
+                    $this->veLabel('ve.error.noWorkspaceSelected'),
                     ['taskUid' => $taskUid],
                 );
             }
@@ -642,7 +697,7 @@ final class TaskAjaxController
             if ($state === TaskState::REVIEW || $state === TaskState::READY) {
                 $versionsByTable = $this->memberSynchronizer->findPendingVersionsByTable($taskUid, (int)$task['workspace_uid']);
                 if ($versionsByTable !== []) {
-                    $comment = 'Reopened for editing from the Visual Editor task selector.';
+                    $comment = $this->veLabel('ve.comment.reopened');
                     $refusal = $this->stageTransitionService->transition(
                         $task,
                         $versionsByTable,
@@ -663,10 +718,7 @@ final class TaskAjaxController
             }
         }
 
-        $beUser->setAndSaveSessionData('content_flow_active_task', [
-            'pageUid' => $pageUid,
-            'taskUid' => $taskUid,
-        ]);
+        $this->activeTaskSession->remember($beUser, $pageUid, $taskUid);
 
         return new JsonResponse([
             'success' => true,
@@ -680,16 +732,28 @@ final class TaskAjaxController
     }
 
     /**
-     * B4's hover markers: for every open task touching a page, which records
-     * it already claims - so the Visual Editor can mark an editable field
-     * that belongs to a *different* task than the one currently active,
-     * before an editor accidentally edits into it. Excludes closed/Done
-     * tasks for the same reason findAllOpenForPage() does: nothing to warn
-     * about once work is finished.
+     * B4's markers: for every open task touching a page, which records it
+     * already claims - so the Visual Editor can mark a content element that
+     * belongs to a *different* task than the one currently active, before an
+     * editor accidentally edits into it. Excludes closed/Done tasks for the
+     * same reason findAllOpenForPage() does: nothing to warn about once work
+     * is finished.
+     *
+     * Each member carries a list of `table:uid` identifiers rather than one
+     * uid, because the two sides do not agree on which uid names a record.
+     * Membership rows hold the LIVE uid; the Visual Editor renders the
+     * frontend page workspace-overlaid, and EXT:visual_editor's
+     * ContentElementWrapperService writes `uid = localizedUid ?: versionedUid
+     * ?: uid` onto every `ve-content-element` - and `versionedUid` is
+     * `_ORIG_uid`, which PageRepository::versionOL() sets to the VERSION while
+     * leaving `uid` live. So exactly the interesting case, a task being worked
+     * on, would never match on a single uid. Sending both, and letting the
+     * client match either, is what makes the markers appear at all.
      */
     public function listMemberTaskMarkersForPageAction(ServerRequestInterface $request): ResponseInterface
     {
         $pageUid = (int)($request->getQueryParams()['pageUid'] ?? 0);
+        $workspaceUid = (int)$this->getBackendUser()->workspace;
 
         $tasks = $this->taskRepository->findAllOpenForPage($pageUid);
 
@@ -699,15 +763,39 @@ final class TaskAjaxController
             $taskUid = (int)$task['uid'];
             $taskList[] = ['uid' => $taskUid, 'title' => (string)$task['title']];
             foreach ($this->taskRepository->findMembers($taskUid) as $member) {
+                $table = (string)$member['record_table'];
+                $liveUid = (int)$member['record_uid'];
                 $members[] = [
-                    'table' => (string)$member['record_table'],
-                    'uid' => (int)$member['record_uid'],
+                    'table' => $table,
+                    'uid' => $liveUid,
                     'taskUid' => $taskUid,
+                    'identifiers' => $this->memberIdentifiers($table, $liveUid, $workspaceUid),
                 ];
             }
         }
 
         return new JsonResponse(['success' => true, 'tasks' => $taskList, 'members' => $members]);
+    }
+
+    /**
+     * Every `table:uid` spelling one member can appear under in the rendered
+     * frontend - the live record, plus its pending workspace version when one
+     * exists. Resolution is TaskMemberSynchronizer's, not a second copy of it,
+     * so a record created directly inside the workspace (no live counterpart)
+     * is handled the same way here as everywhere else.
+     *
+     * @return list<string>
+     */
+    private function memberIdentifiers(string $table, int $liveUid, int $workspaceUid): array
+    {
+        $identifiers = [$table . ':' . $liveUid];
+
+        $versionUid = $this->memberSynchronizer->findVersionUid($table, $liveUid, $workspaceUid);
+        if ($versionUid > 0 && $versionUid !== $liveUid) {
+            $identifiers[] = $table . ':' . $versionUid;
+        }
+
+        return $identifiers;
     }
 
     /**
@@ -949,7 +1037,7 @@ final class TaskAjaxController
         if ($workspaceUid < 1) {
             return $this->reject(
                 'no-workspace-selected',
-                'Switch into a workspace before moving this ticket to a review stage.',
+                'Switch into a workspace before starting work on this ticket.',
                 ['taskUid' => $taskUid],
             );
         }
@@ -1282,6 +1370,17 @@ final class TaskAjaxController
     private function getLanguageService(): LanguageService
     {
         return $GLOBALS['LANG'];
+    }
+
+    /**
+     * The Visual Editor actions' own editor-facing texts, through the same
+     * `content_flow.messages` domain the wizard uses (TaskWizardProvider::
+     * translate()). Only these actions are covered so far - the rest of this
+     * controller still answers in English literals, which is a separate job.
+     */
+    private function veLabel(string $key): string
+    {
+        return $this->getLanguageService()->sL('content_flow.messages:' . $key);
     }
 
     /**

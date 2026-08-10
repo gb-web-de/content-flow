@@ -422,6 +422,19 @@ Audited against the code on 2026-08-07, not written from memory.
 - Ajax endpoints: create, attach, detach, move-stage, execute-stage, assign-me,
   details, ticket, comment, wizard-pending, wizard-submit - each re-deriving
   permissions server-side and logging every rejection with a stable code.
+- **Visual Editor integration**: a task select in EXT:visual_editor's toolbar,
+  where picking a task is a declaration made *before* editing (`ActiveTaskSession`,
+  honoured by `TaskAutoCreationService` on every surface, not just this one),
+  Backlog/Planned lifted into Editing and Review/Ready regressed back to it on
+  the pick, and a coloured bubble on every content element another open task
+  already claims. Three documents are involved and the difference matters: the
+  backend chrome loads the module, EXT:visual_editor's own module document holds
+  the toolbar, and the rendered frontend page - one nested `iframe` deeper - is
+  the only place `ve-content-element` exists. Reaching into that iframe is safe
+  because `PageEdit.html` renders it only for a same-origin site. Members are
+  matched by *both* their live and their workspace-version uid, because the
+  wrapper writes the version uid onto the element while a membership row holds
+  the live one.
 
 **Not implemented**
 
@@ -432,9 +445,10 @@ Audited against the code on 2026-08-07, not written from memory.
 - **Context-menu item provider** for planning a task by right-clicking the page tree.
   Listed under "meet editors where they are" as a lesson taken from the xima
   content-planner - the lesson is recorded, the code is not written.
-- **Notification/@mention system** and the Visual Editor.
-- **Automated coverage for the JavaScript.** The PHP side is tested; the board modules
-  are only syntax-checked.
+- **Notification/@mention system.**
+- **Automated coverage for most of the JavaScript.** `dom-scope.js`, the wizard's
+  submission service and the Visual Editor's marker matching have vitest tests;
+  the board modules are still only syntax-checked.
 
 **Verification**
 

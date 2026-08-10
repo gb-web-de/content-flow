@@ -96,7 +96,15 @@ final class TaskMemberSynchronizer
         return false;
     }
 
-    private function findVersionUid(string $table, int $liveUid, int $workspaceUid): int
+    /**
+     * The pending version of one live record in one workspace, or 0.
+     *
+     * Public because the Visual Editor's markers need the same answer for a
+     * single member without asking for a whole task's pairs: the frontend
+     * renders workspace-overlaid records, so an element there may carry either
+     * uid (see TaskAjaxController::listMemberTaskMarkersForPageAction()).
+     */
+    public function findVersionUid(string $table, int $liveUid, int $workspaceUid): int
     {
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());

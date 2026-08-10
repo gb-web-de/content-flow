@@ -46,7 +46,10 @@ final class WizardLabelsResolveTest extends FunctionalTestCase
 
         $codes = [];
         foreach ($this->wizardLabelKeys() as $key) {
-            if (!str_starts_with($key, 'wizard.error.')) {
+            // The two namespaces that hold messages *about* a failure. Not
+            // every key mentioning "error" is one - `step.error.title` names
+            // the wizard's error step, and a heading carries no code.
+            if (!str_starts_with($key, 'wizard.error.') && !str_starts_with($key, 've.error.')) {
                 continue;
             }
 
@@ -71,8 +74,28 @@ final class WizardLabelsResolveTest extends FunctionalTestCase
     {
         return array_values(array_unique([
             ...$this->providerLabelKeys(),
+            ...$this->controllerLabelKeys(),
             ...$this->javaScriptLabelKeys(),
         ]));
+    }
+
+    /**
+     * The Visual Editor's actions translate through TaskAjaxController::veLabel()
+     * rather than the provider's translate(), so they need scraping of their own.
+     *
+     * @return list<string>
+     */
+    private function controllerLabelKeys(): array
+    {
+        $source = file_get_contents(__DIR__ . '/../../../Classes/Controller/TaskAjaxController.php');
+        self::assertIsString($source);
+
+        preg_match_all("/veLabel\('([^']+)'/", $source, $matches);
+
+        $keys = array_values(array_unique($matches[1]));
+        self::assertNotEmpty($keys, 'No veLabel() calls found - has the helper been renamed?');
+
+        return $keys;
     }
 
     /**

@@ -43,6 +43,7 @@ final class TaskAutoCreationService
         private readonly TcaSchemaFactory $tcaSchemaFactory,
         private readonly StageTransitionService $stageTransitionService,
         private readonly CommentRepository $commentRepository,
+        private readonly ActiveTaskSession $activeTaskSession,
     ) {
     }
 
@@ -86,7 +87,7 @@ final class TaskAutoCreationService
         // the one the choice was made from. The choice is explicit and
         // proactive, so it outranks the automatic routing below entirely -
         // there is nothing left to ask, and no pending wizard to queue.
-        $activeTaskUid = $this->resolveActiveTaskOverride($dataHandler, $pageUid);
+        $activeTaskUid = $this->activeTaskSession->resolve($dataHandler->BE_USER, $pageUid);
         if ($activeTaskUid !== null) {
             $homePid = $this->derivePid($table, $liveUid);
             $shared = $this->referenceInspector->isSharedAcrossPages($table, $liveUid, $homePid);
@@ -453,33 +454,6 @@ final class TaskAutoCreationService
         ]);
 
         return true;
-    }
-
-    /**
-     * The task an editor explicitly picked for this page via the Visual
-     * Editor's task select, if any still applies. Session-wide rather than
-     * scoped to one edit, so it survives across saves on the same page - but
-     * it must still be re-validated on every call: the task may have closed,
-     * or the stored choice may be left over from a different page entirely.
-     *
-     * @return int|null the task uid to claim onto, or null when no override applies
-     */
-    private function resolveActiveTaskOverride(DataHandler $dataHandler, int $pageUid): ?int
-    {
-        $active = $dataHandler->BE_USER->getSessionData('content_flow_active_task');
-        if (!is_array($active) || (int)($active['pageUid'] ?? 0) !== $pageUid) {
-            return null;
-        }
-        $taskUid = (int)($active['taskUid'] ?? 0);
-        if ($taskUid < 1) {
-            return null;
-        }
-        $task = $this->taskRepository->findByUid($taskUid);
-        if ($task === null || (int)$task['closed'] === 1) {
-            return null;
-        }
-
-        return $taskUid;
     }
 
     /**

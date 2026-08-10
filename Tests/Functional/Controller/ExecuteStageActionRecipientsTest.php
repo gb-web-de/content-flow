@@ -100,6 +100,7 @@ final class ExecuteStageActionRecipientsTest extends FunctionalTestCase
             $this->get(TaskMemberSynchronizer::class),
             $this->get(ReferenceInspector::class),
             $activityLogger,
+            $this->get(\GbWeb\ContentFlow\Service\ActiveTaskSession::class),
             $this->get(\GbWeb\ContentFlow\Notification\AssignmentNotificationService::class),
             new WorkspaceIntegrationService(
                 $connectionPool,
