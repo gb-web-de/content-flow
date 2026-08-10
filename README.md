@@ -89,7 +89,26 @@ ddev composer cs:fix
 ddev composer phpstan       # level 8
 ddev composer test:unit
 ddev composer test:functional
+npm run test:js             # vitest, the extension's own ES modules
+npm run test:e2e            # Playwright, against a served backend
 ```
+
+The functional suite runs on SQLite in CI and needs no database service:
+`typo3DatabaseDriver=pdo_sqlite composer test:functional`.
+
+Playwright needs a running site and a backend login, both read from the
+environment — there is no fixed default, because the DDEV project name is not
+unique across worktrees:
+
+```bash
+npm ci && npx playwright install --with-deps chromium
+CONTENTFLOW_BASE_URL=$(ddev describe -j | jq -r .raw.primary_url) npm run test:e2e
+```
+
+CI serves the same installation without DDEV: `typo3 setup` on SQLite,
+`extension:setup` for the Camino content, `contentflow:democontent` for the
+workspace, then PHP's built-in server via
+[`Build/playwright/router.php`](Build/playwright/router.php).
 
 ## Status
 

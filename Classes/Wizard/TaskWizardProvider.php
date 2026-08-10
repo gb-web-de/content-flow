@@ -22,6 +22,7 @@ use TYPO3\CMS\Backend\Wizard\DTO\Step;
 use TYPO3\CMS\Backend\Wizard\DTO\SubmissionResult;
 use TYPO3\CMS\Backend\Wizard\WizardProviderInterface;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 
 /**
@@ -54,6 +55,12 @@ use TYPO3\CMS\Core\Type\Bitmask\Permission;
 #[AsTaggedItem(index: 'contentflow_task_wizard')]
 final readonly class TaskWizardProvider implements WizardProviderInterface
 {
+    /**
+     * Translation domain of Resources/Private/Language/locallang.xlf, which the
+     * path resolves to rather than anything registering it.
+     */
+    private const LANGUAGE_DOMAIN = 'content_flow.messages';
+
     public function __construct(
         private TaskRepository $taskRepository,
         private TaskSubjectRegistry $subjectRegistry,
@@ -99,7 +106,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
                 return Configuration::create([
                     Step::create('@gb-web/content-flow/wizard/steps/route-choice-step.js')
                         ->withConfigurationData([
-                            'pageTaskTitle' => (string)($pending['pageTaskTitle'] ?? 'Untitled task'),
+                            'pageTaskTitle' => (string)($pending['pageTaskTitle'] ?? $this->translate('task.untitled')),
                         ]),
                 ]);
             }
@@ -117,7 +124,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
 
         return Configuration::create([
             Step::create('@gb-web/content-flow/wizard/steps/error-step.js')
-                ->withConfigurationData(['message' => 'Invalid wizard submission!']),
+                ->withConfigurationData(['message' => $this->translate('wizard.error.invalidSubmission')]),
         ]);
     }
 
@@ -133,7 +140,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
             'create_from_picker' => $this->submitCreateFromPicker($body),
             'create_pending_page' => $this->submitCreatePendingPage($body),
             'regression_comment' => $this->submitUpdateRegressionComment($body),
-            default => SubmissionResult::createErrorResult(['Unknown wizard mode.']),
+            default => SubmissionResult::createErrorResult([$this->translate('wizard.error.unknownMode')]),
         };
     }
 
@@ -160,16 +167,16 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
 
         $title = trim((string)($body['title'] ?? ''));
         if ($title === '') {
-            return $this->reject('A title is required to keep this task.', ['table' => $table, 'uid' => $uid]);
+            return $this->reject($this->translate('wizard.error.titleRequiredToKeep'), ['table' => $table, 'uid' => $uid]);
         }
 
         $taskUid = (int)($body['taskUid'] ?? 0);
         $task = $this->taskRepository->findByUid($taskUid);
         if ($task === null) {
-            return $this->reject('This task no longer exists.', ['taskUid' => $taskUid]);
+            return $this->reject($this->translate('wizard.error.taskGone'), ['taskUid' => $taskUid]);
         }
         if ((int)$task['closed'] === 1) {
-            return $this->reject('This task is closed - you cannot update it.', ['taskUid' => $taskUid]);
+            return $this->reject($this->translate('wizard.error.taskClosed'), ['taskUid' => $taskUid]);
         }
 
         $description = trim((string)($body['description'] ?? ''));
@@ -182,7 +189,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
             $this->notifyAssignment($taskUid, $title, (string)$task['subject_table'], (int)$task['subject_uid'], $assignee);
         }
 
-        return $this->success('Task details saved.', $taskUid);
+        return $this->success($this->translate('wizard.success.detailsSaved'), $taskUid);
     }
 
     /**
@@ -202,25 +209,25 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
         if ($destination === 'attach_to_page_task') {
             $pageTaskUid = (int)($body['pageTaskUid'] ?? 0);
             if ($pageTaskUid < 1) {
-                return $this->reject('No page task was specified to attach this element to.', ['table' => $table, 'uid' => $uid]);
+                return $this->reject($this->translate('wizard.error.noPageTaskGiven'), ['table' => $table, 'uid' => $uid]);
             }
             $this->taskRepository->moveMemberToTask($table, $uid, $pageTaskUid);
 
-            return $this->success('Edit added to the existing task.', $pageTaskUid);
+            return $this->success($this->translate('wizard.success.editAttached'), $pageTaskUid);
         }
 
         if ($destination !== 'create_new_task') {
-            return $this->reject(sprintf('The wizard destination "%s" is not supported.', $destination), ['table' => $table, 'uid' => $uid]);
+            return $this->reject($this->translate('wizard.error.unsupportedDestination', (string)$destination), ['table' => $table, 'uid' => $uid]);
         }
 
         $title = trim((string)($body['title'] ?? ''));
         if ($title === '') {
-            return $this->reject('A title is required to create a new task.', ['table' => $table, 'uid' => $uid]);
+            return $this->reject($this->translate('wizard.error.titleRequiredForNewTask'), ['table' => $table, 'uid' => $uid]);
         }
 
         if ($this->taskRepository->findOpenTaskByMember($table, $uid) === null) {
             return $this->reject(
-                'This record does not belong to an open task, so there is nothing to split into a new one.',
+                $this->translate('wizard.error.recordHasNoOpenTask'),
                 ['table' => $table, 'uid' => $uid],
             );
         }
@@ -250,7 +257,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
         ]);
         $this->notifyAssignment((int)$task['uid'], $title, $table, $uid, $assignee);
 
-        return $this->success('A separate task was created.', (int)$task['uid']);
+        return $this->success($this->translate('wizard.success.separateTaskCreated'), (int)$task['uid']);
     }
 
     /**
@@ -267,7 +274,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
 
         $title = trim((string)($body['title'] ?? ''));
         if ($title === '') {
-            return $this->reject('A title is required to create the task.', ['table' => $table, 'uid' => $uid]);
+            return $this->reject($this->translate('wizard.error.titleRequiredToCreate'), ['table' => $table, 'uid' => $uid]);
         }
 
         $description = trim((string)($body['description'] ?? ''));
@@ -293,7 +300,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
             $this->notifyAssignment($taskUid, (string)$task['title'], $table, $uid, $assignee);
         }
 
-        return $this->success('Task created.', $taskUid);
+        return $this->success($this->translate('wizard.success.taskCreated'), $taskUid);
     }
 
     /**
@@ -303,15 +310,15 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
     {
         $parentPid = (int)($body['parentPid'] ?? 0);
         if ($parentPid < 1) {
-            return $this->reject('No parent page was specified to create the new page under.');
+            return $this->reject($this->translate('wizard.error.noParentPageGiven'));
         }
         if (!$this->mayCreatePageUnder($parentPid)) {
-            return $this->reject('You are not allowed to create a new page here.', ['parentPid' => $parentPid]);
+            return $this->reject($this->translate('wizard.error.noPageCreatePermission'), ['parentPid' => $parentPid]);
         }
 
         $title = trim((string)($body['title'] ?? ''));
         if ($title === '') {
-            return $this->reject('A title is required.');
+            return $this->reject($this->translate('wizard.error.titleRequired'));
         }
 
         $description = trim((string)($body['description'] ?? ''));
@@ -334,7 +341,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
 
         $this->notifyAssignment($taskUid, $title, 'pages', 0, $assignee);
 
-        return $this->success('Task created.', $taskUid);
+        return $this->success($this->translate('wizard.success.taskCreated'), $taskUid);
     }
 
     /**
@@ -348,21 +355,21 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
 
         $task = $this->taskRepository->findByUid($taskUid);
         if ($task === null) {
-            return $this->reject('This task no longer exists.', ['taskUid' => $taskUid]);
+            return $this->reject($this->translate('wizard.error.taskGone'), ['taskUid' => $taskUid]);
         }
         if ((int)$task['closed'] === 1) {
-            return $this->reject('This task is closed - you cannot update its comment.', ['taskUid' => $taskUid]);
+            return $this->reject($this->translate('wizard.error.commentTaskClosed'), ['taskUid' => $taskUid]);
         }
         if ($commentUid < 1) {
-            return $this->reject('No comment was specified to update.', ['taskUid' => $taskUid]);
+            return $this->reject($this->translate('wizard.error.noCommentGiven'), ['taskUid' => $taskUid]);
         }
         if ($content === '') {
-            return $this->reject('A comment cannot be empty.', ['taskUid' => $taskUid]);
+            return $this->reject($this->translate('wizard.error.commentEmpty'), ['taskUid' => $taskUid]);
         }
 
         $this->commentRepository->updateContent($commentUid, $taskUid, $content);
 
-        return $this->success('Comment updated.', $taskUid);
+        return $this->success($this->translate('wizard.success.commentUpdated'), $taskUid);
     }
 
     private function mayCreatePageUnder(int $parentPid): bool
@@ -408,26 +415,26 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
     private function assertMayEdit(string $table, int $uid): ?string
     {
         if ($uid < 1) {
-            return 'No record was specified.';
+            return $this->translate('wizard.error.noRecordGiven');
         }
         if (!$this->subjectRegistry->isTrackable($table)) {
-            return sprintf('"%s" records cannot be tracked here - they support no workspace versioning.', $table);
+            return $this->translate('wizard.error.tableNotTrackable', $table);
         }
 
         $record = BackendUtility::getRecord($table, $uid);
         if ($record === null) {
-            return sprintf('%s:%d no longer exists.', $table, $uid);
+            return $this->translate('wizard.error.recordGone', $table, (string)$uid);
         }
 
         $backendUser = $this->getBackendUser();
         if ($table === 'pages') {
             if (!$backendUser->doesUserHaveAccess($record, Permission::PAGE_EDIT)) {
-                return 'You do not have edit permission on this page.';
+                return $this->translate('wizard.error.noPageEditPermission');
             }
         } else {
             $page = BackendUtility::getRecord('pages', (int)($record['pid'] ?? 0));
             if ($page === null || !$backendUser->doesUserHaveAccess($page, Permission::CONTENT_EDIT)) {
-                return 'You do not have edit permission on the page this record is on.';
+                return $this->translate('wizard.error.noRecordEditPermission');
             }
         }
 
@@ -435,11 +442,11 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
         if (!$accessResult->isAllowed) {
             return $accessResult->errorMessage !== ''
                 ? $accessResult->errorMessage
-                : sprintf('%s:%d cannot be edited right now.', $table, $uid);
+                : $this->translate('wizard.error.recordNotEditable', $table, (string)$uid);
         }
 
         if (!$backendUser->workspaceAllowsLiveEditingInTable($table) && $backendUser->workspace === 0) {
-            return sprintf('"%s" records cannot be edited directly on the Live workspace.', $table);
+            return $this->translate('wizard.error.noLiveEditing', $table);
         }
 
         return null;
@@ -509,5 +516,23 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
     private function getBackendUser(): BackendUserAuthentication
     {
         return $GLOBALS['BE_USER'];
+    }
+
+    /**
+     * Everything this provider hands back reaches an editor - a wizard step
+     * title, a success notice, an error in the wizard's own error step - so it
+     * goes through the translation domain rather than being written in English
+     * here. Arguments are passed through sprintf() like sL()'s callers do.
+     */
+    private function translate(string $key, string ...$arguments): string
+    {
+        $label = $this->getLanguageService()->sL(self::LANGUAGE_DOMAIN . ':' . $key);
+
+        return $arguments === [] ? $label : sprintf($label, ...$arguments);
+    }
+
+    private function getLanguageService(): LanguageService
+    {
+        return $GLOBALS['LANG'];
     }
 }

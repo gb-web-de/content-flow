@@ -10,6 +10,8 @@ import { defineConfig, devices } from '@playwright/test'
  * .ddev/config.yaml isn't unique across worktrees, so no fixed default is
  * assumed here.
  */
+export const authFile = '.Build/playwright/backend-auth.json'
+
 export default defineConfig({
   testDir: './Tests/Playwright',
   fullyParallel: false,
@@ -21,7 +23,6 @@ export default defineConfig({
     baseURL: process.env.CONTENTFLOW_BASE_URL ?? 'https://content-flow.ddev.site',
     trace: 'retain-on-failure',
     ignoreHTTPSErrors: true,
-    storageState: '.Build/playwright/backend-auth.json',
   },
   projects: [
     {
@@ -29,8 +30,11 @@ export default defineConfig({
       testMatch: /auth\.setup\.ts/,
     },
     {
+      // storageState belongs here rather than in the top-level `use`: applied
+      // globally it is also handed to the setup project, which then fails
+      // trying to read the very file it exists to write.
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], storageState: authFile },
       dependencies: ['setup'],
     },
   ],

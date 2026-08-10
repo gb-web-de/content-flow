@@ -15,6 +15,101 @@
             <trans-unit id="column.other_workspaces" xml:space="preserve">
                 <source>Other workspaces</source>
             </trans-unit>
+
+            <trans-unit id="task.untitled" xml:space="preserve">
+                <source>Untitled task</source>
+            </trans-unit>
+            <trans-unit id="wizard.success.detailsSaved" xml:space="preserve">
+                <source>Task details saved.</source>
+            </trans-unit>
+            <trans-unit id="wizard.success.editAttached" xml:space="preserve">
+                <source>Edit added to the existing task.</source>
+            </trans-unit>
+            <trans-unit id="wizard.success.separateTaskCreated" xml:space="preserve">
+                <source>A separate task was created.</source>
+            </trans-unit>
+            <trans-unit id="wizard.success.taskCreated" xml:space="preserve">
+                <source>Task created.</source>
+            </trans-unit>
+            <trans-unit id="wizard.success.commentUpdated" xml:space="preserve">
+                <source>Comment updated.</source>
+            </trans-unit>
+
+            <!--
+                Every message below is shown to an editor who cannot read the
+                code, so each carries a code of its own: it is what a bug report
+                can name and what a support answer can be looked up by. The code
+                is part of the translated text so it survives translation.
+            -->
+            <trans-unit id="wizard.error.invalidSubmission" xml:space="preserve">
+                <source>This wizard was opened with data that cannot be read. Close it and start again. (CF-1001)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.unknownMode" xml:space="preserve">
+                <source>This wizard does not know what it was asked to do. Close it and start again. (CF-1002)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.titleRequiredToKeep" xml:space="preserve">
+                <source>A title is required to keep this task. (CF-1003)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.taskGone" xml:space="preserve">
+                <source>This task no longer exists. (CF-1004)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.taskClosed" xml:space="preserve">
+                <source>This task is closed - you cannot update it. (CF-1005)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.noPageTaskGiven" xml:space="preserve">
+                <source>No page task was specified to attach this element to. (CF-1006)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.unsupportedDestination" xml:space="preserve">
+                <source>The wizard destination "%s" is not supported. (CF-1007)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.titleRequiredForNewTask" xml:space="preserve">
+                <source>A title is required to create a new task. (CF-1008)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.recordHasNoOpenTask" xml:space="preserve">
+                <source>This record does not belong to an open task, so there is nothing to split into a new one. (CF-1009)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.titleRequiredToCreate" xml:space="preserve">
+                <source>A title is required to create the task. (CF-1010)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.noParentPageGiven" xml:space="preserve">
+                <source>No parent page was specified to create the new page under. (CF-1011)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.noPageCreatePermission" xml:space="preserve">
+                <source>You are not allowed to create a new page here. (CF-1012)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.titleRequired" xml:space="preserve">
+                <source>A title is required. (CF-1013)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.commentTaskClosed" xml:space="preserve">
+                <source>This task is closed - you cannot update its comment. (CF-1014)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.noCommentGiven" xml:space="preserve">
+                <source>No comment was specified to update. (CF-1015)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.commentEmpty" xml:space="preserve">
+                <source>A comment cannot be empty. (CF-1016)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.noRecordGiven" xml:space="preserve">
+                <source>No record was specified. (CF-1017)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.noPageEditPermission" xml:space="preserve">
+                <source>You do not have edit permission on this page. (CF-1018)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.noRecordEditPermission" xml:space="preserve">
+                <source>You do not have edit permission on the page this record is on. (CF-1019)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.tableNotTrackable" xml:space="preserve">
+                <source>"%s" records cannot be tracked here - they support no workspace versioning. (CF-1020)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.recordGone" xml:space="preserve">
+                <source>%s:%d no longer exists. (CF-1021)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.recordNotEditable" xml:space="preserve">
+                <source>%s:%d cannot be edited right now. (CF-1022)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.noLiveEditing" xml:space="preserve">
+                <source>"%s" records cannot be edited directly on the Live workspace. (CF-1023)</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>
