@@ -37,17 +37,27 @@ test.describe('the Visual Editor task select', () => {
 
     // The legend mirrors the select: every task offered there is a colour here,
     // which is the property that makes a coloured dot in the page mean
-    // anything. Both counts come from the same endpoint, so a mismatch is a
-    // rendering bug rather than a data one.
-    const taskOptions = await moduleFrame
-      .locator('.contentflow-ve-task-select select option[data-task]')
-      .count()
-    // minus "No task" and "+ Create new task", which are not tasks
-    const expected = Math.max(taskOptions - 2, 0)
+    // anything. Both come from the same endpoint, so a mismatch is a rendering
+    // bug rather than a data one. "No task" and "+ Create new task" carry the
+    // same data-task flag but are commands, not tasks - matched out by their
+    // fixed values rather than by counting them off, which quietly went wrong
+    // the moment "No task" was added.
+    const taskOptions = moduleFrame.locator(
+      '.contentflow-ve-task-select select option[data-task]:not([value="__none__"]):not([value="__create__"])',
+    )
+    const expected = await taskOptions.count()
 
     await expect(swatches).toHaveCount(expected)
     if (expected > 0) {
       await expect(legend).toHaveAttribute('title', /tasks on this page/i)
+
+      // Each swatch names its task. A bare colour meant nothing until it was
+      // hovered, which is not something an editor discovers on their own.
+      const firstOption = (await taskOptions.first().textContent()) ?? ''
+      // The option reads "Title (Stage)"; the legend shows the title alone.
+      const firstTitle = firstOption.split(' (')[0].trim()
+
+      await expect(swatches.first().locator('.contentflow-ve-legend-title')).toHaveText(firstTitle)
     }
   })
 

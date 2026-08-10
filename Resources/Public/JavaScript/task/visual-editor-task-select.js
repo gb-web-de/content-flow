@@ -68,18 +68,46 @@ const TOOLBAR_STYLES = `
 .contentflow-ve-legend:empty {
   display: none;
 }
+/*
+ * Dot plus title, not a bare dot: a colour says nothing until it has been
+ * hovered, and the toolbar has the room to just say which tasks these are.
+ * The title is clipped rather than allowed to push the toolbar apart - the
+ * full one, with stage and assignee, stays in the tooltip.
+ */
 .contentflow-ve-legend-swatch {
-  width: 12px;
-  height: 12px;
-  padding: 0;
-  border: 2px solid transparent;
-  border-radius: 50%;
-  background: hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 12em;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  line-height: 1.7;
   cursor: pointer;
 }
-.contentflow-ve-legend-swatch.contentflow-task-claimed-active {
-  background: transparent;
+.contentflow-ve-legend-swatch:hover,
+.contentflow-ve-legend-swatch:focus-visible {
   border-color: hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+}
+.contentflow-ve-legend-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+  border-radius: 50%;
+  background: hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+}
+/* The editor's own task reads as a ring, the same way its bubbles do. */
+.contentflow-ve-legend-swatch.contentflow-task-claimed-active .contentflow-ve-legend-dot {
+  background: transparent;
+}
+.contentflow-ve-legend-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .contentflow-ve-comment-popover {
   position: absolute;
