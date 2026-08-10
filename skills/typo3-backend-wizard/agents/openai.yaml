@@ -1,0 +1,4 @@
+interface:
+  display_name: "TYPO3 Backend Wizard"
+  short_description: "Build native TYPO3 backend wizards"
+  default_prompt: "Use $typo3-backend-wizard to implement or debug a native TYPO3 backend wizard."
