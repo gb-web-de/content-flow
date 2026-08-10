@@ -65,7 +65,12 @@ final readonly class ActiveTaskSession
             return null;
         }
         $task = $this->taskRepository->findByUid($taskUid);
-        if ($task === null || (int)$task['closed'] === 1) {
+        if (
+            $task === null
+            || (int)$task['closed'] === 1
+            || (string)$task['state'] === \GbWeb\ContentFlow\Domain\Model\TaskState::DONE->value
+            || (int)$task['workspace_uid'] !== (int)$backendUser->workspace
+        ) {
             return null;
         }
 
