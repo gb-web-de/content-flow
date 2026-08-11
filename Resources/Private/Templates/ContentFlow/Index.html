@@ -167,12 +167,26 @@
 
                                 <div class="contentflow-card-body">
                                     <span class="contentflow-card-meta">
+                                        <f:comment>
+                                            The page in words, not "pages:5": a task's own title
+                                            is inherited from its page when it was created
+                                            automatically, so the card needs to say which page
+                                            that is - and keep saying it after the page is
+                                            renamed. The table:uid pair stays available as the
+                                            tooltip, where a developer can still find it.
+                                        </f:comment>
                                         <f:if condition="{card.subject_table} == 'pages' && {card.subject_uid} == 0">
                                             <f:then>
-                                                <span class="contentflow-record-ref contentflow-record-ref--pending" title="This page is created once the ticket moves to a review stage">not yet created</span>
+                                                <span class="contentflow-record-ref contentflow-record-ref--pending" title="This page is created once the ticket moves into Editing">not yet created</span>
                                             </f:then>
                                             <f:else>
-                                                <span class="contentflow-record-ref">{card.subject_table}:{card.subject_uid}</span>
+                                                <span class="contentflow-record-ref" title="{card.subject_table}:{card.subject_uid}">
+                                                    <core:icon identifier="apps-pagetree-page-default" size="small" />
+                                                    <f:if condition="{card.subjectPageTitle}">
+                                                        <f:then>{card.subjectPageTitle}</f:then>
+                                                        <f:else>{card.subject_table}:{card.subject_uid}</f:else>
+                                                    </f:if>
+                                                </span>
                                             </f:else>
                                         </f:if>
                                     </span>

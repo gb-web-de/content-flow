@@ -19,6 +19,14 @@
             <trans-unit id="task.untitled" xml:space="preserve">
                 <source>Untitled task</source>
             </trans-unit>
+
+            <!-- The Page module's banner (Resources/Private/Templates/PageModule/Banner.html). -->
+            <trans-unit id="banner.heading" xml:space="preserve">
+                <source>Tasks on this page</source>
+            </trans-unit>
+            <trans-unit id="banner.active" xml:space="preserve">
+                <source>you are working on this</source>
+            </trans-unit>
             <trans-unit id="wizard.success.detailsSaved" xml:space="preserve">
                 <source>Task details saved.</source>
             </trans-unit>

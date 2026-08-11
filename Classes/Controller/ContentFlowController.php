@@ -244,6 +244,17 @@ final class ContentFlowController extends ActionController
             $task['warnedMembers'] = $this->taskRepository->findWarnedMembers((int)$task['uid'], (int)$task['subject_pid']);
             $task['warnedCount'] = count($task['warnedMembers']);
 
+            // Which page this task is about, in words. An auto-created task
+            // takes its title from the page it was born on
+            // (TaskAutoCreationService::deriveTitle()), so two tasks on the
+            // same page read as the same thing - and once the page is renamed,
+            // the card still carries the old name with nothing to relate it to.
+            // The card used to answer that with "pages:5", which is a fact
+            // about the database rather than about the work.
+            $task['subjectPageTitle'] = $this->resolvePageTitle(
+                $table === 'pages' ? $uid : (int)($task['subject_pid'] ?? 0),
+            );
+
             // Never color-only (ARCHITECTURE.md's "always icon and label, never
             // silence" rule, already followed everywhere else on the board) -
             // dueDateLabel carries the same information in words, dueDateUrgency
@@ -330,6 +341,28 @@ final class ContentFlowController extends ActionController
         }
         return (int)($task['workspace_uid'] ?? 0) === 0
             && (string)($task['state'] ?? '') === $column['state'];
+    }
+
+    /**
+     * The title of a page as the current workspace sees it.
+     *
+     * Overlaid on purpose: a task in a workspace is usually about a page whose
+     * title was changed in that same workspace, and showing the live title
+     * there would name something the editor is in the middle of replacing.
+     */
+    private function resolvePageTitle(int $pageUid): string
+    {
+        if ($pageUid < 1) {
+            return '';
+        }
+
+        $page = BackendUtility::getRecord('pages', $pageUid, 'uid,pid,title,t3ver_oid,t3ver_wsid,t3ver_state');
+        if ($page === null) {
+            return '';
+        }
+        BackendUtility::workspaceOL('pages', $page);
+
+        return (string)($page['title'] ?? '');
     }
 
     /**

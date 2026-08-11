@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace GbWeb\ContentFlow\EventListener;
 
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\ContentFlow\Service\ActiveTaskSession;
+use GbWeb\ContentFlow\Service\TaskColor;
 use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
 use TYPO3\CMS\Backend\Controller\Event\ModifyPageLayoutContentEvent;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Attribute\AsEventListener;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\View\ViewFactoryData;
 use TYPO3\CMS\Core\View\ViewFactoryInterface;
@@ -34,7 +37,13 @@ final class PageModuleEventListener
         private readonly UriBuilder $uriBuilder,
         private readonly PageRenderer $pageRenderer,
         private readonly TaskSubjectRegistry $subjectRegistry,
+        private readonly ActiveTaskSession $activeTaskSession,
     ) {
+    }
+
+    private function getBackendUser(): BackendUserAuthentication
+    {
+        return $GLOBALS['BE_USER'];
     }
 
     #[AsEventListener(identifier: 'content-flow/page-module-header')]
@@ -45,7 +54,23 @@ final class PageModuleEventListener
             return;
         }
 
-        $task = $this->taskRepository->findOpenBySubject('pages', $pageUid);
+        // Every open task touching this page, not just the one whose subject it
+        // is: a page routinely carries several - the page's own task plus any
+        // task that claimed a content element on it - and showing one of them
+        // let an editor believe it was the only one. The one they declared in
+        // the Visual Editor is marked as theirs, the same distinction the
+        // editor's own bubbles make there.
+        $tasks = $this->taskRepository->findAllOpenForPage($pageUid);
+        $activeTaskUid = $this->activeTaskSession->resolve($this->getBackendUser(), $pageUid) ?? 0;
+        $tasks = array_map(
+            fn (array $task): array => $task + [
+                'hue' => TaskColor::hueFor((int)$task['uid']),
+                'isActive' => (int)$task['uid'] === $activeTaskUid,
+                'assigneeName' => $this->resolveAssigneeName($task),
+            ],
+            $tasks,
+        );
+
         $pageRecord = BackendUtility::getRecord('pages', $pageUid) ?? [];
         $pageTitle = $pageRecord !== [] ? BackendUtility::getRecordTitle('pages', $pageRecord) : '';
 
@@ -76,8 +101,8 @@ final class PageModuleEventListener
         $view->assignMultiple([
             'pageUid' => $pageUid,
             'pageTitle' => $pageTitle,
-            'task' => $task,
-            'assigneeName' => $this->resolveAssigneeName($task),
+            'tasks' => $tasks,
+            'activeTaskUid' => $activeTaskUid,
             'boardUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_contentflow', ['id' => $pageUid]),
         ]);
 

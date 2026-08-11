@@ -418,6 +418,107 @@
     gap: 8px;
 }
 
+/*
+ * One row per open task on this page. The dot carries the task's own colour
+ * (TaskColor::hueFor()), which is the same colour its content is marked with in
+ * the Visual Editor - that correspondence is the only reason the dots are here
+ * rather than plain text.
+ */
+.contentflow-page-banner-count {
+    display: inline-block;
+    min-width: 18px;
+    margin-left: 6px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--typo3-component-border-color, #d1d5db);
+    color: var(--typo3-text-color-base, #1a1a1a);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.contentflow-page-banner-tasks {
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.contentflow-page-banner-task {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    line-height: 1.8;
+}
+
+.contentflow-task-dot {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    border: 2px solid hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+    border-radius: 50%;
+    background: hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+}
+
+/* A ring rather than a filled dot for the task the editor picked - the same
+   "this one is mine" mark the Visual Editor's bubbles use. */
+.contentflow-page-banner-task--active .contentflow-task-dot {
+    background: transparent;
+}
+
+.contentflow-page-banner-task-title {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    cursor: pointer;
+}
+
+.contentflow-page-banner-task-title:hover,
+.contentflow-page-banner-task-title:focus-visible {
+    text-decoration-style: solid;
+}
+
+/* Never colour alone: the ring above is repeated here in words. */
+.contentflow-badge-active {
+    background: hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+    color: #fff;
+}
+
+.contentflow-page-banner-assignee {
+    opacity: .8;
+}
+
+/*
+ * The same claim the Visual Editor draws as a bubble, on the same element in
+ * the Page module (ContentElementTaskBadgeListener). Same colour, so a task
+ * looks like itself on both surfaces.
+ */
+.contentflow-element-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 6px;
+    padding: 1px 8px 1px 5px;
+    border: 1px solid hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+    border-radius: 10px;
+    background: hsl(var(--contentflow-task-hue, 0), 70%, 45%, .12);
+    font-size: 11px;
+    line-height: 1.7;
+}
+
+.contentflow-element-badge--active {
+    background: hsl(var(--contentflow-task-hue, 0), 70%, 45%, .25);
+    font-weight: 600;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .contentflow-card,
     .contentflow-column {

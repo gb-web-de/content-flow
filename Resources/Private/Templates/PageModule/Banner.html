@@ -2,28 +2,61 @@
       xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
       data-namespace-typo3-fluid="true">
 
+<f:comment>
+    Every open task touching this page, not only the one whose subject it is.
+    A page normally carries several - its own task plus whatever claimed a
+    content element on it - and naming one of them made the others invisible.
+
+    The colour of each dot is the task's own (TaskColor::hueFor()), the same one
+    its content carries in the Visual Editor, so "the green one" means one task
+    across both surfaces. Colour is never the only signal: the active task also
+    says so in words.
+</f:comment>
 <div class="contentflow-page-banner">
     <div class="contentflow-page-banner-info">
         <core:icon identifier="apps-pagetree-page-default" size="medium" />
         <div>
-            <f:if condition="{task}">
+            <f:if condition="{tasks}">
                 <f:then>
                     <div class="contentflow-page-banner-title">
-                        Content Flow Task: <strong>{task.title}</strong>
+                        <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:banner.heading" default="Content Flow" />
+                        <span class="contentflow-page-banner-count">{tasks -> f:count()}</span>
                     </div>
-                    <div style="font-size: 11px; opacity: 0.8; display: flex; gap: 8px; margin-top: 2px;">
-                        <span class="badge badge-info">{task.state}</span>
-                        <f:if condition="{assigneeName}">
-                            <span>Assigned to: <strong>{assigneeName}</strong></span>
-                        </f:if>
-                        <f:if condition="{task.auto_created}">
-                            <span class="badge badge-secondary" title="Created automatically when editing started">auto-created</span>
-                        </f:if>
-                    </div>
+                    <ul class="contentflow-page-banner-tasks">
+                        <f:for each="{tasks}" as="task">
+                            <li class="contentflow-page-banner-task{f:if(condition: task.isActive, then: ' contentflow-page-banner-task--active')}"
+                                style="--contentflow-task-hue: {task.hue}">
+                                <span class="contentflow-task-dot"></span>
+                                <button type="button"
+                                        class="contentflow-page-banner-task-title"
+                                        data-contentflow-open-ticket="{task.uid}">{task.title}</button>
+                                <span class="badge badge-info">{task.state}</span>
+                                <f:if condition="{task.isActive}">
+                                    <span class="badge contentflow-badge-active"
+                                          title="You picked this task in the Visual Editor - edits on this page go to it">
+                                        <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:banner.active" default="you are working on this" />
+                                    </span>
+                                </f:if>
+                                <f:if condition="{task.assigneeName}">
+                                    <span class="contentflow-page-banner-assignee">
+                                        <core:icon identifier="actions-user" size="small" /> {task.assigneeName}
+                                    </span>
+                                </f:if>
+                                <f:if condition="{task.auto_created}">
+                                    <span class="badge badge-secondary" title="Created automatically when editing started">auto</span>
+                                </f:if>
+                                <f:if condition="{task.assigneeName} == ''">
+                                    <button type="button" class="btn btn-xs btn-default contentflow-action-assign" data-task-uid="{task.uid}">
+                                        <core:icon identifier="actions-user" size="small" /> Assign to me
+                                    </button>
+                                </f:if>
+                            </li>
+                        </f:for>
+                    </ul>
                 </f:then>
                 <f:else>
                     <div class="contentflow-page-banner-title">
-                        Content Flow: <em>No active task for this page</em>
+                        Content Flow: <em>No open task for this page</em>
                     </div>
                 </f:else>
             </f:if>
@@ -31,13 +64,8 @@
     </div>
 
     <div class="contentflow-page-banner-actions">
-        <f:if condition="{task}">
+        <f:if condition="{tasks}">
             <f:then>
-                <f:if condition="{assigneeName} == ''">
-                    <button type="button" class="btn btn-sm btn-default contentflow-action-assign" data-task-uid="{task.uid}">
-                        <core:icon identifier="actions-user" size="small" /> Assign to me
-                    </button>
-                </f:if>
                 <a href="{boardUrl}" class="btn btn-sm btn-primary">
                     <core:icon identifier="actions-view-page" size="small" /> Open in Board
                 </a>

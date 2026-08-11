@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GbWeb\ContentFlow\Tests\Functional\View;
 
+use GbWeb\ContentFlow\Service\TaskColor;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\View\ViewFactoryData;
 use TYPO3\CMS\Core\View\ViewFactoryInterface;
@@ -139,8 +140,8 @@ final class TemplateRendersTest extends FunctionalTestCase
         $view->assignMultiple([
             'pageUid' => 2,
             'pageTitle' => 'About us',
-            'task' => null,
-            'assigneeName' => '',
+            'tasks' => [],
+            'activeTaskUid' => 0,
             'boardUrl' => '/typo3/module/web/ContentFlow?id=2',
         ]);
 
@@ -149,6 +150,58 @@ final class TemplateRendersTest extends FunctionalTestCase
         self::assertStringContainsString('data-contentflow-page="2"', $output);
         self::assertStringContainsString('data-contentflow-page-title="About us"', $output);
         self::assertStringContainsString('Plan task for this page', $output);
+    }
+
+    /**
+     * A page normally carries several open tasks - its own plus whatever
+     * claimed a content element on it. The banner named one of them, which made
+     * the rest invisible to an editor who never opens the board.
+     */
+    #[Test]
+    public function thePageModuleBannerListsEveryTaskAndMarksTheActiveOne(): void
+    {
+        $viewFactory = $this->get(ViewFactoryInterface::class);
+        $view = $viewFactory->create(new ViewFactoryData(
+            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
+        ));
+        $view->assignMultiple([
+            'pageUid' => 2,
+            'pageTitle' => 'About us',
+            'tasks' => [
+                [
+                    'uid' => 7,
+                    'title' => 'Rewrite the intro',
+                    'state' => 'in_progress',
+                    'auto_created' => 0,
+                    'hue' => TaskColor::hueFor(7),
+                    'isActive' => true,
+                    'assigneeName' => 'Erin Editor',
+                ],
+                [
+                    'uid' => 8,
+                    'title' => 'Fix the footer',
+                    'state' => 'review',
+                    'auto_created' => 1,
+                    'hue' => TaskColor::hueFor(8),
+                    'isActive' => false,
+                    'assigneeName' => '',
+                ],
+            ],
+            'activeTaskUid' => 7,
+            'boardUrl' => '/typo3/module/web/ContentFlow?id=2',
+        ]);
+
+        $output = $view->render('PageModule/Banner');
+
+        self::assertStringContainsString('Rewrite the intro', $output);
+        self::assertStringContainsString('Fix the footer', $output);
+        // Colour is never the only signal - the active task says so in words too.
+        self::assertStringContainsString('contentflow-page-banner-task--active', $output);
+        self::assertStringContainsString('you are working on this', $output);
+        // Each dot carries the same hue the Visual Editor draws that task in.
+        self::assertStringContainsString('--contentflow-task-hue: ' . TaskColor::hueFor(7), $output);
+        // Only the unassigned one offers to be taken.
+        self::assertSame(1, substr_count($output, 'contentflow-action-assign'));
     }
 
     #[Test]
