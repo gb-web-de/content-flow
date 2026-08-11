@@ -22,12 +22,36 @@ test.describe('the Visual Editor task select', () => {
     const moduleFrame = await openVisualEditor(page).goto()
     const select = moduleFrame.locator('.contentflow-ve-task-select select')
 
-    // Inserted before ve-auto-save-toggle, so it sits in the toolbar rather
-    // than somewhere in the page body - the difference between "the element
-    // exists" and "an editor can find it".
+    // In the toolbar rather than somewhere in the page body - the difference
+    // between "the element exists" and "an editor can find it".
     await expect(moduleFrame.locator('.contentflow-ve-task-select')).toBeVisible()
     await expect(select.locator('option', { hasText: /no task/i })).toHaveCount(1)
     await expect(select.locator('option', { hasText: /create new task/i })).toHaveCount(1)
+
+    // And in the toolbar's right-hand half, on its own line-height, rather than
+    // wedged into EXT:visual_editor's button group where it used to take two
+    // thirds of the width and push core's own controls along. Geometry, because
+    // that is the property an editor actually sees; a class name would still
+    // pass with the slot back on the left or wrapped onto a second row.
+    const placement = await moduleFrame
+      .locator('.contentflow-ve-toolbar-slot')
+      .evaluate((slot) => {
+        const toolbar = slot.closest('.btn-toolbar')
+        if (toolbar === null) {
+          return null
+        }
+        const slotBox = slot.getBoundingClientRect()
+        const toolbarBox = toolbar.getBoundingClientRect()
+
+        return {
+          startsInRightHalf: slotBox.left - toolbarBox.left > toolbarBox.width / 2,
+          wrapped: slotBox.top - toolbarBox.top > 4,
+        }
+      })
+
+    expect(placement).not.toBeNull()
+    expect(placement!.startsInRightHalf).toBe(true)
+    expect(placement!.wrapped).toBe(false)
   })
 
   test('renders one legend swatch per task on the page', async ({ page }) => {
