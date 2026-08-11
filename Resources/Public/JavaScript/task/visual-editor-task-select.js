@@ -51,10 +51,20 @@ const NONE_VALUE = '__none__'
  * reason one level further down.)
  */
 const TOOLBAR_STYLES = `
+/*
+ * Pushed to the right-hand end of EXT:visual_editor's toolbar, into the space
+ * its own controls leave empty - see insertToolbar() for why it is not in the
+ * button group any more.
+ */
+.contentflow-ve-toolbar-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: .5em;
+  margin-left: auto;
+}
 .contentflow-ve-task-select {
   display: inline-flex;
   align-items: center;
-  margin-right: .5em;
 }
 .contentflow-ve-task-select select {
   width: auto;
@@ -63,7 +73,6 @@ const TOOLBAR_STYLES = `
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  margin-right: .5em;
 }
 .contentflow-ve-legend:empty {
   display: none;
@@ -185,6 +194,34 @@ class VisualEditorTaskSelect {
 
     injectStyles(this.doc, TOOLBAR_STYLE_ID, TOOLBAR_STYLES)
 
+    /*
+     * A slot of our own at the end of the toolbar, pushed right by
+     * `margin-left: auto`, rather than squeezed in front of
+     * ve-auto-save-toggle.
+     *
+     * Two reasons. That anchor sits inside a Bootstrap `.btn-group`, whose
+     * members are glued together with `margin-left: -1px` - a select and a
+     * legend are not buttons and had no business in that seam. And they took
+     * 433 of the group's 588 pixels, pushing EXT:visual_editor's own controls
+     * along and leaving the toolbar's right half empty. This is where an
+     * editor is told which task they are working on, so it belongs in that
+     * empty half.
+     */
+    // A re-render leaves the previous slot behind detached from our select;
+    // clearing first keeps a remount from stacking two of them.
+    this.doc.querySelectorAll('.contentflow-ve-toolbar-slot').forEach((stale) => stale.remove())
+
+    const toolbar = anchor.closest('.btn-toolbar')
+    const slot = this.doc.createElement('div')
+    slot.className = 'contentflow-ve-toolbar-slot'
+    if (toolbar) {
+      toolbar.append(slot)
+    } else {
+      // No toolbar to hang off - keep the old anchor rather than dropping the
+      // select entirely.
+      anchor.parentElement.insertBefore(slot, anchor)
+    }
+
     const wrapper = this.doc.createElement('span')
     wrapper.className = 'contentflow-ve-task-select'
 
@@ -200,12 +237,12 @@ class VisualEditorTaskSelect {
     select.append(placeholder)
 
     wrapper.append(select)
-    anchor.parentElement.insertBefore(wrapper, anchor)
+    slot.append(wrapper)
     this.select = select
 
     const legend = this.doc.createElement('span')
     legend.className = 'contentflow-ve-legend'
-    anchor.parentElement.insertBefore(legend, anchor)
+    slot.append(legend)
     this.markers.mountLegend(legend)
 
     select.addEventListener('change', () => this.onChange())
