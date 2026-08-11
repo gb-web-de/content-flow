@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GbWeb\ContentFlow\Command;
 
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use GbWeb\ContentFlow\Domain\Model\TaskState;
 use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -264,21 +265,28 @@ final class RepairTaskDataCommand extends Command
             ->where(
                 $queryBuilder->expr()->eq('i.closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('i.deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
-                $queryBuilder->expr()->eq('t.closed', $queryBuilder->createNamedParameter(1, Connection::PARAM_INT)),
+                // Both halves of "finished", because both make the claim
+                // invisible: findAllOpenForPage() skips a task that is closed
+                // AND one whose state is Done, so a member row under either is
+                // held by something no surface will ever draw.
+                $queryBuilder->expr()->or(
+                    $queryBuilder->expr()->eq('t.closed', $queryBuilder->createNamedParameter(1, Connection::PARAM_INT)),
+                    $queryBuilder->expr()->eq('t.state', $queryBuilder->createNamedParameter(TaskState::DONE->value)),
+                ),
             )
             ->executeQuery()
             ->fetchAllAssociative();
 
         if ($stranded === []) {
-            $io->writeln('No task_item rows are held open by a closed task.');
+            $io->writeln('No task_item rows are held open by a finished task.');
             return 0;
         }
 
-        $io->section(sprintf('%d task_item row(s) still claimed by a closed task:', count($stranded)));
+        $io->section(sprintf('%d task_item row(s) still claimed by a finished task:', count($stranded)));
         $itemConnection = $this->connectionPool->getConnectionForTable(self::TABLE_ITEM);
         foreach ($stranded as $row) {
             $io->writeln(sprintf(
-                '  item %d: closed task %d ("%s") still holds %s:%d',
+                '  item %d: finished task %d ("%s") still holds %s:%d',
                 $row['uid'],
                 $row['task'],
                 (string)$row['title'],

@@ -111,7 +111,7 @@ final class RepairTaskDataCommandTest extends FunctionalTestCase
 
         $output = $this->runRepair(false);
 
-        self::assertStringContainsString('still claimed by a closed task', $output);
+        self::assertStringContainsString('still claimed by a finished task', $output);
         self::assertStringContainsString('tt_content:10', $output);
         // Dry run by default - the row is untouched.
         self::assertSame(['closed' => 0, 'deleted' => 0], $this->findItem(1));
@@ -163,6 +163,22 @@ final class RepairTaskDataCommandTest extends FunctionalTestCase
         $this->runRepair(true);
 
         self::assertFalse($this->findItem($stranded), 'the row that could go nowhere else is gone');
+    }
+
+    /**
+     * "Bubbles and badges only on content belonging to a task that is not
+     * done." Done is reachable without `closed` ever being set, and a claim
+     * under such a task is just as invisible as one under a closed task.
+     */
+    #[Test]
+    public function aClaimUnderADoneTaskCountsAsFinishedToo(): void
+    {
+        $doneTask = $this->createTask(['state' => TaskState::DONE->value, 'closed' => 0]);
+        $itemUid = $this->addMember($doneTask, 10);
+
+        $this->runRepair(true);
+
+        self::assertSame(1, (int)$this->findItem($itemUid)['closed']);
     }
 
     #[Test]
