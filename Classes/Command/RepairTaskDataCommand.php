@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace GbWeb\ContentFlow\Command;
 
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -43,6 +45,7 @@ final class RepairTaskDataCommand extends Command
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,
+        private readonly TaskMemberSynchronizer $memberSynchronizer,
     ) {
         parent::__construct();
     }
@@ -64,10 +67,14 @@ final class RepairTaskDataCommand extends Command
         $fix = (bool)$input->getOption('fix');
 
         $orphanCount = $this->repairOrphanedItems($io, $fix);
+        $strandedCount = $this->releaseClaimsOfClosedTasks($io, $fix);
         $backfillCount = $this->backfillMissingPid($io, $fix);
+        // After the two releases above, and only then: a slot that was just
+        // freed is of no use to anyone until an open task takes it.
+        $reclaimed = $fix ? $this->reclaimPagesForOpenTasks($io) : 0;
         $this->reportEmptyTasks($io);
 
-        if ($orphanCount === 0 && $backfillCount === 0) {
+        if ($orphanCount === 0 && $strandedCount === 0 && $backfillCount === 0 && $reclaimed === 0) {
             $io->success('Nothing to repair.');
             return Command::SUCCESS;
         }
@@ -143,6 +150,148 @@ final class RepairTaskDataCommand extends Command
         }
 
         return count($orphans);
+    }
+
+    /**
+     * Take one member row out of circulation, whatever it takes.
+     *
+     * `one_open_task_per_record` spans (record_table, record_uid, closed,
+     * deleted), so every escape route can itself be occupied by an older row
+     * for the same record: closing collides with a row closed earlier, and
+     * soft-deleting while still open collides with one deleted earlier - which
+     * is exactly how this command failed the first time it was run for real.
+     * Each step therefore falls through to a more final one, and the last of
+     * them cannot collide because the row is gone.
+     */
+    private function retireItem(Connection $connection, int $itemUid): void
+    {
+        try {
+            $connection->update(self::TABLE_ITEM, ['closed' => 1, 'tstamp' => $GLOBALS['EXEC_TIME']], ['uid' => $itemUid]);
+            return;
+        } catch (UniqueConstraintViolationException) {
+        }
+
+        try {
+            $connection->update(
+                self::TABLE_ITEM,
+                ['closed' => 1, 'deleted' => 1, 'tstamp' => $GLOBALS['EXEC_TIME']],
+                ['uid' => $itemUid],
+            );
+            return;
+        } catch (UniqueConstraintViolationException) {
+        }
+
+        // Nothing about this row is worth keeping: the record's history already
+        // lives on the rows it collided with, and a claim nobody can see must
+        // not keep blocking the record.
+        $connection->delete(self::TABLE_ITEM, ['uid' => $itemUid]);
+    }
+
+    /**
+     * An open page task should hold that page's content - "one card = this page
+     * and everything on it" is the whole reason a card is not one per element.
+     * A slot freed above belongs to nobody until somebody takes it, and until
+     * then the element shows no marker anywhere while still being part of the
+     * work.
+     *
+     * Only runs with --fix, and only ever adds: syncPageMembers() goes through
+     * addMemberIfUnclaimed(), so an element another open task holds stays where
+     * it is. Repairing must not redistribute work between tasks.
+     */
+    private function reclaimPagesForOpenTasks(SymfonyStyle $io): int
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE_TASK);
+        $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+        $tasks = $queryBuilder
+            ->select('uid', 'title', 'subject_uid')
+            ->from(self::TABLE_TASK)
+            ->where(
+                $queryBuilder->expr()->eq('subject_table', $queryBuilder->createNamedParameter('pages')),
+                $queryBuilder->expr()->gt('subject_uid', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+            )
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        $claimed = 0;
+        foreach ($tasks as $task) {
+            $count = $this->memberSynchronizer->syncPageMembers((int)$task['uid'], (int)$task['subject_uid']);
+            if ($count > 0) {
+                $io->writeln(sprintf(
+                    '  task %d ("%s") reclaimed %d unheld record(s) on page %d',
+                    $task['uid'],
+                    (string)$task['title'],
+                    $count,
+                    $task['subject_uid'],
+                ));
+                $claimed += $count;
+            }
+        }
+
+        if ($claimed === 0) {
+            $io->writeln('No unheld records to reclaim for open page tasks.');
+        } else {
+            $io->section(sprintf('%d record(s) reclaimed by their page task.', $claimed));
+        }
+
+        return $claimed;
+    }
+
+    /**
+     * A member row still open under a task that is already closed.
+     *
+     * Worse than the orphan above, because nothing shows it: the board and the
+     * markers both ask findAllOpenForPage(), which skips closed tasks, so the
+     * claim is invisible - while one_open_task_per_record still counts it, so
+     * the record cannot be claimed by any open task either. The element ends up
+     * belonging to nobody an editor can see and to somebody the database will
+     * not let go of, which is exactly what "no badge on content that plainly
+     * has a task" looks like from the outside.
+     *
+     * Closing the row is what TaskRepository::close() would have done, with the
+     * same collision fallback: a record that already holds a closed slot from
+     * an earlier task keeps that history, and this row is soft-deleted instead.
+     */
+    private function releaseClaimsOfClosedTasks(SymfonyStyle $io, bool $fix): int
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE_ITEM);
+        $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+        $stranded = $queryBuilder
+            ->select('i.uid', 'i.task', 'i.record_table', 'i.record_uid', 't.title')
+            ->from(self::TABLE_ITEM, 'i')
+            ->join('i', self::TABLE_TASK, 't', $queryBuilder->expr()->eq('t.uid', $queryBuilder->quoteIdentifier('i.task')))
+            ->where(
+                $queryBuilder->expr()->eq('i.closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('i.deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('t.closed', $queryBuilder->createNamedParameter(1, Connection::PARAM_INT)),
+            )
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        if ($stranded === []) {
+            $io->writeln('No task_item rows are held open by a closed task.');
+            return 0;
+        }
+
+        $io->section(sprintf('%d task_item row(s) still claimed by a closed task:', count($stranded)));
+        $itemConnection = $this->connectionPool->getConnectionForTable(self::TABLE_ITEM);
+        foreach ($stranded as $row) {
+            $io->writeln(sprintf(
+                '  item %d: closed task %d ("%s") still holds %s:%d',
+                $row['uid'],
+                $row['task'],
+                (string)$row['title'],
+                $row['record_table'],
+                $row['record_uid'],
+            ));
+            if (!$fix) {
+                continue;
+            }
+            $this->retireItem($itemConnection, (int)$row['uid']);
+        }
+
+        return count($stranded);
     }
 
     /**
