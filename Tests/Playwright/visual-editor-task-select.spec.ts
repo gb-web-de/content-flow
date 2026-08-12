@@ -79,7 +79,7 @@ test.describe('the Visual Editor task select', () => {
       // hovered, which is not something an editor discovers on their own.
       const firstOption = (await taskOptions.first().textContent()) ?? ''
       // The option reads "Title (Stage)"; the legend shows the title alone.
-      const firstTitle = firstOption.split(' (')[0].trim()
+      const firstTitle = firstOption.replace(/\s+\([^()]*\)\s*$/, '').trim()
 
       await expect(swatches.first().locator('.contentflow-ve-legend-title')).toHaveText(firstTitle)
     }
