@@ -211,7 +211,7 @@ final class RepairTaskDataCommand extends Command
                 $queryBuilder->expr()->gt('subject_uid', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
-            )
+                $queryBuilder->expr()->neq('state', $queryBuilder->createNamedParameter(TaskState::DONE->value)),
             ->executeQuery()
             ->fetchAllAssociative();
 
