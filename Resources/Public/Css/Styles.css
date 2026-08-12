@@ -488,8 +488,8 @@
 
 /* Never colour alone: the ring above is repeated here in words. */
 .contentflow-badge-active {
-    background: hsl(var(--contentflow-task-hue, 0), 70%, 45%);
-    color: #fff;
+    background: hsl(var(--contentflow-task-hue, 0), 70%, 90%);
+    color: hsl(var(--contentflow-task-hue, 0), 70%, 20%);
 }
 
 .contentflow-page-banner-assignee {
