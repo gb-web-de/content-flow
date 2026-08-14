@@ -1,0 +1,86 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GbWeb\ContentFlow\Tests\Functional\Service;
+
+use GbWeb\ContentFlow\Service\RecordCreationTargetProvider;
+use PHPUnit\Framework\Attributes\Test;
+use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
+
+final class RecordCreationTargetProviderTest extends FunctionalTestCase
+{
+    /**
+     * @var string[]
+     */
+    protected array $coreExtensionsToLoad = [
+        'typo3/cms-workspaces',
+        'typo3/cms-dashboard',
+    ];
+
+    /**
+     * @var string[]
+     */
+    protected array $testExtensionsToLoad = [
+        'gb-web/content-flow',
+    ];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->importCSVDataSet(__DIR__ . '/../Fixtures/be_users.csv');
+        $this->importCSVDataSet(__DIR__ . '/../Fixtures/pages.csv');
+        $this->setUpBackendUser(1);
+        $GLOBALS['BE_USER']->setWorkspace(1);
+        $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)
+            ->createFromUserPreferences($GLOBALS['BE_USER']);
+    }
+
+    #[Test]
+    public function recordTypesContainEligibleWorkspaceTablesButNeverPages(): void
+    {
+        $types = $this->get(RecordCreationTargetProvider::class)
+            ->getCreatableRecordTypes($GLOBALS['BE_USER']);
+        $tables = array_column($types, 'table');
+
+        self::assertContains('tt_content', $tables);
+        self::assertNotContains('pages', $tables);
+        self::assertNotContains('sys_log', $tables);
+    }
+
+    #[Test]
+    public function eligiblePagesCoverTheAccessibleTreeAndHonorPageTsRestrictions(): void
+    {
+        $this->getConnectionPool()->getConnectionForTable('pages')->update(
+            'pages',
+            ['TSconfig' => 'mod.web_list.deniedNewTables = tt_content'],
+            ['uid' => 2],
+        );
+
+        $targets = $this->get(RecordCreationTargetProvider::class)
+            ->getEligiblePages('tt_content', $GLOBALS['BE_USER']);
+        $pageUids = array_column($targets, 'uid');
+
+        self::assertContains(1, $pageUids, 'the root of the accessible page tree is a valid target');
+        self::assertNotContains(2, $pageUids, 'PageTS can remove an otherwise valid target page');
+    }
+
+    #[Test]
+    public function nonAdminWithoutWebmountCannotUseOtherwiseEditablePages(): void
+    {
+        $this->setUpBackendUser(2);
+        $GLOBALS['BE_USER']->workspace = 1;
+        $GLOBALS['BE_USER']->groupData['tables_modify'] = 'tt_content';
+        $this->getConnectionPool()->getConnectionForTable('pages')->update(
+            'pages',
+            ['perms_everybody' => 17],
+            [],
+        );
+
+        $targets = $this->get(RecordCreationTargetProvider::class)
+            ->getEligiblePages('tt_content', $GLOBALS['BE_USER']);
+
+        self::assertSame([], $targets);
+    }
+}
