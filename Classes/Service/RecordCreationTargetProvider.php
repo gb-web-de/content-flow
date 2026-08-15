@@ -18,6 +18,9 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  */
 final readonly class RecordCreationTargetProvider
 {
+    private const PAGE_TABLE = 'pages';
+    private const CONTENT_ELEMENT_TABLE = 'tt_content';
+
     public function __construct(
         private TcaSchemaFactory $tcaSchemaFactory,
         private PageDoktypeRegistry $pageDoktypeRegistry,
@@ -50,7 +53,7 @@ final readonly class RecordCreationTargetProvider
 
     public function isCreatableRecordTable(string $table, BackendUserAuthentication $backendUser): bool
     {
-        if ($table === 'pages' || !$this->tcaSchemaFactory->has($table)) {
+        if (in_array($table, [self::PAGE_TABLE, self::CONTENT_ELEMENT_TABLE], true) || !$this->tcaSchemaFactory->has($table)) {
             return false;
         }
 

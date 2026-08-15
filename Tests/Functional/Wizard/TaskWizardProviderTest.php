@@ -344,10 +344,9 @@ final class TaskWizardProviderTest extends FunctionalTestCase
             '@gb-web/content-flow/wizard/steps/record-type-step.js',
             '@gb-web/content-flow/wizard/steps/task-details-step.js',
         ], array_column($configuration['steps'], 'module'));
-        self::assertContains(
-            'tt_content',
-            array_column($configuration['steps'][0]['configurationData']['recordTypes'], 'table'),
-        );
+        $tables = array_column($configuration['steps'][0]['configurationData']['recordTypes'], 'table');
+        self::assertContains('sys_category', $tables);
+        self::assertNotContains('tt_content', $tables);
     }
 
     #[Test]
@@ -358,15 +357,15 @@ final class TaskWizardProviderTest extends FunctionalTestCase
         $result = $this->subject()->handleSubmit($this->submitRequest([
             'mode' => 'create_pending_record',
             'parentPid' => 1,
-            'recordType' => 'tt_content',
-            'title' => 'New hero element',
+            'recordType' => 'sys_category',
+            'title' => 'New category',
             'assignee' => 'me',
         ]))->jsonSerialize();
 
         self::assertTrue($result['success']);
         $taskUid = (int)$result['finisher']['data']['task'];
         $task = $this->fetchRow('tx_contentflow_task', $taskUid);
-        self::assertSame('tt_content', $task['subject_table']);
+        self::assertSame('sys_category', $task['subject_table']);
         self::assertSame(0, (int)$task['subject_uid']);
         self::assertSame(1, (int)$task['subject_pid']);
     }

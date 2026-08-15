@@ -116,6 +116,19 @@
     min-width: 140px;
 }
 
+.contentflow-entry-chooser {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.contentflow-entry-section-title {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--typo3-text-color-base, #212529);
+}
+
 .contentflow-entry-choices {
     display: flex;
     flex-direction: column;
@@ -157,12 +170,14 @@
 
 .contentflow-record-type-option {
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
+    align-items: flex-start;
     gap: 10px;
     padding: 10px 12px;
     border: 1px solid var(--typo3-component-border-color, #d1d5db);
     border-radius: var(--contentflow-card-radius);
     cursor: pointer;
+    min-width: 0;
 }
 
 .contentflow-record-type-option:has(input:checked) {
@@ -170,9 +185,16 @@
     background: color-mix(in srgb, var(--contentflow-accent) 8%, transparent);
 }
 
+.contentflow-record-type-option span {
+    flex: 1 1 auto;
+    min-width: 160px;
+}
+
 .contentflow-record-type-option small {
-    margin-left: auto;
+    flex: 1 0 100%;
+    margin-left: 26px;
     opacity: .6;
+    overflow-wrap: anywhere;
 }
 
 .contentflow-record-ref--pending {
@@ -303,6 +325,23 @@
     border: 1px solid var(--typo3-component-border-color, #d1d5db);
     border-radius: var(--contentflow-card-radius);
     background: var(--typo3-surface-container-low, #f6f6f6);
+}
+
+.contentflow-stage-notify {
+    margin-bottom: 16px;
+    padding: 12px;
+    border: 1px solid var(--typo3-component-border-color, #d1d5db);
+    border-radius: var(--contentflow-card-radius);
+    background: var(--typo3-surface-container-low, #f6f6f6);
+}
+
+.contentflow-stage-notify-summary {
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.contentflow-stage-notify[open] .contentflow-stage-notify-summary {
+    margin-bottom: 10px;
 }
 
 .contentflow-stage-active-choice .form-text {

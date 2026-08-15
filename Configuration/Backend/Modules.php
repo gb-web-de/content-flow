@@ -9,9 +9,9 @@ use GbWeb\ContentFlow\Controller\ContentFlowController;
  */
 return [
     'web_contentflow' => [
-        'parent' => 'web',
-        'position' => ['after' => 'web_info'],
-        'inheritNavigationComponentFromMainModule' => true,
+        'parent' => 'content',
+        'position' => ['after' => 'records'],
+        'navigationComponent' => '@typo3/backend/tree/page-tree-element',
         'access' => 'user',
         'workspaces' => '*',
         'icon' => 'EXT:content_flow/Resources/Public/Icons/module-dualtone.svg',

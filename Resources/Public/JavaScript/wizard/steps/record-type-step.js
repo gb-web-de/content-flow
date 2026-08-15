@@ -9,6 +9,7 @@ export class RecordTypeStep {
     this.autoAdvance = false
     this.recordTypes = Array.isArray(configurationData.recordTypes) ? configurationData.recordTypes : []
     this.value = context.getStoreData(this.key) || ''
+    this.filter = ''
   }
 
   isComplete() {
@@ -29,11 +30,35 @@ export class RecordTypeStep {
       return html`<div class="callout callout-warning"><div class="callout-body">${labels.get('step.recordType.empty')}</div></div>`
     }
 
+    const filter = this.filter.trim().toLowerCase()
+    const visibleTypes = filter === ''
+      ? this.recordTypes
+      : this.recordTypes.filter((type) => {
+        const haystack = `${type.label || ''} ${type.table || ''}`.toLowerCase()
+        return haystack.includes(filter)
+      })
+
     return html`
       <fieldset class="form-group">
         <legend class="form-label">${labels.get('step.recordType.description')}</legend>
+        <div class="form-group">
+          <label class="form-label" for="contentflow-record-type-filter">${labels.get('step.recordType.search')}</label>
+          <input
+            id="contentflow-record-type-filter"
+            type="search"
+            class="form-control"
+            .value=${this.filter}
+            placeholder=${labels.get('step.recordType.searchPlaceholder')}
+            @input=${(event) => {
+              this.filter = event.target.value || ''
+              this.context.wizard.requestUpdate()
+            }}
+          >
+        </div>
         <div class="contentflow-record-type-list">
-          ${this.recordTypes.map((type) => html`
+          ${visibleTypes.length === 0 ? html`
+            <div class="callout callout-info"><div class="callout-body">${labels.get('step.recordType.noResults')}</div></div>
+          ` : visibleTypes.map((type) => html`
             <label class="contentflow-record-type-option">
               <input
                 type="radio"
@@ -49,8 +74,8 @@ export class RecordTypeStep {
                   this.context.wizard.requestUpdate()
                 }}
               >
-              <span>${type.label}</span>
-              <small>${type.table}</small>
+              <span title=${type.label}>${type.label}</span>
+              <small title=${type.table}>${type.table}</small>
             </label>
           `)}
         </div>
