@@ -403,6 +403,79 @@ final class VisualEditorTaskSelectTest extends FunctionalTestCase
         self::assertSame('', $payload['tasks'][0]['assigneeName']);
     }
 
+    #[Test]
+    public function aRecordContextCanActivateOnlyThatRecord(): void
+    {
+        $taskUid = $this->createTask([
+            'title' => 'Rewrite the intro',
+            'subject_table' => 'tt_content',
+            'subject_uid' => 10,
+            'subject_pid' => 2,
+            'state' => TaskState::IN_PROGRESS->value,
+            'workspace_uid' => 1,
+        ]);
+        $this->addMember($taskUid, 'tt_content', 10);
+
+        $context = $this->decode($this->subject()->activeTaskContextAction($this->getRequest([
+            'table' => 'tt_content',
+            'uid' => 10,
+        ])));
+        self::assertSame($taskUid, $context['tasks'][0]['uid']);
+
+        $selected = $this->decode($this->subject()->setActiveTaskForContextAction($this->postRequest([
+            'table' => 'tt_content',
+            'uid' => 10,
+            'taskUid' => $taskUid,
+        ])));
+        self::assertTrue($selected['success']);
+        self::assertSame('tt_content', $selected['activeTask']['contextTable']);
+        self::assertSame(10, $selected['activeTask']['contextUid']);
+
+        $session = $this->get(ActiveTaskSession::class);
+        self::assertSame($taskUid, $session->resolveForEdit($GLOBALS['BE_USER'], 'tt_content', 10, 2));
+        self::assertNull($session->resolveForEdit($GLOBALS['BE_USER'], 'tt_content', 11, 2));
+        self::assertNull($session->resolve($GLOBALS['BE_USER'], 2));
+    }
+
+    #[Test]
+    public function aRecordContextDoesNotOfferOrAcceptASiblingRecordsTask(): void
+    {
+        $recordTaskUid = $this->createTask([
+            'title' => 'Rewrite the intro',
+            'subject_table' => 'tt_content',
+            'subject_uid' => 10,
+            'subject_pid' => 2,
+            'state' => TaskState::IN_PROGRESS->value,
+            'workspace_uid' => 1,
+        ]);
+        $this->addMember($recordTaskUid, 'tt_content', 10);
+        $siblingTaskUid = $this->createTask([
+            'title' => 'Rewrite the second element',
+            'subject_table' => 'tt_content',
+            'subject_uid' => 11,
+            'subject_pid' => 2,
+            'state' => TaskState::IN_PROGRESS->value,
+            'workspace_uid' => 1,
+        ]);
+
+        $context = $this->decode($this->subject()->activeTaskContextAction($this->getRequest([
+            'table' => 'tt_content',
+            'uid' => 10,
+        ])));
+        self::assertSame([$recordTaskUid], array_column($context['tasks'], 'uid'));
+
+        $response = $this->subject()->setActiveTaskForContextAction($this->postRequest([
+            'table' => 'tt_content',
+            'uid' => 10,
+            'taskUid' => $siblingTaskUid,
+        ]));
+        $selected = $this->decode($response);
+        self::assertSame(400, $response->getStatusCode());
+        self::assertFalse($selected['success']);
+        self::assertSame('task-not-in-context', $selected['code']);
+        self::assertNull($this->get(ActiveTaskSession::class)->current($GLOBALS['BE_USER']));
+    }
+
     /*
      * The page uid on all three endpoints is the client's claim, not a fact.
      * Ungated, the two listing actions handed out the task titles and the

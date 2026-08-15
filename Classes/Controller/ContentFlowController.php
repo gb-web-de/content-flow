@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GbWeb\ContentFlow\Controller;
 
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\ContentFlow\Service\ActiveTaskSession;
 use GbWeb\ContentFlow\Service\AssignableUserProvider;
 use GbWeb\ContentFlow\Service\BoardColumnRegistry;
 use GbWeb\ContentFlow\Service\BoardScopeResolver;
@@ -42,6 +43,7 @@ final class ContentFlowController extends ActionController
         protected readonly BoardScopeResolver $boardScopeResolver,
         protected readonly WorkspaceService $workspaceService,
         protected readonly AssignableUserProvider $assignableUserProvider,
+        protected readonly ActiveTaskSession $activeTaskSession,
     ) {
     }
 
@@ -108,26 +110,6 @@ final class ContentFlowController extends ActionController
             'ContentFlow',
             'elementBrowserUrl',
             (string)$this->backendUriBuilder->buildUriFromRoute('wizard_element_browser'),
-        );
-        // "+ New task" offers creating a brand new page/record too, via core's own
-        // wizards rather than a bespoke form - db_new_pages is the page-type picker
-        // ("before/after/inside"), db_new is the general new-record table picker.
-        // Both take the current page as the parent to create under; returnUrl sends
-        // core back to this board once the new record's own edit form is closed.
-        $returnUrl = (string)$this->backendUriBuilder->buildUriFromRoute('web_contentflow', ['id' => $pageUid]);
-        $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
-            'newPageUrl',
-            $pageUid > 0
-                ? (string)$this->backendUriBuilder->buildUriFromRoute('db_new_pages', ['id' => $pageUid, 'returnUrl' => $returnUrl])
-                : '',
-        );
-        $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
-            'newRecordUrl',
-            $pageUid > 0
-                ? (string)$this->backendUriBuilder->buildUriFromRoute('db_new', ['id' => $pageUid, 'returnUrl' => $returnUrl])
-                : '',
         );
         $this->pageRenderer->addInlineSetting(
             'ContentFlow',
@@ -228,10 +210,12 @@ final class ContentFlowController extends ActionController
         }
 
         $tasks = $this->taskRepository->findForBoard($pageUids);
-        $enrichedTasks = array_map(function (array $task) use ($backendUser, $workspaceUid): array {
+        $activeTaskUid = $this->activeTaskSession->current($backendUser)['taskUid'] ?? 0;
+        $enrichedTasks = array_map(function (array $task) use ($backendUser, $workspaceUid, $activeTaskUid): array {
             $table = (string)($task['subject_table'] ?? 'pages');
             $uid = (int)($task['subject_uid'] ?? 0);
             $task['iconIdentifier'] = $table === 'pages' ? 'apps-pagetree-page-default' : 'mimetypes-x-content-text';
+            $task['isActive'] = (int)$task['uid'] === $activeTaskUid;
 
             $assigneeUid = (int)($task['assignee'] ?? 0);
             if ($assigneeUid > 0) {

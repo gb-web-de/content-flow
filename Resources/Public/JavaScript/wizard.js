@@ -21,6 +21,7 @@ import { SeverityEnum } from '@typo3/backend/enum/severity.js'
 import labels from '~labels/content_flow.messages'
 
 import { WIZARD_MODAL_SIZE } from '@gb-web/content-flow/wizard/task-wizard.js'
+import { taskContextTitle } from '@gb-web/content-flow/task/task-context-title.js'
 import { observeVisualEditorTaskSelect } from '@gb-web/content-flow/task/visual-editor-task-select.js'
 
 class ContentFlowWizard {
@@ -66,14 +67,9 @@ class ContentFlowWizard {
   }
 
   openWizard(pending) {
-    const titles = {
-      route_member: labels.get('modal.routeEdit'),
-      regression_comment: labels.get('modal.reopened'),
-    }
-
     Modal.advanced({
       type: Modal.types.default,
-      title: titles[pending.mode] || labels.get('modal.finishDetails'),
+      title: taskContextTitle(pending, labels),
       content: html`<contentflow-task-wizard .pending=${pending}></contentflow-task-wizard>`,
       severity: SeverityEnum.notice,
       size: WIZARD_MODAL_SIZE,

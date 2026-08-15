@@ -13,8 +13,11 @@ use GbWeb\ContentFlow\Notification\AssignmentNotificationService;
 use GbWeb\ContentFlow\Service\ActiveTaskSession;
 use GbWeb\ContentFlow\Service\ActivityLogger;
 use GbWeb\ContentFlow\Service\PendingPageHandoff;
+use GbWeb\ContentFlow\Service\PendingSubjectHandoff;
+use GbWeb\ContentFlow\Service\RecordCreationTargetProvider;
 use GbWeb\ContentFlow\Service\ReferenceInspector;
 use GbWeb\ContentFlow\Service\StageTransitionService;
+use GbWeb\ContentFlow\Service\TaskColor;
 use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
 use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
 use GbWeb\ContentFlow\Service\WorkspaceIntegrationService;
@@ -27,6 +30,7 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Http\HtmlResponse;
 use TYPO3\CMS\Core\Http\JsonResponse;
+use TYPO3\CMS\Core\Http\RedirectResponse;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -51,6 +55,8 @@ final class TaskAjaxController
         private readonly ActivityLogger $activityLogger,
         private readonly ActiveTaskSession $activeTaskSession,
         private readonly PendingPageHandoff $pendingPageHandoff,
+        private readonly PendingSubjectHandoff $pendingSubjectHandoff,
+        private readonly RecordCreationTargetProvider $recordCreationTargetProvider,
         private readonly AssignmentNotificationService $assignmentNotificationService,
         private readonly WorkspaceIntegrationService $workspaceService,
         private readonly WorkspacePublishGate $workspacePublishGate,
@@ -424,9 +430,10 @@ final class TaskAjaxController
         // page. Rejecting that move used to tell an editor their entirely
         // correct drag was wrong ("move it to a review stage to create it"),
         // which is what this distinction is for.
-        $isPendingPage = (string)$task['subject_table'] === 'pages' && (int)$task['subject_uid'] === 0;
+        $isPendingSubject = (int)$task['subject_uid'] === 0;
+        $isPendingPage = $isPendingSubject && (string)$task['subject_table'] === 'pages';
 
-        if ($isPendingPage) {
+        if ($isPendingSubject) {
             if ($state === null) {
                 return $this->reject(
                     'unknown-target-column',
@@ -436,8 +443,10 @@ final class TaskAjaxController
             }
             if ($state === TaskState::DONE) {
                 return $this->reject(
-                    'pending-page-cannot-be-done',
-                    'This ticket never became a page, so there is nothing to finish. Start work on it first.',
+                    $isPendingPage ? 'pending-page-cannot-be-done' : 'pending-subject-cannot-be-done',
+                    $isPendingPage
+                        ? 'This ticket never became a page, so there is nothing to finish. Start work on it first.'
+                        : 'This ticket has no record yet, so there is nothing to finish. Start work on it first.',
                     ['taskUid' => $taskUid],
                 );
             }
@@ -447,13 +456,15 @@ final class TaskAjaxController
                 // an editor's decision, and core already asks for them properly.
                 // The move itself is completed by the DataHandler hook once that
                 // wizard creates the page - see PendingPageHandoff.
-                return $this->requestPageWizard($task);
+                return $isPendingPage
+                    ? $this->requestPageWizard($task)
+                    : $this->requestRecordTarget($task);
             }
         }
 
         // Skipped for a ticket that still has no page: there is no record to
         // hold a permission on, and the move about to happen writes none.
-        if (!$isPendingPage) {
+        if (!$isPendingSubject) {
             $error = $this->assertMayEdit((string)$task['subject_table'], (int)$task['subject_uid']);
             if ($error !== null) {
                 return $this->error($error);
@@ -466,6 +477,9 @@ final class TaskAjaxController
         // exist precisely because core has no state for "not versioned yet", are
         // written directly.
         if ($state !== null && $state->hasVersion()) {
+            if ((int)$task['workspace_uid'] === 0 && $targetStageUid === StagesService::STAGE_EDIT_ID) {
+                return $this->startEditing($task);
+            }
             return $this->executeStageAction($request);
         }
 
@@ -488,6 +502,56 @@ final class TaskAjaxController
         ]);
 
         return new JsonResponse(['success' => true]);
+    }
+
+    /**
+     * Start a planned task before a workspace version exists. The first actual
+     * save creates that version; the active context makes sure it lands here.
+     *
+     * @param array<string, mixed> $task
+     */
+    private function startEditing(array $task): ResponseInterface
+    {
+        $backendUser = $this->getBackendUser();
+        $workspaceUid = (int)$backendUser->workspace;
+        $taskUid = (int)$task['uid'];
+        if ($workspaceUid < 1) {
+            return $this->reject(
+                'no-workspace-selected',
+                $this->veLabel('ve.error.noWorkspaceSelected'),
+                ['taskUid' => $taskUid],
+            );
+        }
+
+        $table = (string)$task['subject_table'];
+        $uid = (int)$task['subject_uid'];
+        $this->taskRepository->attachWorkspace($taskUid, $workspaceUid, StagesService::STAGE_EDIT_ID);
+        $this->activeTaskSession->rememberForContext($backendUser, $table, $uid, $taskUid);
+        $this->activityLogger->log(
+            $taskUid,
+            ActivityLogger::EVENT_WORK_STARTED,
+            (int)($backendUser->user['uid'] ?? 0),
+            [
+                'contextTable' => $table,
+                'contextUid' => $uid,
+                'startedFromBoard' => true,
+            ],
+        );
+
+        $redirectUrl = $table === 'pages'
+            ? (string)$this->uriBuilder->buildUriFromRoute('web_layout', ['id' => $uid])
+            : (string)$this->uriBuilder->buildUriFromRoute('record_edit', [
+                'edit' => [$table => [$uid => 'edit']],
+                'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_contentflow', [
+                    'id' => $this->derivePid($table, $uid),
+                ]),
+            ]);
+
+        return new JsonResponse([
+            'success' => true,
+            'startedEditing' => true,
+            'redirectUrl' => $redirectUrl,
+        ]);
     }
 
     /**
@@ -595,6 +659,45 @@ final class TaskAjaxController
     }
 
     /**
+     * Active-task control shared by Board, Layout and record edit forms.
+     */
+    public function activeTaskContextAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $query = $request->getQueryParams();
+        $table = trim((string)($query['table'] ?? ''));
+        $uid = (int)($query['uid'] ?? 0);
+
+        $tasks = [];
+        if ($table !== '' && $uid > 0) {
+            $error = $this->assertMayEdit($table, $uid);
+            if ($error !== null) {
+                return $this->error($error);
+            }
+            $tasks = array_map(
+                fn (array $task): array => $this->activeTaskPayload($task),
+                $this->openTasksForContext($table, $uid),
+            );
+        }
+
+        return new JsonResponse([
+            'success' => true,
+            'activeTask' => $this->currentActiveTaskPayload(),
+            'tasks' => $tasks,
+        ]);
+    }
+
+    public function setActiveTaskForContextAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+
+        return $this->setActiveTaskForContext(
+            trim((string)($body['table'] ?? '')),
+            (int)($body['uid'] ?? 0),
+            (int)($body['taskUid'] ?? 0),
+        );
+    }
+
+    /**
      * A human-readable name for wherever a task currently sits - a core stage
      * title for anything with a workspace version (StagesService::
      * getStageTitle() already handles Editing/Ready to publish/custom stages
@@ -621,31 +724,7 @@ final class TaskAjaxController
         };
     }
 
-    /**
-     * B4: declare which open task an editor is about to work on, for a given
-     * page - the Visual Editor's persistent "Task" select, chosen before any
-     * edit happens rather than routed after the fact. Two things follow from
-     * that:
-     *
-     * - Backlog/Planned -> Editing, and Review/Ready regressed back to
-     *   Editing with an auto-generated comment - the same transitions
-     *   TaskAutoCreationService::maybeRegressPastEditing() makes reactively
-     *   on an edit, just made explicit by picking the task instead of
-     *   waiting for the first keystroke to imply it.
-     * - The choice is remembered in session (`content_flow_active_task`) so
-     *   TaskAutoCreationService::captureEdit() can claim whatever gets
-     *   edited next straight onto it, for any surface (Visual Editor,
-     *   Layout, Records) - not only the module this request came from.
-     *
-     * Never itself creates a task - "+ Create new task" in the select reuses
-     * createAction() (table=pages) first and calls this action with the
-     * resulting uid, the same as any other existing-task choice.
-     *
-     * `taskUid = 0` is the way back out: it drops the declaration and moves
-     * nothing. A choice that could be made but never unmade would be a trap,
-     * because it keeps routing saves on this page long after the editor has
-     * stopped thinking about it.
-     */
+    /** Visual Editor compatibility wrapper around the generic context action. */
     public function setActiveTaskForPageAction(ServerRequestInterface $request): ResponseInterface
     {
         $body = $this->getBody($request);
@@ -656,18 +735,11 @@ final class TaskAjaxController
             return $this->reject('missing-page-uid', $this->veLabel('ve.error.noPageGiven'), ['taskUid' => $taskUid]);
         }
 
-        // This action writes: it attaches a workspace (Backlog/Planned ->
-        // Editing) and can run a real stage transition with a comment attached
-        // to the acting user. It was gated on "the task is open" alone, which
-        // let any backend user drag an arbitrary task out of review and sign a
-        // comment with someone else's workflow. Both the page the declaration
-        // is made for and the task's own subject have to be editable by this
-        // user - the same pair moveStageAction() already checks before a move.
-        $error = $this->assertMayEdit('pages', $pageUid);
-        if ($error !== null) {
-            return $this->error($error);
-        }
+        return $this->setActiveTaskForContext('pages', $pageUid, $taskUid);
+    }
 
+    private function setActiveTaskForContext(string $table, int $uid, int $taskUid): ResponseInterface
+    {
         if ($taskUid === 0) {
             $this->activeTaskSession->forget($this->getBackendUser());
 
@@ -679,12 +751,38 @@ final class TaskAjaxController
                 'transitioned' => false,
                 'comment' => '',
                 'commentUid' => 0,
+                'activeTask' => null,
             ]);
+        }
+
+        if ($table === '' || $uid < 1) {
+            return $this->reject('missing-record-context', 'No record context was specified.', [
+                'table' => $table,
+                'uid' => $uid,
+                'taskUid' => $taskUid,
+            ]);
+        }
+
+        $error = $this->assertMayEdit($table, $uid);
+        if ($error !== null) {
+            return $this->error($error);
         }
 
         $task = $this->findOpenTaskOrError($taskUid, 'make it the active task');
         if ($task instanceof ResponseInterface) {
             return $task;
+        }
+
+        $allowedTaskUids = array_map(
+            static fn (array $candidate): int => (int)$candidate['uid'],
+            $this->openTasksForContext($table, $uid),
+        );
+        if (!in_array($taskUid, $allowedTaskUids, true)) {
+            return $this->reject('task-not-in-context', 'This task does not belong to the selected record context.', [
+                'table' => $table,
+                'uid' => $uid,
+                'taskUid' => $taskUid,
+            ]);
         }
 
         // Skipped for a ticket that still has no page, exactly as
@@ -722,8 +820,9 @@ final class TaskAjaxController
             // edit itself.
             $this->taskRepository->attachWorkspace($taskUid, $workspaceUid, StagesService::STAGE_EDIT_ID);
             $this->activityLogger->log($taskUid, ActivityLogger::EVENT_WORK_STARTED, $beUserId, [
-                'pageUid' => $pageUid,
-                'selectedInVisualEditor' => true,
+                'contextTable' => $table,
+                'contextUid' => $uid,
+                'selectedAsActiveTask' => true,
             ]);
             $transitioned = true;
             $task = $this->taskRepository->findByUid($taskUid) ?? $task;
@@ -732,7 +831,7 @@ final class TaskAjaxController
             if ($state === TaskState::REVIEW || $state === TaskState::READY) {
                 $versionsByTable = $this->memberSynchronizer->findPendingVersionsByTable($taskUid, (int)$task['workspace_uid']);
                 if ($versionsByTable !== []) {
-                    $comment = $this->veLabel('ve.comment.reopened');
+                    $comment = $this->veLabel('active.comment.reopened');
                     $refusal = $this->stageTransitionService->transition(
                         $task,
                         $versionsByTable,
@@ -753,7 +852,7 @@ final class TaskAjaxController
             }
         }
 
-        $this->activeTaskSession->remember($beUser, $pageUid, $taskUid);
+        $this->activeTaskSession->rememberForContext($beUser, $table, $uid, $taskUid);
 
         return new JsonResponse([
             'success' => true,
@@ -763,7 +862,75 @@ final class TaskAjaxController
             'transitioned' => $transitioned,
             'comment' => $comment,
             'commentUid' => $commentUid,
+            'activeTask' => $this->activeTaskPayload($task, $table, $uid),
         ]);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function openTasksForContext(string $table, int $uid): array
+    {
+        $pageUid = $this->derivePid($table, $uid);
+        if ($pageUid < 1) {
+            return [];
+        }
+
+        $tasks = $this->taskRepository->findAllOpenForPage($pageUid);
+        if ($table !== 'pages') {
+            $contextTaskUids = [];
+            $subjectTask = $this->taskRepository->findOpenBySubject($table, $uid);
+            if ($subjectTask !== null) {
+                $contextTaskUids[] = (int)$subjectTask['uid'];
+            }
+            $memberTask = $this->taskRepository->findOpenTaskByMember($table, $uid);
+            if ($memberTask !== null) {
+                $contextTaskUids[] = (int)$memberTask['uid'];
+            }
+            $tasks = array_filter(
+                $tasks,
+                static fn (array $task): bool => in_array((int)$task['uid'], $contextTaskUids, true),
+            );
+        }
+
+        $workspaceUid = (int)$this->getBackendUser()->workspace;
+
+        return array_values(array_filter(
+            $tasks,
+            static fn (array $task): bool => (int)$task['workspace_uid'] === 0
+                || (int)$task['workspace_uid'] === $workspaceUid,
+        ));
+    }
+
+    /**
+     * @param array<string, mixed> $task
+     * @return array<string, mixed>
+     */
+    private function activeTaskPayload(array $task, ?string $table = null, ?int $uid = null): array
+    {
+        return [
+            'uid' => (int)$task['uid'],
+            'title' => (string)$task['title'],
+            'state' => (string)$task['state'],
+            'stageLabel' => $this->stageLabelFor($task),
+            'hue' => TaskColor::hueFor((int)$task['uid']),
+            'contextTable' => $table,
+            'contextUid' => $uid,
+        ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private function currentActiveTaskPayload(): ?array
+    {
+        $active = $this->activeTaskSession->current($this->getBackendUser());
+        if ($active === null) {
+            return null;
+        }
+        $task = $this->taskRepository->findByUid($active['taskUid']);
+
+        return $task !== null
+            ? $this->activeTaskPayload($task, $active['table'], $active['uid'])
+            : null;
     }
 
     /**
@@ -864,6 +1031,10 @@ final class TaskAjaxController
         $targetStageUid = (int)($body['stageUid'] ?? 0);
         $comment = trim((string)($body['comment'] ?? ''));
         $additionalRecipients = trim((string)($body['additional'] ?? ''));
+        $deactivateActiveTask = filter_var(
+            $body['deactivateActiveTask'] ?? false,
+            FILTER_VALIDATE_BOOL,
+        );
         $selectedRecipientUids = [];
         if (is_array($body['recipients'] ?? null)) {
             foreach ($body['recipients'] as $recipientUid) {
@@ -937,10 +1108,14 @@ final class TaskAjaxController
             ], 400);
         }
 
+        $activeTaskDeactivated = $deactivateActiveTask
+            && $this->activeTaskSession->forgetIfTask($this->getBackendUser(), $taskUid);
+
         return new JsonResponse([
             'success' => true,
             'stageUid' => $targetStageUid,
             'incompleteChecklistItems' => $incompleteChecklistItems,
+            'activeTaskDeactivated' => $activeTaskDeactivated,
         ]);
     }
 
@@ -1120,6 +1295,122 @@ final class TaskAjaxController
             ],
             'title' => (string)$task['title'],
         ]);
+    }
+
+    /**
+     * A pending record needs a real target page before FormEngine can create it.
+     *
+     * @param array<string, mixed> $task
+     */
+    private function requestRecordTarget(array $task): ResponseInterface
+    {
+        $table = (string)$task['subject_table'];
+        if (!$this->recordCreationTargetProvider->isCreatableRecordTable($table, $this->getBackendUser())) {
+            return $this->reject(
+                'record-table-not-creatable',
+                'You are not allowed to create this record type in the current workspace.',
+                ['taskUid' => (int)$task['uid'], 'table' => $table],
+            );
+        }
+
+        return new JsonResponse([
+            'success' => true,
+            'requiresRecordTarget' => true,
+            'taskUid' => (int)$task['uid'],
+            'recordTable' => $table,
+            'recordTypeLabel' => $this->recordCreationTargetProvider->getRecordTypeLabel($table),
+            'title' => (string)$task['title'],
+        ]);
+    }
+
+    public function recordCreationTargetsAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $taskUid = (int)($body['task'] ?? 0);
+        $task = $this->findOpenTaskOrError($taskUid, 'create its record');
+        if ($task instanceof ResponseInterface) {
+            return $task;
+        }
+
+        $table = (string)$task['subject_table'];
+        if ((int)$task['subject_uid'] !== 0 || $table === 'pages') {
+            return $this->reject(
+                'task-not-waiting-for-record',
+                'This task is not waiting for a new record.',
+                ['taskUid' => $taskUid],
+            );
+        }
+
+        return new JsonResponse([
+            'success' => true,
+            'taskUid' => $taskUid,
+            'recordTable' => $table,
+            'recordTypeLabel' => $this->recordCreationTargetProvider->getRecordTypeLabel($table),
+            'pages' => $this->recordCreationTargetProvider->getEligiblePages($table, $this->getBackendUser()),
+        ]);
+    }
+
+    public function startRecordCreationAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $taskUid = (int)($body['task'] ?? 0);
+        $pageUid = (int)($body['page'] ?? 0);
+        $task = $this->findOpenTaskOrError($taskUid, 'create its record');
+        if ($task instanceof ResponseInterface) {
+            return $task;
+        }
+
+        $table = (string)$task['subject_table'];
+        if ((int)$task['subject_uid'] !== 0 || $table === 'pages') {
+            return $this->reject(
+                'task-not-waiting-for-record',
+                'This task is not waiting for a new record.',
+                ['taskUid' => $taskUid],
+            );
+        }
+        if ((int)$this->getBackendUser()->workspace < 1) {
+            return $this->reject(
+                'no-workspace-selected',
+                'Switch into a workspace before starting work on this ticket.',
+                ['taskUid' => $taskUid],
+            );
+        }
+        if (!$this->recordCreationTargetProvider->isPageEligible($table, $pageUid, $this->getBackendUser())) {
+            return $this->reject(
+                'record-target-not-allowed',
+                'You are not allowed to create this record type on that page.',
+                ['taskUid' => $taskUid, 'table' => $table, 'pageUid' => $pageUid],
+            );
+        }
+
+        $this->pendingSubjectHandoff->remember($this->getBackendUser(), $taskUid, $table, $pageUid);
+        $returnUrl = (string)$this->uriBuilder->buildUriFromRoute('contentflow_record_creation_return', [
+            'task' => $taskUid,
+            'id' => $pageUid,
+        ]);
+        $redirectUrl = (string)$this->uriBuilder->buildUriFromRoute('record_edit', [
+            'edit' => [$table => [$pageUid => 'new']],
+            'returnUrl' => $returnUrl,
+        ]);
+
+        return new JsonResponse([
+            'success' => true,
+            'taskUid' => $taskUid,
+            'redirectUrl' => $redirectUrl,
+        ]);
+    }
+
+    public function recordCreationReturnAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $query = $request->getQueryParams();
+        $taskUid = (int)($query['task'] ?? 0);
+        $pageUid = (int)($query['id'] ?? 0);
+        $this->pendingSubjectHandoff->forget($this->getBackendUser(), $taskUid > 0 ? $taskUid : null);
+
+        return new RedirectResponse(
+            $this->uriBuilder->buildUriFromRoute('web_contentflow', ['id' => $pageUid]),
+            303,
+        );
     }
 
     /**

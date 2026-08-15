@@ -10,6 +10,7 @@ use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use GbWeb\ContentFlow\Notification\AssignmentNotificationService;
 use GbWeb\ContentFlow\Service\ActivityLogger;
+use GbWeb\ContentFlow\Service\RecordCreationTargetProvider;
 use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
@@ -34,7 +35,7 @@ use TYPO3\CMS\Core\Type\Bitmask\Permission;
  * wizard_config/wizard_submit AJAX routes, just a different `mode` identifier.
  *
  * `pending.mode` values (most set by TaskAutoCreationService::storePendingWizard(),
- * 'create_from_picker' and 'create_pending_page' constructed client-side in
+ * 'create_from_picker', 'create_pending_page' and 'create_pending_record' constructed client-side in
  * create-wizard.js, 'regression_comment' by TaskAutoCreationService::
  * maybeRegressPastEditing()):
  *  - configure_auto_task: a single task-details step.
@@ -48,6 +49,8 @@ use TYPO3\CMS\Core\Type\Bitmask\Permission;
  *    0) instead of one tied to an existing record. See TaskRepository::
  *    createPendingPageTask() and TaskAjaxController::materializePendingPage()
  *    for how the page itself gets created later.
+ *  - create_pending_record: record type followed by task details. The target
+ *    page is chosen when the resulting card enters Editing.
  *  - regression_comment: a single comment-textarea step, letting the editor
  *    refine the auto-generated "reopened for editing" comment B5's regression
  *    already wrote - the transition itself already happened.
@@ -67,6 +70,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
         private ActivityLogger $activityLogger,
         private AssignmentNotificationService $assignmentNotificationService,
         private CommentRepository $commentRepository,
+        private RecordCreationTargetProvider $recordCreationTargetProvider,
         private UriBuilder $uriBuilder,
         private LoggerInterface $logger,
     ) {
@@ -89,6 +93,17 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
         if ($mode === 'create_from_picker' || $mode === 'create_pending_page') {
             return Configuration::create([
                 $this->taskDetailsStep((string)($pending['recordTitle'] ?? ''), showExtraFields: true),
+            ]);
+        }
+
+        if ($mode === 'create_pending_record') {
+            return Configuration::create([
+                Step::create('@gb-web/content-flow/wizard/steps/record-type-step.js')
+                    ->withConfigurationData([
+                        'recordTypes' => $this->recordCreationTargetProvider
+                            ->getCreatableRecordTypes($this->getBackendUser()),
+                    ]),
+                $this->taskDetailsStep('', showExtraFields: true),
             ]);
         }
 
@@ -139,6 +154,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
             'route_member' => $this->submitRouteMember($body),
             'create_from_picker' => $this->submitCreateFromPicker($body),
             'create_pending_page' => $this->submitCreatePendingPage($body),
+            'create_pending_record' => $this->submitCreatePendingRecord($body),
             'regression_comment' => $this->submitUpdateRegressionComment($body),
             default => SubmissionResult::createErrorResult([$this->translate('wizard.error.unknownMode')]),
         };
@@ -340,6 +356,54 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
         $taskUid = (int)$task['uid'];
 
         $this->notifyAssignment($taskUid, $title, 'pages', 0, $assignee);
+
+        return $this->success($this->translate('wizard.success.taskCreated'), $taskUid);
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function submitCreatePendingRecord(array $body): SubmissionResult
+    {
+        $subjectPid = (int)($body['parentPid'] ?? 0);
+        $subjectTable = trim((string)($body['recordType'] ?? ''));
+        $planningPage = $subjectPid > 0 ? BackendUtility::getRecord('pages', $subjectPid) : null;
+        if ($planningPage === null || !$this->getBackendUser()->doesUserHaveAccess($planningPage, Permission::PAGE_SHOW)) {
+            return $this->reject($this->translate('wizard.error.noPlanningPageGiven'), ['subjectPid' => $subjectPid]);
+        }
+        if (!$this->recordCreationTargetProvider->isCreatableRecordTable($subjectTable, $this->getBackendUser())
+            || $this->recordCreationTargetProvider->getEligiblePages($subjectTable, $this->getBackendUser()) === []
+        ) {
+            return $this->reject(
+                $this->translate('wizard.error.recordTypeNotCreatable', $subjectTable),
+                ['subjectTable' => $subjectTable],
+            );
+        }
+
+        $title = trim((string)($body['title'] ?? ''));
+        if ($title === '') {
+            return $this->reject($this->translate('wizard.error.titleRequired'));
+        }
+
+        $description = trim((string)($body['description'] ?? ''));
+        $priority = TaskPriority::fromRequest($body['priority'] ?? null);
+        $assignee = $this->resolveRequestedAssignee($body['assignee'] ?? 'me');
+        $startDate = $this->parseDate($body['startDate'] ?? null);
+        $dueDate = $this->parseDate($body['dueDate'] ?? null);
+
+        $task = $this->taskRepository->createPendingSubjectTask($subjectPid, $subjectTable, [
+            'title' => $title,
+            'description' => $description,
+            'state' => $startDate > 0 ? TaskState::PLANNED->value : TaskState::BACKLOG->value,
+            'priority' => $priority->value,
+            'assignee' => $assignee,
+            'start_date' => $startDate,
+            'due_date' => $dueDate,
+            'auto_created' => 0,
+        ]);
+        $taskUid = (int)$task['uid'];
+
+        $this->notifyAssignment($taskUid, $title, $subjectTable, 0, $assignee);
 
         return $this->success($this->translate('wizard.success.taskCreated'), $taskUid);
     }

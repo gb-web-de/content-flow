@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GbWeb\ContentFlow\Hooks;
 
 use GbWeb\ContentFlow\Service\PendingPageClaimService;
+use GbWeb\ContentFlow\Service\PendingSubjectClaimService;
 use GbWeb\ContentFlow\Service\TaskAutoCreationService;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 
@@ -13,6 +14,7 @@ final class TaskAutoCreationDataHandlerHook
     public function __construct(
         private readonly TaskAutoCreationService $taskAutoCreationService,
         private readonly PendingPageClaimService $pendingPageClaimService,
+        private readonly PendingSubjectClaimService $pendingSubjectClaimService,
     ) {
     }
 
@@ -38,6 +40,14 @@ final class TaskAutoCreationDataHandlerHook
             // documented in AGENDA.md for the version uid on 'update'.)
             $this->pendingPageClaimService->claimCreatedPage(
                 $dataHandler->BE_USER,
+                (int)($dataHandler->substNEWwithIDs[$id] ?? 0),
+                (int)($fieldArray['pid'] ?? 0),
+            );
+        }
+        if ($status === 'new' && $table !== 'pages') {
+            $this->pendingSubjectClaimService->claimCreatedSubject(
+                $dataHandler->BE_USER,
+                $table,
                 (int)($dataHandler->substNEWwithIDs[$id] ?? 0),
                 (int)($fieldArray['pid'] ?? 0),
             );

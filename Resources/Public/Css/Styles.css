@@ -149,6 +149,32 @@
     opacity: 0.75;
 }
 
+.contentflow-record-type-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+}
+
+.contentflow-record-type-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--typo3-component-border-color, #d1d5db);
+    border-radius: var(--contentflow-card-radius);
+    cursor: pointer;
+}
+
+.contentflow-record-type-option:has(input:checked) {
+    border-color: var(--contentflow-accent);
+    background: color-mix(in srgb, var(--contentflow-accent) 8%, transparent);
+}
+
+.contentflow-record-type-option small {
+    margin-left: auto;
+    opacity: .6;
+}
+
 .contentflow-record-ref--pending {
     font-style: italic;
     opacity: 0.7;
@@ -233,6 +259,54 @@
 .contentflow-card.is-selected {
     border-color: var(--contentflow-accent);
     box-shadow: inset 4px 0 0 var(--contentflow-accent), var(--contentflow-card-hover-shadow);
+}
+
+.contentflow-card--active {
+    border-color: var(--contentflow-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--contentflow-accent) 30%, transparent), var(--contentflow-card-shadow);
+}
+
+.contentflow-active-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+}
+
+.contentflow-active-control-select {
+    width: min(280px, 28vw);
+}
+
+.contentflow-active-control-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 220px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.contentflow-active-control-status > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.contentflow-active-control-empty {
+    font-size: 12px;
+    opacity: .65;
+}
+
+.contentflow-stage-active-choice {
+    margin-top: 16px;
+    padding: 12px;
+    border: 1px solid var(--typo3-component-border-color, #d1d5db);
+    border-radius: var(--contentflow-card-radius);
+    background: var(--typo3-surface-container-low, #f6f6f6);
+}
+
+.contentflow-stage-active-choice .form-text {
+    margin-left: 24px;
 }
 
 /* Read-only: belongs to a workspace other than the one currently active - see

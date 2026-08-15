@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace GbWeb\ContentFlow\Tests\Functional\Controller;
 
 use GbWeb\ContentFlow\Controller\TaskAjaxController;
+use GbWeb\ContentFlow\Domain\Model\TaskState;
 use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\ContentFlow\Service\ActiveTaskSession;
 use GbWeb\ContentFlow\Service\ActivityLogger;
 use GbWeb\ContentFlow\Service\ReferenceInspector;
 use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
@@ -85,6 +87,53 @@ final class ExecuteStageActionRecipientsTest extends FunctionalTestCase
         ], $historyPayload['recipients']);
     }
 
+    #[Test]
+    public function aSuccessfulStageChangeCanStopTheActiveTaskWithoutClosingIt(): void
+    {
+        $stageUid = $this->createReviewStage();
+        $this->editPageInWorkspace();
+        $taskUid = $this->findOpenTaskUid();
+        $this->get(ActiveTaskSession::class)->remember($GLOBALS['BE_USER'], 2, $taskUid);
+
+        $payload = $this->decode($this->subject()->executeStageAction($this->jsonRequest([
+            'task' => $taskUid,
+            'stageUid' => $stageUid,
+            'deactivateActiveTask' => true,
+        ])));
+
+        self::assertTrue($payload['success']);
+        self::assertTrue($payload['activeTaskDeactivated']);
+        self::assertNull($this->get(ActiveTaskSession::class)->current($GLOBALS['BE_USER']));
+        self::assertSame(TaskState::REVIEW->value, $this->get(TaskRepository::class)->findByUid($taskUid)['state']);
+
+        // Deactivation releases only the editor's choice. The record still
+        // belongs to this open task, so a real edit reopens the same card.
+        $this->editPageInWorkspace('About us (edited after review)');
+        $reopened = $this->get(TaskRepository::class)->findByUid($taskUid);
+        self::assertSame(TaskState::IN_PROGRESS->value, $reopened['state']);
+        self::assertSame(0, (int)$reopened['stage_uid']);
+        self::assertSame($taskUid, $this->findOpenTaskUid());
+    }
+
+    #[Test]
+    public function anActiveTaskCanRemainSelectedAfterTheStageChange(): void
+    {
+        $stageUid = $this->createReviewStage();
+        $this->editPageInWorkspace();
+        $taskUid = $this->findOpenTaskUid();
+        $this->get(ActiveTaskSession::class)->remember($GLOBALS['BE_USER'], 2, $taskUid);
+
+        $payload = $this->decode($this->subject()->executeStageAction($this->jsonRequest([
+            'task' => $taskUid,
+            'stageUid' => $stageUid,
+            'deactivateActiveTask' => false,
+        ])));
+
+        self::assertTrue($payload['success']);
+        self::assertFalse($payload['activeTaskDeactivated']);
+        self::assertSame($taskUid, $this->get(ActiveTaskSession::class)->resolve($GLOBALS['BE_USER'], 2));
+    }
+
     private function subject(): TaskAjaxController
     {
         $connectionPool = $this->get(\TYPO3\CMS\Core\Database\ConnectionPool::class);
@@ -102,6 +151,8 @@ final class ExecuteStageActionRecipientsTest extends FunctionalTestCase
             $activityLogger,
             $this->get(\GbWeb\ContentFlow\Service\ActiveTaskSession::class),
             $this->get(\GbWeb\ContentFlow\Service\PendingPageHandoff::class),
+            $this->get(\GbWeb\ContentFlow\Service\PendingSubjectHandoff::class),
+            $this->get(\GbWeb\ContentFlow\Service\RecordCreationTargetProvider::class),
             $this->get(\GbWeb\ContentFlow\Notification\AssignmentNotificationService::class),
             new WorkspaceIntegrationService(
                 $connectionPool,
@@ -151,10 +202,10 @@ final class ExecuteStageActionRecipientsTest extends FunctionalTestCase
         return (int)$connection->lastInsertId('sys_workspace_stage');
     }
 
-    private function editPageInWorkspace(): void
+    private function editPageInWorkspace(string $title = 'About us (revised)'): void
     {
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
-        $dataHandler->start(['pages' => [2 => ['title' => 'About us (revised)']]], []);
+        $dataHandler->start(['pages' => [2 => ['title' => $title]]], []);
         $dataHandler->process_datamap();
     }
 

@@ -33,9 +33,29 @@
                                 <span class="badge badge-info">{task.state}</span>
                                 <f:if condition="{task.isActive}">
                                     <span class="badge contentflow-badge-active"
-                                          title="You picked this task in the Visual Editor - edits on this page go to it">
+                                          title="This is your active Content Flow task">
                                         <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:banner.active" default="you are working on this" />
                                     </span>
+                                </f:if>
+                                <f:if condition="{task.subject_uid} > 0">
+                                    <f:if condition="{task.isActive}">
+                                        <f:then>
+                                            <button type="button" class="btn btn-xs btn-warning"
+                                                    data-contentflow-stop-editing data-contentflow-task-uid="{task.uid}"
+                                                    data-contentflow-reload="true">
+                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:active.stop" default="Stop editing" />
+                                            </button>
+                                        </f:then>
+                                        <f:else>
+                                            <button type="button" class="btn btn-xs btn-default"
+                                                    data-contentflow-set-active="{task.uid}"
+                                                    data-contentflow-context-table="{task.subject_table}"
+                                                    data-contentflow-context-uid="{task.subject_uid}"
+                                                    data-contentflow-reload="true">
+                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:active.start" default="Work on this task" />
+                                            </button>
+                                        </f:else>
+                                    </f:if>
                                 </f:if>
                                 <f:if condition="{task.assigneeName}">
                                     <span class="contentflow-page-banner-assignee">

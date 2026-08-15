@@ -22,6 +22,7 @@ import Modal from '@typo3/backend/modal.js';
 import { SeverityEnum } from '@typo3/backend/enum/severity.js';
 import Workspaces from '@typo3/workspaces/workspaces.js';
 import { topLevelModuleImport } from '@typo3/backend/utility/top-level-module-import.js';
+import labels from '~labels/content_flow.messages';
 
 import { registerFilters } from '@gb-web/content-flow/board/filters.js';
 import { registerScopeControls } from '@gb-web/content-flow/board/scope.js';
@@ -138,10 +139,9 @@ class ContentFlowBoard {
 
     if (targetStage !== null) {
       if (currentWorkspaceUid < 1) {
-        // A ticket planned as "a new page" has nothing versioned yet, but
-        // Editing is exactly where it stops being a plan: TYPO3's page wizard
-        // creates the page there. Every other stage still needs a real one.
-        return this.isPendingPageCard(card) && targetStage === EDITING_STAGE_UID;
+        // Editing is where any planned task starts. Pending subjects open core's
+        // creation wizard; existing subjects become the active edit context.
+        return targetStage === EDITING_STAGE_UID;
       }
       return currentStage !== targetStage;
     }
@@ -172,10 +172,7 @@ class ContentFlowBoard {
     const targetStage = this.parseStageUid(column.dataset.contentflowStage);
 
     if (targetStage !== null && currentWorkspaceUid < 1) {
-      if (this.isPendingPageCard(card)) {
-        return 'This ticket is still only a plan. Drop it into Editing - TYPO3\'s page wizard creates the page there.';
-      }
-      return 'This task has no workspace version yet. Edit it first so TYPO3 can create one.';
+      return 'This planned task has to enter Editing before it can move to a review stage.';
     }
     if (targetStage === null && currentWorkspaceUid > 0) {
       return 'This task already has a workspace version, so it cannot be moved back to a planning column.';
@@ -201,12 +198,19 @@ class ContentFlowBoard {
       // versioned to move. Its drop into Editing means "create the page now",
       // and the server answers that with the page wizard rather than a
       // transition (TaskAjaxController::requestPageWizard()).
-      if (this.isPendingPageCard(card)) {
+      const currentWorkspaceUid = parseInt(card?.dataset.contentflowWorkspace || '0', 10);
+      if (this.isPendingPageCard(card) || (currentWorkspaceUid < 1 && targetStageUid === EDITING_STAGE_UID)) {
         await this.moveTaskToColumn(taskUid, targetState, targetStageUid, columnTitle, cardTitle);
         return;
       }
 
-      await this.openStageTransitionModal(taskUid, targetStageUid, columnTitle, cardTitle);
+      await this.openStageTransitionModal(
+        taskUid,
+        targetStageUid,
+        columnTitle,
+        cardTitle,
+        card?.dataset.contentflowActive === 'true' && targetStageUid !== EDITING_STAGE_UID,
+      );
       return;
     }
 
@@ -236,6 +240,16 @@ class ContentFlowBoard {
       // Editing when the page does (PendingPageClaimService).
       if (result.requiresPageWizard === true) {
         await this.openPageWizard(result, cardTitle);
+        return;
+      }
+
+      if (result.requiresRecordTarget === true) {
+        await this.openRecordTargetModal(result, cardTitle);
+        return;
+      }
+
+      if (result.startedEditing === true && typeof result.redirectUrl === 'string' && result.redirectUrl !== '') {
+        window.location.href = result.redirectUrl;
         return;
       }
 
@@ -272,6 +286,86 @@ class ContentFlowBoard {
     }
   }
 
+  async openRecordTargetModal(result, cardTitle) {
+    try {
+      const targetUrl = TYPO3.settings.ajaxUrls.contentflow_task_record_creation_targets;
+      const startUrl = TYPO3.settings.ajaxUrls.contentflow_task_start_record_creation;
+      if (!targetUrl || !startUrl) {
+        Notification.error('Content Flow', labels.get('recordTarget.error.unavailable'));
+        return;
+      }
+
+      const targets = await this.postJson(targetUrl, { task: result.taskUid });
+      if (targets.success !== true) {
+        Notification.error('Content Flow', targets.message || labels.get('recordTarget.error.load'));
+        return;
+      }
+      if (!Array.isArray(targets.pages) || targets.pages.length === 0) {
+        Notification.warning('Content Flow', labels.get('recordTarget.empty'));
+        return;
+      }
+
+      const content = document.createElement('div');
+      const description = document.createElement('p');
+      description.textContent = labels.get('recordTarget.description', [targets.recordTypeLabel || targets.recordTable]);
+      const label = document.createElement('label');
+      label.className = 'form-label';
+      label.htmlFor = 'contentflow-record-target-page';
+      label.textContent = labels.get('recordTarget.page');
+      const select = document.createElement('select');
+      select.id = 'contentflow-record-target-page';
+      select.className = 'form-select';
+      targets.pages.forEach((page) => {
+        const option = document.createElement('option');
+        option.value = String(page.uid);
+        option.textContent = page.path || page.title;
+        select.append(option);
+      });
+      content.append(description, label, select);
+
+      Modal.advanced({
+        type: Modal.types.default,
+        title: labels.get('recordTarget.title', [cardTitle]),
+        content,
+        severity: SeverityEnum.notice,
+        buttons: [
+          {
+            text: labels.get('entry.cancel'),
+            btnClass: 'btn-default',
+            name: 'cancel',
+            trigger: (event, modal) => modal.hideModal(),
+          },
+          {
+            text: labels.get('recordTarget.start'),
+            btnClass: 'btn-primary',
+            name: 'start',
+            trigger: async (event, modal) => {
+              event.target.disabled = true;
+              try {
+                const started = await this.postJson(startUrl, {
+                  task: result.taskUid,
+                  page: parseInt(select.value, 10),
+                });
+                if (started.success !== true || !started.redirectUrl) {
+                  Notification.error('Content Flow', started.message || labels.get('recordTarget.error.start'));
+                  return;
+                }
+                modal.hideModal();
+                window.location.href = started.redirectUrl;
+              } catch (error) {
+                Notification.error('Content Flow', await this.extractErrorMessage(error, labels.get('recordTarget.error.start')));
+              } finally {
+                event.target.disabled = false;
+              }
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      Notification.error('Content Flow', await this.extractErrorMessage(error, labels.get('recordTarget.error.load')));
+    }
+  }
+
   /*
    * Core's wizard redirects to the new page on success, so a modal that merely
    * closes almost always means "cancelled". Telling the server so keeps the
@@ -298,7 +392,7 @@ class ContentFlowBoard {
     }
   }
 
-  async openStageTransitionModal(taskUid, targetStageUid, columnTitle, cardTitle) {
+  async openStageTransitionModal(taskUid, targetStageUid, columnTitle, cardTitle, askToDeactivate = false) {
     try {
       // TYPO3.Modal is reused from the parent frame when this board runs inside
       // the backend's content iframe (see modal.js), so the dialog is built in
@@ -322,6 +416,14 @@ class ContentFlowBoard {
       }
 
       const modal = this.workspaceUi.renderSendToStageWindow(payload);
+      const appendChoice = () => {
+        const form = modal.querySelector('form');
+        if (askToDeactivate && form !== null && form.querySelector('[name="deactivateActiveTask"]') === null) {
+          this.appendActiveTaskChoice(form);
+        }
+      };
+      appendChoice();
+      modal.addEventListener('typo3-modal-shown', appendChoice, { once: true });
       modal.addEventListener('button.clicked', async (event) => {
         if (event.target.name !== 'ok') {
           return;
@@ -355,6 +457,7 @@ class ContentFlowBoard {
             comment: dialogValues.comment,
             recipients: dialogValues.recipients,
             additional: dialogValues.additional,
+            deactivateActiveTask: dialogValues.deactivateActiveTask,
           });
           if (result.success !== true) {
             Notification.error('Content Flow', result.message || 'Could not move the task to that stage.');
@@ -447,7 +550,34 @@ class ContentFlowBoard {
       comment: String(formData.get('comments') || '').trim(),
       additional: String(formData.get('additional') || '').trim(),
       recipients,
+      deactivateActiveTask: formData.get('deactivateActiveTask') === '1',
     };
+  }
+
+  appendActiveTaskChoice(form) {
+    const section = form.ownerDocument.createElement('fieldset');
+    section.className = 'contentflow-stage-active-choice';
+
+    const wrapper = form.ownerDocument.createElement('div');
+    wrapper.className = 'form-check';
+    const checkbox = form.ownerDocument.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'form-check-input';
+    checkbox.id = 'contentflow-deactivate-active-task';
+    checkbox.name = 'deactivateActiveTask';
+    checkbox.value = '1';
+    checkbox.checked = true;
+    const label = form.ownerDocument.createElement('label');
+    label.className = 'form-check-label';
+    label.htmlFor = checkbox.id;
+    label.textContent = labels.get('stage.deactivate.label');
+    wrapper.append(checkbox, label);
+
+    const hint = form.ownerDocument.createElement('div');
+    hint.className = 'form-text';
+    hint.textContent = labels.get('stage.deactivate.hint');
+    section.append(wrapper, hint);
+    form.append(section);
   }
 
   parseStageUid(rawValue) {

@@ -192,4 +192,22 @@ final class TaskRepositoryTest extends FunctionalTestCase
 
         self::assertNull($this->subject()->findOpenTaskByMember('tt_content', 11));
     }
+
+    #[Test]
+    public function aPendingRecordBecomesAnExactSubjectAndMember(): void
+    {
+        $task = $this->subject()->createPendingSubjectTask(2, 'tt_content', [
+            'title' => 'New hero',
+            'state' => 'planned',
+        ]);
+        $taskUid = (int)$task['uid'];
+
+        $this->subject()->attachCreatedSubject($taskUid, 'tt_content', 25, 2);
+
+        $attached = $this->subject()->findByUid($taskUid);
+        self::assertSame('tt_content', $attached['subject_table']);
+        self::assertSame(25, (int)$attached['subject_uid']);
+        self::assertSame(2, (int)$attached['subject_pid']);
+        self::assertSame($taskUid, (int)$this->subject()->findOpenTaskByMember('tt_content', 25)['uid']);
+    }
 }

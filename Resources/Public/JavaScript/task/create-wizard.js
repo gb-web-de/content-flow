@@ -15,6 +15,7 @@ import { html } from 'lit'
 import labels from '~labels/content_flow.messages'
 
 import { WIZARD_MODAL_SIZE } from '@gb-web/content-flow/wizard/task-wizard.js'
+import { taskContextTitle } from '@gb-web/content-flow/task/task-context-title.js'
 
 const ELEMENT_BROWSER_FIELD_REFERENCE_PREFIX = 'contentflow-create-target'
 
@@ -56,11 +57,12 @@ function formatRecordLabel(table, uid) {
 }
 
 function openNewTaskWizard(table, uid, recordTitle) {
+  const pending = { mode: 'create_from_picker', table, uid, recordTitle }
   Modal.advanced({
     type: Modal.types.default,
-    title: labels.get('modal.newTask'),
+    title: taskContextTitle(pending, labels),
     content: html`<contentflow-task-wizard
-      .pending=${{ mode: 'create_from_picker', table, uid, recordTitle }}
+      .pending=${pending}
     ></contentflow-task-wizard>`,
     severity: SeverityEnum.notice,
     size: WIZARD_MODAL_SIZE,
@@ -77,16 +79,37 @@ function openNewTaskWizard(table, uid, recordTitle) {
  */
 function openPendingPageWizard() {
   const parentPid = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
+  const pending = { mode: 'create_pending_page', parentPid }
   Modal.advanced({
     type: Modal.types.default,
-    title: labels.get('modal.newTask'),
+    title: taskContextTitle(pending, labels),
     content: html`<contentflow-task-wizard
-      .pending=${{ mode: 'create_pending_page', parentPid }}
+      .pending=${pending}
     ></contentflow-task-wizard>`,
     severity: SeverityEnum.notice,
     size: WIZARD_MODAL_SIZE,
     staticBackdrop: true,
     buttons: [],
+  })
+}
+
+function openPendingRecordWizard() {
+  const parentPid = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
+  const pending = { mode: 'create_pending_record', parentPid }
+  const modal = Modal.advanced({
+    type: Modal.types.default,
+    title: taskContextTitle(pending, labels),
+    content: html`<contentflow-task-wizard .pending=${pending}></contentflow-task-wizard>`,
+    severity: SeverityEnum.notice,
+    size: WIZARD_MODAL_SIZE,
+    staticBackdrop: true,
+    buttons: [],
+  })
+  modal.addEventListener('contentflow:record-type-selected', (event) => {
+    modal.modalTitle = taskContextTitle({
+      ...pending,
+      recordTypeLabel: event.detail?.label || '',
+    }, labels)
   })
 }
 
@@ -134,38 +157,6 @@ function openRecordPicker(allowedTypesOverride) {
   })
 }
 
-/*
- * Opens one of core's own record wizards (db_new) in an iframe, the same
- * Modal.types.iframe pattern openRecordPicker() already uses. Unlike the
- * element browser, this wizard emits no `typo3:elementBrowser` event this
- * extension can listen for once a record is actually created - it ends in
- * core's own FormEngine inside the same iframe instead. Rather than a fragile
- * bridge into core internals, closing the modal simply reloads the board:
- * TaskAutoCreationService::captureEdit() already runs on the record's first
- * save (a workspace `update` DataHandler operation, which a brand new
- * record's initial FormEngine save is), so an unplanned task is captured and
- * its own pending wizard (see wizard.js) surfaces right after the reload -
- * the same path an edit made anywhere else in the workspace already takes.
- */
-function openCoreRecordWizard(url, title) {
-  if (!url) {
-    Notification.error(NOTIFICATION_TITLE, labels.get('wizard.error.recordWizardMissing'))
-    return
-  }
-
-  const modal = Modal.advanced({
-    type: Modal.types.iframe,
-    title,
-    content: url,
-    size: Modal.sizes.large,
-    severity: SeverityEnum.notice,
-  })
-
-  modal.addEventListener('typo3-modal-hidden', () => {
-    window.location.reload()
-  })
-}
-
 function openEntryChoiceWizard() {
   const choices = [
     {
@@ -186,7 +177,7 @@ function openEntryChoiceWizard() {
     {
       label: labels.get('entry.newRecord.label'),
       description: labels.get('entry.newRecord.description'),
-      action: () => openCoreRecordWizard(TYPO3.settings.ContentFlow?.newRecordUrl, labels.get('entry.newRecord.label')),
+      action: () => openPendingRecordWizard(),
     },
   ]
 
