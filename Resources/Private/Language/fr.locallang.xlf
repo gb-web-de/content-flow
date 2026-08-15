@@ -1,454 +1,539 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <xliff version="1.0">
-    <file source-language="en" datatype="plaintext" original="messages" date="2026-08-07" product-name="content_flow">
+    <file source-language="en" target-language="fr" datatype="plaintext" original="messages" date="2026-08-15" product-name="content_flow">
         <header/>
         <body>
             <trans-unit id="column.backlog" xml:space="preserve">
                 <source>Backlog</source>
+                <target>À faire</target>
             </trans-unit>
             <trans-unit id="column.planned" xml:space="preserve">
                 <source>Planned</source>
+                <target>Planifié</target>
             </trans-unit>
             <trans-unit id="column.done" xml:space="preserve">
                 <source>Done</source>
+                <target>Terminé</target>
             </trans-unit>
             <trans-unit id="column.other_workspaces" xml:space="preserve">
                 <source>Other workspaces</source>
+                <target>Autres espaces de travail</target>
             </trans-unit>
-
             <trans-unit id="task.untitled" xml:space="preserve">
                 <source>Untitled task</source>
+                <target>Tâche sans titre</target>
             </trans-unit>
-
-            <!-- The Page module's banner (Resources/Private/Templates/PageModule/Banner.html). -->
             <trans-unit id="banner.heading" xml:space="preserve">
                 <source>Tasks on this page</source>
+                <target>Tâches sur cette page</target>
             </trans-unit>
             <trans-unit id="banner.active" xml:space="preserve">
                 <source>you are working on this</source>
+                <target>vous travaillez sur cette tâche</target>
             </trans-unit>
             <trans-unit id="active.select.none" xml:space="preserve">
                 <source>No active task</source>
+                <target>Aucune tâche active</target>
             </trans-unit>
             <trans-unit id="active.stop" xml:space="preserve">
                 <source>Stop editing</source>
+                <target>Arrêter la modification</target>
             </trans-unit>
             <trans-unit id="active.start" xml:space="preserve">
                 <source>Work on this task</source>
+                <target>Travailler sur cette tâche</target>
             </trans-unit>
             <trans-unit id="active.notification.changed" xml:space="preserve">
                 <source>The active task was changed.</source>
+                <target>La tâche active a été modifiée.</target>
             </trans-unit>
             <trans-unit id="active.notification.stopped" xml:space="preserve">
                 <source>Active task editing was stopped.</source>
+                <target>La modification de la tâche active a été arrêtée.</target>
             </trans-unit>
             <trans-unit id="active.comment.reopened" xml:space="preserve">
                 <source>Reopened for editing by selecting the task as active.</source>
+                <target>Rouverte pour modification après avoir été sélectionnée comme tâche active.</target>
             </trans-unit>
             <trans-unit id="stage.deactivate.label" xml:space="preserve">
                 <source>Stop active editing after sending this task</source>
+                <target>Arrêter la modification active après l’envoi de cette tâche</target>
             </trans-unit>
             <trans-unit id="stage.deactivate.hint" xml:space="preserve">
                 <source>The task remains open and keeps its records. Editing one of them again moves this same task back to Editing. A new task can only be created after this task is Done.</source>
+                <target>La tâche reste ouverte et conserve ses enregistrements. Modifier à nouveau l’un d’eux replace cette même tâche dans Modification. Une nouvelle tâche ne peut être créée qu’après la clôture de celle-ci.</target>
             </trans-unit>
             <trans-unit id="wizard.success.detailsSaved" xml:space="preserve">
                 <source>Task details saved.</source>
+                <target>Détails de la tâche enregistrés.</target>
             </trans-unit>
             <trans-unit id="wizard.success.editAttached" xml:space="preserve">
                 <source>Edit added to the existing task.</source>
+                <target>Modification ajoutée à la tâche existante.</target>
             </trans-unit>
             <trans-unit id="wizard.success.separateTaskCreated" xml:space="preserve">
                 <source>A separate task was created.</source>
+                <target>Une tâche distincte a été créée.</target>
             </trans-unit>
             <trans-unit id="wizard.success.taskCreated" xml:space="preserve">
                 <source>Task created.</source>
+                <target>Tâche créée.</target>
             </trans-unit>
             <trans-unit id="wizard.success.commentUpdated" xml:space="preserve">
                 <source>Comment updated.</source>
+                <target>Commentaire mis à jour.</target>
             </trans-unit>
-
-            <!--
-                Everything from here to the error block is read by the wizard's
-                own JavaScript rather than by PHP: the step modules and the
-                modals that host them import this file as the
-                `content_flow.messages` translation domain
-                (`~labels/content_flow.messages`, resolved by core's
-                TranslationDomainMapper from the file's own path). Note that
-                LabelProvider.get() throws on a key it does not know, so a typo
-                here empties the wizard rather than printing a blank - the
-                functional test over these keys exists for that reason.
-            -->
             <trans-unit id="modal.newTask" xml:space="preserve">
                 <source>New task</source>
+                <target>Nouvelle tâche</target>
             </trans-unit>
             <trans-unit id="modal.newTask.newPage" xml:space="preserve">
                 <source>New task for a new page</source>
+                <target>Nouvelle tâche pour une nouvelle page</target>
             </trans-unit>
             <trans-unit id="modal.newTask.newRecord" xml:space="preserve">
                 <source>New task for a new record</source>
+                <target>Nouvelle tâche pour un nouvel enregistrement</target>
             </trans-unit>
             <trans-unit id="modal.newTask.newRecordType" xml:space="preserve">
                 <source>New task for a new %s record</source>
+                <target>Nouvelle tâche pour un nouvel enregistrement de type %s</target>
             </trans-unit>
             <trans-unit id="modal.newTask.existingPage" xml:space="preserve">
                 <source>New task for page: %s</source>
+                <target>Nouvelle tâche pour la page : %s</target>
             </trans-unit>
             <trans-unit id="modal.newTask.existingRecord" xml:space="preserve">
                 <source>New task for record: %s</source>
+                <target>Nouvelle tâche pour l’enregistrement : %s</target>
             </trans-unit>
             <trans-unit id="modal.routeEdit" xml:space="preserve">
                 <source>Route this edit</source>
+                <target>Affecter cette modification</target>
             </trans-unit>
             <trans-unit id="modal.reopened" xml:space="preserve">
                 <source>Reopened for editing</source>
+                <target>Rouverte pour modification</target>
             </trans-unit>
             <trans-unit id="modal.finishDetails" xml:space="preserve">
                 <source>Finish task details</source>
+                <target>Compléter les détails de la tâche</target>
             </trans-unit>
             <trans-unit id="modal.finishPageDetails" xml:space="preserve">
                 <source>Finish task details for page: %s</source>
+                <target>Compléter les détails de la tâche pour la page : %s</target>
             </trans-unit>
             <trans-unit id="modal.finishRecordDetails" xml:space="preserve">
                 <source>Finish task details for record: %s</source>
+                <target>Compléter les détails de la tâche pour l’enregistrement : %s</target>
             </trans-unit>
             <trans-unit id="modal.routeEditFor" xml:space="preserve">
                 <source>Route this edit: %s</source>
+                <target>Affecter cette modification : %s</target>
             </trans-unit>
             <trans-unit id="modal.reopenedFor" xml:space="preserve">
                 <source>Reopened for editing: %s</source>
+                <target>Rouverte pour modification : %s</target>
             </trans-unit>
             <trans-unit id="modal.confirmButton" xml:space="preserve">
                 <source>Save</source>
+                <target>Enregistrer</target>
             </trans-unit>
-
             <trans-unit id="entry.title" xml:space="preserve">
                 <source>New task - how do you want to start?</source>
+                <target>Nouvelle tâche - comment souhaitez-vous commencer ?</target>
             </trans-unit>
             <trans-unit id="entry.cancel" xml:space="preserve">
                 <source>Cancel</source>
+                <target>Annuler</target>
             </trans-unit>
             <trans-unit id="entry.newPage.label" xml:space="preserve">
                 <source>Create a new page</source>
+                <target>Créer une nouvelle page</target>
             </trans-unit>
             <trans-unit id="entry.newPage.description" xml:space="preserve">
                 <source>Plan a new page - it is only actually created once this ticket moves into Editing.</source>
+                <target>Planifiez une nouvelle page - elle ne sera créée que lorsque cette tâche passera dans Modification.</target>
             </trans-unit>
             <trans-unit id="entry.existingPage.label" xml:space="preserve">
                 <source>Edit an existing page</source>
+                <target>Modifier une page existante</target>
             </trans-unit>
             <trans-unit id="entry.existingPage.description" xml:space="preserve">
                 <source>Pick an existing page from the page tree.</source>
+                <target>Sélectionnez une page existante dans l’arborescence.</target>
             </trans-unit>
             <trans-unit id="entry.record.label" xml:space="preserve">
                 <source>Select a record</source>
+                <target>Sélectionner un enregistrement</target>
             </trans-unit>
             <trans-unit id="entry.record.description" xml:space="preserve">
                 <source>Pick any record - page, content element or other.</source>
+                <target>Sélectionnez un enregistrement quelconque : page, élément de contenu ou autre.</target>
             </trans-unit>
             <trans-unit id="entry.newRecord.label" xml:space="preserve">
                 <source>Create a new record</source>
+                <target>Créer un nouvel enregistrement</target>
             </trans-unit>
             <trans-unit id="entry.newRecord.description" xml:space="preserve">
                 <source>Create a new record with TYPO3's own record wizard.</source>
+                <target>Créez un nouvel enregistrement avec l’assistant d’enregistrement de TYPO3.</target>
             </trans-unit>
             <trans-unit id="entry.recordPicker.title" xml:space="preserve">
                 <source>Select a page, content element or record</source>
+                <target>Sélectionner une page, un élément de contenu ou un enregistrement</target>
             </trans-unit>
-
             <trans-unit id="step.taskDetails.title" xml:space="preserve">
                 <source>Task details</source>
+                <target>Détails de la tâche</target>
             </trans-unit>
             <trans-unit id="step.recordType.title" xml:space="preserve">
                 <source>Record type</source>
+                <target>Type d’enregistrement</target>
             </trans-unit>
             <trans-unit id="step.recordType.description" xml:space="preserve">
                 <source>What kind of record should be created for this task?</source>
+                <target>Quel type d’enregistrement doit être créé pour cette tâche ?</target>
             </trans-unit>
             <trans-unit id="step.recordType.empty" xml:space="preserve">
                 <source>No record type can be created in the current workspace.</source>
+                <target>Aucun type d’enregistrement ne peut être créé dans l’espace de travail actuel.</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.field.title" xml:space="preserve">
                 <source>Title</source>
+                <target>Titre</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.field.description" xml:space="preserve">
                 <source>Description</source>
+                <target>Description</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.field.description.placeholder" xml:space="preserve">
                 <source>Optional description</source>
+                <target>Description facultative</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.field.assignment" xml:space="preserve">
                 <source>Assignment</source>
+                <target>Attribution</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.field.priority" xml:space="preserve">
                 <source>Priority</source>
+                <target>Priorité</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.field.startDate" xml:space="preserve">
                 <source>Start date</source>
+                <target>Date de début</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.field.dueDate" xml:space="preserve">
                 <source>Due date</source>
+                <target>Date d’échéance</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.priority.high" xml:space="preserve">
                 <source>High</source>
+                <target>Élevée</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.priority.normal" xml:space="preserve">
                 <source>Normal</source>
+                <target>Normale</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.priority.low" xml:space="preserve">
                 <source>Low</source>
+                <target>Faible</target>
             </trans-unit>
-
             <trans-unit id="step.destination.title" xml:space="preserve">
                 <source>Task destination</source>
+                <target>Affectation de la tâche</target>
             </trans-unit>
             <trans-unit id="step.destination.attach" xml:space="preserve">
                 <source>Add it to the existing page task ("%s")</source>
+                <target>L’ajouter à la tâche de page existante ("%s")</target>
             </trans-unit>
             <trans-unit id="step.destination.attach.summary" xml:space="preserve">
                 <source>Add it to "%s"</source>
+                <target>L’ajouter à "%s"</target>
             </trans-unit>
             <trans-unit id="step.destination.create" xml:space="preserve">
                 <source>Create a separate task for this record</source>
+                <target>Créer une tâche distincte pour cet enregistrement</target>
             </trans-unit>
-
             <trans-unit id="step.stage.title" xml:space="preserve">
                 <source>Stage</source>
+                <target>Étape</target>
             </trans-unit>
             <trans-unit id="step.stage.inProgress" xml:space="preserve">
                 <source>Keep in progress (more edits coming)</source>
+                <target>Garder en cours (d’autres modifications sont prévues)</target>
             </trans-unit>
             <trans-unit id="step.stage.inProgress.summary" xml:space="preserve">
                 <source>Keep in progress</source>
+                <target>Garder en cours</target>
             </trans-unit>
             <trans-unit id="step.stage.review" xml:space="preserve">
                 <source>Move directly to review</source>
+                <target>Passer directement en révision</target>
             </trans-unit>
-
             <trans-unit id="step.comment.title" xml:space="preserve">
                 <source>Comment</source>
+                <target>Commentaire</target>
             </trans-unit>
-
             <trans-unit id="step.error.title" xml:space="preserve">
                 <source>Error</source>
+                <target>Erreur</target>
             </trans-unit>
-
             <trans-unit id="assignee.me" xml:space="preserve">
                 <source>Assign to me</source>
+                <target>Me l’attribuer</target>
             </trans-unit>
             <trans-unit id="assignee.open" xml:space="preserve">
                 <source>Leave open for someone to take</source>
+                <target>Laisser ouverte pour qu’une personne puisse la prendre</target>
             </trans-unit>
             <trans-unit id="assignee.noMatches" xml:space="preserve">
                 <source>No matches</source>
+                <target>Aucun résultat</target>
             </trans-unit>
-
-            <!--
-                Every message below is shown to an editor who cannot read the
-                code, so each carries a code of its own: it is what a bug report
-                can name and what a support answer can be looked up by. The code
-                is part of the translated text so it survives translation.
-            -->
             <trans-unit id="wizard.error.invalidSubmission" xml:space="preserve">
                 <source>This wizard was opened with data that cannot be read. Close it and start again. (CF-1001)</source>
+                <target>Cet assistant a été ouvert avec des données illisibles. Fermez-le et recommencez. (CF-1001)</target>
             </trans-unit>
             <trans-unit id="wizard.error.unknownMode" xml:space="preserve">
                 <source>This wizard does not know what it was asked to do. Close it and start again. (CF-1002)</source>
+                <target>Cet assistant ne reconnaît pas l’action demandée. Fermez-le et recommencez. (CF-1002)</target>
             </trans-unit>
             <trans-unit id="wizard.error.titleRequiredToKeep" xml:space="preserve">
                 <source>A title is required to keep this task. (CF-1003)</source>
+                <target>Un titre est requis pour conserver cette tâche. (CF-1003)</target>
             </trans-unit>
             <trans-unit id="wizard.error.taskGone" xml:space="preserve">
                 <source>This task no longer exists. (CF-1004)</source>
+                <target>Cette tâche n’existe plus. (CF-1004)</target>
             </trans-unit>
             <trans-unit id="wizard.error.taskClosed" xml:space="preserve">
                 <source>This task is closed - you cannot update it. (CF-1005)</source>
+                <target>Cette tâche est fermée et ne peut pas être mise à jour. (CF-1005)</target>
             </trans-unit>
             <trans-unit id="wizard.error.noPageTaskGiven" xml:space="preserve">
                 <source>No page task was specified to attach this element to. (CF-1006)</source>
+                <target>Aucune tâche de page à laquelle rattacher cet élément n’a été indiquée. (CF-1006)</target>
             </trans-unit>
             <trans-unit id="wizard.error.unsupportedDestination" xml:space="preserve">
                 <source>The wizard destination "%s" is not supported. (CF-1007)</source>
+                <target>La destination d’assistant "%s" n’est pas prise en charge. (CF-1007)</target>
             </trans-unit>
             <trans-unit id="wizard.error.titleRequiredForNewTask" xml:space="preserve">
                 <source>A title is required to create a new task. (CF-1008)</source>
+                <target>Un titre est requis pour créer une nouvelle tâche. (CF-1008)</target>
             </trans-unit>
             <trans-unit id="wizard.error.recordHasNoOpenTask" xml:space="preserve">
                 <source>This record does not belong to an open task, so there is nothing to split into a new one. (CF-1009)</source>
+                <target>Cet enregistrement n’appartient à aucune tâche ouverte et ne peut donc pas être séparé dans une nouvelle tâche. (CF-1009)</target>
             </trans-unit>
             <trans-unit id="wizard.error.titleRequiredToCreate" xml:space="preserve">
                 <source>A title is required to create the task. (CF-1010)</source>
+                <target>Un titre est requis pour créer la tâche. (CF-1010)</target>
             </trans-unit>
             <trans-unit id="wizard.error.noParentPageGiven" xml:space="preserve">
                 <source>No parent page was specified to create the new page under. (CF-1011)</source>
+                <target>Aucune page parente sous laquelle créer la nouvelle page n’a été indiquée. (CF-1011)</target>
             </trans-unit>
             <trans-unit id="wizard.error.noPageCreatePermission" xml:space="preserve">
                 <source>You are not allowed to create a new page here. (CF-1012)</source>
+                <target>Vous n’êtes pas autorisé à créer une nouvelle page ici. (CF-1012)</target>
             </trans-unit>
             <trans-unit id="wizard.error.titleRequired" xml:space="preserve">
                 <source>A title is required. (CF-1013)</source>
+                <target>Un titre est requis. (CF-1013)</target>
             </trans-unit>
             <trans-unit id="wizard.error.commentTaskClosed" xml:space="preserve">
                 <source>This task is closed - you cannot update its comment. (CF-1014)</source>
+                <target>Cette tâche est fermée et son commentaire ne peut pas être mis à jour. (CF-1014)</target>
             </trans-unit>
             <trans-unit id="wizard.error.noCommentGiven" xml:space="preserve">
                 <source>No comment was specified to update. (CF-1015)</source>
+                <target>Aucun commentaire à mettre à jour n’a été indiqué. (CF-1015)</target>
             </trans-unit>
             <trans-unit id="wizard.error.commentEmpty" xml:space="preserve">
                 <source>A comment cannot be empty. (CF-1016)</source>
+                <target>Un commentaire ne peut pas être vide. (CF-1016)</target>
             </trans-unit>
             <trans-unit id="wizard.error.noRecordGiven" xml:space="preserve">
                 <source>No record was specified. (CF-1017)</source>
+                <target>Aucun enregistrement n’a été indiqué. (CF-1017)</target>
             </trans-unit>
             <trans-unit id="wizard.error.noPageEditPermission" xml:space="preserve">
                 <source>You do not have edit permission on this page. (CF-1018)</source>
+                <target>Vous ne disposez pas des droits de modification sur cette page. (CF-1018)</target>
             </trans-unit>
             <trans-unit id="wizard.error.noRecordEditPermission" xml:space="preserve">
                 <source>You do not have edit permission on the page this record is on. (CF-1019)</source>
+                <target>Vous ne disposez pas des droits de modification sur la page contenant cet enregistrement. (CF-1019)</target>
             </trans-unit>
             <trans-unit id="wizard.error.tableNotTrackable" xml:space="preserve">
                 <source>"%s" records cannot be tracked here - they support no workspace versioning. (CF-1020)</source>
+                <target>Les enregistrements de type "%s" ne peuvent pas être suivis ici, car ils ne prennent pas en charge le versionnement des espaces de travail. (CF-1020)</target>
             </trans-unit>
             <trans-unit id="wizard.error.recordGone" xml:space="preserve">
                 <source>%s:%d no longer exists. (CF-1021)</source>
+                <target>%s:%d n’existe plus. (CF-1021)</target>
             </trans-unit>
             <trans-unit id="wizard.error.recordNotEditable" xml:space="preserve">
                 <source>%s:%d cannot be edited right now. (CF-1022)</source>
+                <target>%s:%d ne peut pas être modifié actuellement. (CF-1022)</target>
             </trans-unit>
             <trans-unit id="wizard.error.noLiveEditing" xml:space="preserve">
                 <source>"%s" records cannot be edited directly on the Live workspace. (CF-1023)</source>
+                <target>Les enregistrements de type "%s" ne peuvent pas être modifiés directement dans l’espace de travail Live. (CF-1023)</target>
             </trans-unit>
-
-            <!-- Raised by the wizard's JavaScript rather than by the provider. -->
             <trans-unit id="wizard.error.elementBrowserMissing" xml:space="preserve">
                 <source>The element browser is not configured. (CF-1024)</source>
+                <target>Le navigateur d’éléments n’est pas configuré. (CF-1024)</target>
             </trans-unit>
             <trans-unit id="wizard.error.recordUnidentified" xml:space="preserve">
                 <source>The selected record could not be identified. (CF-1025)</source>
+                <target>L’enregistrement sélectionné n’a pas pu être identifié. (CF-1025)</target>
             </trans-unit>
             <trans-unit id="wizard.error.recordWizardMissing" xml:space="preserve">
                 <source>This wizard is not configured for the current page. (CF-1026)</source>
+                <target>Cet assistant n’est pas configuré pour la page actuelle. (CF-1026)</target>
             </trans-unit>
             <trans-unit id="wizard.error.stepFallback" xml:space="preserve">
                 <source>Something went wrong. (CF-1027)</source>
+                <target>Une erreur s’est produite. (CF-1027)</target>
             </trans-unit>
             <trans-unit id="wizard.error.noPlanningPageGiven" xml:space="preserve">
                 <source>No accessible page was specified to place this planned task on. (CF-1036)</source>
+                <target>Aucune page accessible sur laquelle placer cette tâche planifiée n’a été indiquée. (CF-1036)</target>
             </trans-unit>
             <trans-unit id="wizard.error.recordTypeNotCreatable" xml:space="preserve">
                 <source>The record type "%s" cannot be created in the current workspace. (CF-1037)</source>
+                <target>Le type d’enregistrement "%s" ne peut pas être créé dans l’espace de travail actuel. (CF-1037)</target>
             </trans-unit>
-
             <trans-unit id="recordTarget.title" xml:space="preserve">
                 <source>Choose where to create the record for "%s"</source>
+                <target>Choisissez où créer l’enregistrement pour "%s"</target>
             </trans-unit>
             <trans-unit id="recordTarget.description" xml:space="preserve">
                 <source>Select the page where TYPO3 should create the new %s record.</source>
+                <target>Sélectionnez la page sur laquelle TYPO3 doit créer le nouvel enregistrement de type %s.</target>
             </trans-unit>
             <trans-unit id="recordTarget.page" xml:space="preserve">
                 <source>Target page</source>
+                <target>Page cible</target>
             </trans-unit>
             <trans-unit id="recordTarget.start" xml:space="preserve">
                 <source>Open record form</source>
+                <target>Ouvrir le formulaire d’enregistrement</target>
             </trans-unit>
             <trans-unit id="recordTarget.empty" xml:space="preserve">
                 <source>There is no page where you may create this record type.</source>
+                <target>Il n’existe aucune page sur laquelle vous pouvez créer ce type d’enregistrement.</target>
             </trans-unit>
             <trans-unit id="recordTarget.error.unavailable" xml:space="preserve">
                 <source>Record creation is not configured.</source>
+                <target>La création d’enregistrements n’est pas configurée.</target>
             </trans-unit>
             <trans-unit id="recordTarget.error.load" xml:space="preserve">
                 <source>The available target pages could not be loaded.</source>
+                <target>Les pages cibles disponibles n’ont pas pu être chargées.</target>
             </trans-unit>
             <trans-unit id="recordTarget.error.start" xml:space="preserve">
                 <source>The record form could not be opened.</source>
+                <target>Le formulaire d’enregistrement n’a pas pu être ouvert.</target>
             </trans-unit>
-
-            <!--
-                The Visual Editor's task select and its markers
-                (Resources/Public/JavaScript/task/visual-editor-task-select.js).
-                Read through the same `content_flow.messages` domain as the
-                wizard above; the two server-side messages at the end are the
-                ones TaskAjaxController's own Visual Editor actions can return.
-            -->
             <trans-unit id="ve.select.label" xml:space="preserve">
                 <source>Content Flow task</source>
+                <target>Tâche Content Flow</target>
             </trans-unit>
             <trans-unit id="ve.select.placeholder" xml:space="preserve">
                 <source>Task</source>
+                <target>Tâche</target>
             </trans-unit>
             <trans-unit id="ve.select.none" xml:space="preserve">
                 <source>No task</source>
+                <target>Aucune tâche</target>
             </trans-unit>
             <trans-unit id="ve.select.create" xml:space="preserve">
                 <source>+ Create new task</source>
+                <target>+ Créer une nouvelle tâche</target>
             </trans-unit>
             <trans-unit id="ve.marker.claimedBy" xml:space="preserve">
                 <source>Belongs to task:</source>
+                <target>Appartient à la tâche :</target>
             </trans-unit>
             <trans-unit id="ve.marker.yourTask" xml:space="preserve">
                 <source>Part of the task you are working on:</source>
+                <target>Fait partie de la tâche sur laquelle vous travaillez :</target>
             </trans-unit>
             <trans-unit id="ve.marker.openTicket" xml:space="preserve">
                 <source>Open this task</source>
+                <target>Ouvrir cette tâche</target>
             </trans-unit>
             <trans-unit id="ve.marker.assignedTo" xml:space="preserve">
                 <source>Assigned to</source>
+                <target>Attribuée à</target>
             </trans-unit>
             <trans-unit id="ve.marker.unassigned" xml:space="preserve">
                 <source>Unassigned</source>
+                <target>Non attribuée</target>
             </trans-unit>
             <trans-unit id="ve.legend.label" xml:space="preserve">
                 <source>Tasks on this page</source>
+                <target>Tâches sur cette page</target>
             </trans-unit>
             <trans-unit id="ve.notification.title" xml:space="preserve">
                 <source>Content Flow</source>
+                <target>Content Flow</target>
             </trans-unit>
             <trans-unit id="ve.notification.taskActive" xml:space="preserve">
                 <source>This task is now active for this page.</source>
+                <target>Cette tâche est maintenant active pour cette page.</target>
             </trans-unit>
             <trans-unit id="ve.comment.prompt" xml:space="preserve">
                 <source>Reopened for editing - add a note?</source>
+                <target>Rouverte pour modification - ajouter une note ?</target>
             </trans-unit>
             <trans-unit id="ve.comment.save" xml:space="preserve">
                 <source>Save note</source>
+                <target>Enregistrer la note</target>
             </trans-unit>
             <trans-unit id="ve.comment.reopened" xml:space="preserve">
                 <source>Reopened for editing from the Visual Editor task selector.</source>
+                <target>Rouverte pour modification depuis le sélecteur de tâches de l’éditeur visuel.</target>
             </trans-unit>
             <trans-unit id="ve.error.selectFailed" xml:space="preserve">
                 <source>Could not select this task. (CF-1028)</source>
+                <target>Cette tâche n’a pas pu être sélectionnée. (CF-1028)</target>
             </trans-unit>
             <trans-unit id="ve.error.createFailed" xml:space="preserve">
                 <source>Could not create a task for this page. (CF-1029)</source>
+                <target>Impossible de créer une tâche pour cette page. (CF-1029)</target>
             </trans-unit>
             <trans-unit id="ve.error.commentFailed" xml:space="preserve">
                 <source>Could not save the note. (CF-1030)</source>
+                <target>La note n’a pas pu être enregistrée. (CF-1030)</target>
             </trans-unit>
             <trans-unit id="ve.error.server" xml:space="preserve">
                 <source>Could not reach the server. (CF-1031)</source>
+                <target>Le serveur n’a pas pu être contacté. (CF-1031)</target>
             </trans-unit>
             <trans-unit id="ve.error.noPageGiven" xml:space="preserve">
                 <source>No page was specified. (CF-1032)</source>
+                <target>Aucune page n’a été indiquée. (CF-1032)</target>
             </trans-unit>
             <trans-unit id="ve.error.noWorkspaceSelected" xml:space="preserve">
                 <source>Switch into a workspace before selecting a task to work on. (CF-1033)</source>
+                <target>Passez dans un espace de travail avant de sélectionner une tâche à traiter. (CF-1033)</target>
             </trans-unit>
             <trans-unit id="ve.error.pageNotFound" xml:space="preserve">
                 <source>This page no longer exists. (CF-1034)</source>
+                <target>Cette page n’existe plus. (CF-1034)</target>
             </trans-unit>
             <trans-unit id="ve.error.noPageAccess" xml:space="preserve">
                 <source>You do not have access to this page. (CF-1035)</source>
+                <target>Vous n’avez pas accès à cette page. (CF-1035)</target>
             </trans-unit>
-
-            <!--
-                The comment TaskAutoCreationService writes when an edit drags a
-                task back out of review. Its Visual Editor counterpart is
-                `ve.comment.reopened` above - both are editor-facing history, so
-                neither belongs in a PHP string literal.
-                %1$s is the table, %2$d the record uid.
-            -->
             <trans-unit id="autoCreation.comment.reopened" xml:space="preserve">
                 <source>Automatically reopened for editing - %1$s:%2$d was modified.</source>
+                <target>Rouverte automatiquement pour modification - %1$s:%2$d a été modifié.</target>
             </trans-unit>
         </body>
     </file>

@@ -177,6 +177,11 @@ class VisualEditorTaskSelect {
     }
     this.watchToolbar()
 
+    window.top.document.addEventListener('contentflow:active-task-changed', async () => {
+      await this.reloadTasks()
+      await this.reloadMarkers()
+    })
+
     await this.reloadTasks()
     await this.reloadMarkers()
   }
@@ -365,6 +370,10 @@ class VisualEditorTaskSelect {
       }
 
       this.activeTaskUid = taskUid
+      const eventDocument = window.top.document
+      eventDocument.dispatchEvent(new eventDocument.defaultView.CustomEvent('contentflow:active-task-changed', {
+        detail: { activeTask: result.activeTask || null },
+      }))
       const selectedOption = this.select.querySelector('option[value="' + taskUid + '"]')
       if (selectedOption) {
         selectedOption.textContent = (selectedOption.textContent || '').split(' (')[0] + ' (' + result.stageLabel + ')'

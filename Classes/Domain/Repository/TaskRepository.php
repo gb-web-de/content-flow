@@ -197,11 +197,26 @@ final class TaskRepository
      */
     public function createPendingPageTask(int $parentPid, array $values): array
     {
+        return $this->createPendingSubjectTask($parentPid, 'pages', $values);
+    }
+
+    /**
+     * Create a task for a page or record that does not exist yet.
+     *
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    public function createPendingSubjectTask(int $subjectPid, string $subjectTable, array $values): array
+    {
+        if ($subjectPid < 1 || $subjectTable === '') {
+            throw new \InvalidArgumentException('A pending subject task requires a table and planning page.');
+        }
+
         $connection = $this->connectionPool->getConnectionForTable(self::TABLE);
         $connection->insert(self::TABLE, array_merge($values, [
-            'subject_table' => 'pages',
+            'subject_table' => $subjectTable,
             'subject_uid' => 0,
-            'subject_pid' => $parentPid,
+            'subject_pid' => $subjectPid,
             'crdate' => $GLOBALS['EXEC_TIME'],
             'tstamp' => $GLOBALS['EXEC_TIME'],
         ]));
@@ -210,7 +225,7 @@ final class TaskRepository
         $created = $this->findByUid($taskUid);
         if ($created === null) {
             throw new \RuntimeException(
-                sprintf('Content Flow pending-page task vanished right after insert (uid %d)', $taskUid),
+                sprintf('Content Flow pending-subject task vanished right after insert (uid %d)', $taskUid),
                 1786300000,
             );
         }
@@ -218,22 +233,32 @@ final class TaskRepository
     }
 
     /**
-     * Give a pending-page task (see createPendingPageTask()) its real subject,
-     * once the page it was waiting for has actually been created. Claims the new
-     * page as the task's own member too, mirroring what
+     * Give a pending task its real subject once the page or record it was
+     * waiting for has actually been created. Claims the new subject as the
+     * task's own member too, mirroring what
      * findOrCreateOpenForSubject() does for a subject that exists from the start.
      */
-    public function attachCreatedSubject(int $taskUid, int $subjectUid): void
-    {
+    public function attachCreatedSubject(
+        int $taskUid,
+        string $subjectTable,
+        int $subjectUid,
+        int $subjectPid,
+    ): void {
+        if ($subjectTable === '' || $subjectUid < 1 || $subjectPid < 1) {
+            throw new \InvalidArgumentException('A created subject requires a table, uid and page.');
+        }
+
         $this->connectionPool->getConnectionForTable(self::TABLE)->update(
             self::TABLE,
             [
+                'subject_table' => $subjectTable,
                 'subject_uid' => $subjectUid,
+                'subject_pid' => $subjectPid,
                 'tstamp' => $GLOBALS['EXEC_TIME'],
             ],
             ['uid' => $taskUid],
         );
-        $this->addMember($taskUid, 'pages', $subjectUid, self::ORIGIN_SUBJECT, $subjectUid);
+        $this->addMember($taskUid, $subjectTable, $subjectUid, self::ORIGIN_SUBJECT, $subjectPid);
     }
 
     /**

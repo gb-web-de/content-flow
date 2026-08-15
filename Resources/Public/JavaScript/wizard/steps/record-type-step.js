@@ -42,6 +42,10 @@ export class RecordTypeStep {
                 .checked=${this.value === type.table}
                 @change=${() => {
                   this.value = type.table
+                  this.context.wizard.dispatchEvent(new CustomEvent('contentflow:record-type-selected', {
+                    bubbles: true,
+                    detail: { table: type.table, label: type.label },
+                  }))
                   this.context.wizard.requestUpdate()
                 }}
               >

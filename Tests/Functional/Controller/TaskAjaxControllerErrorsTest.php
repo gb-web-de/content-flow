@@ -85,6 +85,8 @@ final class TaskAjaxControllerErrorsTest extends FunctionalTestCase
             $activityLogger,
             $this->get(\GbWeb\ContentFlow\Service\ActiveTaskSession::class),
             $this->get(\GbWeb\ContentFlow\Service\PendingPageHandoff::class),
+            $this->get(\GbWeb\ContentFlow\Service\PendingSubjectHandoff::class),
+            $this->get(\GbWeb\ContentFlow\Service\RecordCreationTargetProvider::class),
             $this->get(\GbWeb\ContentFlow\Notification\AssignmentNotificationService::class),
             new WorkspaceIntegrationService(
                 $connectionPool,

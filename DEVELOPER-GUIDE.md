@@ -29,6 +29,7 @@ laufen serverseitig durch denselben DataHandler-Hook:
 Classes/Hooks/TaskAutoCreationDataHandlerHook.php
   └─ processDatamap_afterDatabaseOperations()
        ├─ PendingPageClaimService::claimCreatedPage()   (nur bei status === 'new', table === 'pages')
+       ├─ PendingSubjectClaimService::claimCreatedSubject() (bei neuen Nicht-Seiten-Records)
        └─ TaskAutoCreationService::captureEdit()         (bei jedem Save)
 ```
 
@@ -39,10 +40,10 @@ gerade das Board, der Visual Editor oder das Layout-Modul offen war — deshalb
 zeigen alle drei Oberflächen danach denselben Task mit derselben Farbe
 (`TaskColor::hueFor()`, [Classes/Service/TaskColor.php](Classes/Service/TaskColor.php)).
 
-Die einzige Oberfläche, die *vor* dem Speichern eine Entscheidung trifft, ist
-der Visual Editor (Abschnitt 3): dort wählt man den Ziel-Task explizit über
-`ActiveTaskSession`, bevor überhaupt getippt wird. Board und Layout-Modul
-reagieren nur *nach* dem Speichern.
+Der Ziel-Task kann vor dem Speichern im Visual Editor, Board, Layout-Banner
+oder Datensatzformular gewählt werden. `ActiveTaskSession` speichert genau
+eine persönliche Auswahl: ein Seiten-Kontext gilt für alle Records der Seite,
+ein Record-Kontext nur für genau diesen Datensatz.
 
 Zwei Event-Listener sorgen dafür, dass JS-Modul und CSS-Datei der Extension
 **in jedem Backend-Rendering** verfügbar sind, unabhängig vom aktuellen Modul:
@@ -106,8 +107,8 @@ Ablauf beim Öffnen/Neuladen des Boards, Zeile für Zeile:
      `other-workspaces`.
 4. Diverse `pageRenderer->addInlineSetting('ContentFlow', …)` — das sind die
    Werte, die im Browser unter `TYPO3.settings.ContentFlow.*` auftauchen und
-   von `board.js` gelesen werden (`elementBrowserUrl`, `newPageUrl`,
-   `newRecordUrl`, `currentUserId`, `createTargetTables`, `assignableUsers`,
+   von `board.js` gelesen werden (`elementBrowserUrl`, `currentUserId`,
+   `createTargetTables`, `assignableUsers`,
    `currentPageId`, `canPublish`, `depth`, `fromWorkspaceRoot`).
 5. `pageRenderer->addCssFile(…Styles.css)` und
    `pageRenderer->loadJavaScriptModule('@gb-web/content-flow/board.js')` —
@@ -230,24 +231,28 @@ board.handleCardDrop() → board.openStageTransitionModal()   [board.js:301]
    Element <typo3-workspaces-send-to-stage-form> dort undefiniert)
  → Workspaces.sendRemoteRequest('sendToSpecificStageWindow', …)  (Core-API)
  → Core rendert den "An Stage senden"-Dialog (Kommentar, Empfänger)
+ → ist der Task aktiv und verlässt Editing: Content Flow ergänzt die
+   vorausgewählte Option „aktive Bearbeitung beenden" samt Lifecycle-Hinweis
  → Klick auf "OK" im Dialog
- → readStageTransitionForm(form) liest comment/recipients/additional
- → POST contentflow_task_execute_stage { task, stageUid, comment, recipients, additional }
+ → readStageTransitionForm(form) liest comment/recipients/additional/deactivateActiveTask
+ → POST contentflow_task_execute_stage { task, stageUid, comment, recipients,
+   additional, deactivateActiveTask }
  → TaskAjaxController::executeStageAction()  [TaskAjaxController.php:860]
     → StageTransitionService::transition() — echter Core-Stage-Wechsel
       (sys_history, Benachrichtigungen laufen durch Core)
+    → erst nach Erfolg: ActiveTaskSession::forgetIfTask(), falls gewählt
  → modal.hideModal(), window.location.reload()
 ```
 
-#### d) Ticket ohne Seite ("Neue Seite erstellen") in "In Progress" ziehen
+#### d) Ticket ohne Subject in "In Progress" ziehen
 
-Sonderfall in `moveStageAction()` (Zeile 429 ff.): `subject_table ===
-'pages' && subject_uid === 0` (ein per `createPendingPageAction()`
-angelegtes reines Plan-Ticket ohne echten Datensatz). Zielspalte hat eine
-Version (`state->hasVersion()`) →
+Sonderfall in `moveStageAction()`: `subject_uid === 0` bezeichnet ein reines
+Plan-Ticket ohne echten Datensatz. Je nach `subject_table` wird Core zum
+Erstellen einer Seite oder eines Records geöffnet:
 
 ```
-TaskAjaxController::moveStageAction() → requestPageWizard($task)  [Zeile 1080]
+Pending Page (`subject_table === 'pages'`):
+TaskAjaxController::moveStageAction() → requestPageWizard($task)
  → JsonResponse { requiresPageWizard: true, positionData: … }
  → board.moveTaskToColumn() erkennt requiresPageWizard === true
  → board.openPageWizard(result, cardTitle)   [board.js:261]
@@ -261,6 +266,16 @@ TaskAjaxController::moveStageAction() → requestPageWizard($task)  [Zeile 1080]
          TaskAutoCreationDataHandlerHook → PendingPageClaimService::
          claimCreatedPage() verknüpft Ticket mit der neuen Seite
          (siehe Abschnitt 0)
+
+Pending Record (`subject_table !== 'pages'`):
+TaskAjaxController::moveStageAction() → requestRecordTarget($task)
+ → board.openRecordTargetModal() lädt contentflow_task_record_creation_targets
+ → Editor wählt eine zulässige Zielseite
+ → contentflow_task_start_record_creation speichert PendingSubjectHandoff
+   und öffnet Core-FormEngine (record_edit, command=new)
+ → DataHandler-Save triggert PendingSubjectClaimService::claimCreatedSubject()
+   → Subject + Membership werden gesetzt, Task wechselt nach Editing
+ → Return-Route löscht einen nicht verbrauchten Handoff und öffnet das Board
 ```
 
 #### e) „+ New task" klicken
@@ -275,15 +290,16 @@ Klick auf [data-contentflow-action="create-task"] (ohne data-contentflow-page)
       3. „Datensatz auswählen" → openRecordPicker()
            → Core Element-Browser (Modal.types.iframe, elementBrowserUrl)
            → Event 'typo3:element-browser:message' → openNewTaskWizard(table, uid, label)
-      4. „Neuen Datensatz anlegen" → openCoreRecordWizard(newRecordUrl, …)
-           → Core-FormEngine im Iframe; beim Schließen: window.location.reload()
-             (Task entsteht dann über den normalen captureEdit()-Pfad, Abschnitt 0)
+      4. „Neuen Datensatz anlegen" → openPendingRecordWizard()
+           → <contentflow-task-wizard .pending={mode:'create_pending_record', parentPid}>
+           → Record-Typ + Task-Details werden gesammelt; der echte Record
+             entsteht erst beim Wechsel des Tickets nach Editing (Abschnitt d)
  → <contentflow-task-wizard> ist Core-eigene Wizard-Shell
    (@typo3/backend/wizard/wizard.js), Schritte in wizard/steps/*.js,
    siehe Classes/Wizard/TaskWizardProvider.php für die Server-Logik.
- → Abschluss des Wizards für „create_from_picker"/„create_pending_page"
-   → TaskAjaxController::createAction() bzw. createPendingPageAction()
-   → JsonResponse { success:true, task: <uid> }
+ → Abschluss für `create_from_picker`, `create_pending_page` oder
+   `create_pending_record` läuft über TaskWizardProvider::handleSubmit()
+   → SubmissionResult { success:true, finisher.data.task: <uid> }
 ```
 
 #### f) Ticket öffnen (Klick auf Kartentitel)
@@ -397,6 +413,8 @@ alle unter `/contentflow/...`, alle auf `TaskAjaxController`:
 | `contentflow_task_create` | `createAction()` | create-wizard.js, VE-Select „+ Create" |
 | `contentflow_task_create_pending_page` | `createPendingPageAction()` | create-wizard.js |
 | `contentflow_task_cancel_page_wizard` | `cancelPageWizardAction()` | board.js (Seitenassistent abgebrochen) |
+| `contentflow_task_record_creation_targets` | `recordCreationTargetsAction()` | board.js (Zielseite für Pending Record) |
+| `contentflow_task_start_record_creation` | `startRecordCreationAction()` | board.js (Core-FormEngine öffnen) |
 | `contentflow_task_attach` | `attachAction()` | „Select to task" (Element-Browser-Fluss) |
 | `contentflow_task_detach` | `detachAction()` | Split-from-task-Aktion im Ticket |
 | `contentflow_task_preview_member` | `previewMemberAction()` | task/member-actions.js |
@@ -406,6 +424,8 @@ alle unter `/contentflow/...`, alle auf `TaskAjaxController`:
 | `contentflow_task_details` | `detailsAction()` | (Inspector-Detaildaten) |
 | `contentflow_task_list_open_for_page` | `listOpenTasksForPageAction()` | **VE**: task-select.js `reloadTasks()` |
 | `contentflow_task_set_active_for_page` | `setActiveTaskForPageAction()` | **VE**: task-select.js `onChange()` |
+| `contentflow_task_active_context` | `activeTaskContextAction()` | globales DocHeader-Control |
+| `contentflow_task_set_active_context` | `setActiveTaskForContextAction()` | Board/Layout/Record-Formular |
 | `contentflow_task_list_member_markers` | `listMemberTaskMarkersForPageAction()` | **VE**: task-select.js `reloadMarkers()` |
 | `contentflow_task_comment` | `commentAction()` | task/comment.js |
 | `contentflow_task_ticket` | `ticketAction()` | board.js/visual-editor-markers.js `openTicket()` |
@@ -633,7 +653,7 @@ change-Event auf <select>
         → StageTransitionService::transition(…, STAGE_EDIT_ID, …)
           (Rückstufung nach Editing MIT automatischem Kommentar
           „ve.comment.reopened")
-      → ActiveTaskSession::remember(pageUid, taskUid)
+      → ActiveTaskSession::rememberForContext('pages', pageUid, taskUid)
  → Antwort: { success, taskUid, state, stageLabel, transitioned, comment, commentUid }
  → onChange() aktualisiert Options-Text „Titel (Stage)"
  → falls transitioned: Notification.success(„taskActive")
@@ -902,6 +922,7 @@ Escaping vorhanden, da kein Template beteiligt ist).
 | Board | `ContentFlowController::indexAction()` | `board.js` (direkt) | `ContentFlowController` + `LoadWizardModuleEventListener` |
 | Visual Editor | (kein eigener Controller — reine Backend-Chrome) | `wizard.js` → `visual-editor-task-select.js` (dynamischer Import) | injizierte `<style>`-Blöcke, **nicht** `Styles.css` |
 | Layout-Modul | `PageModuleEventListener::__invoke()` | `board.js` (erneut, für Banner-Buttons) + `wizard.js` | `PageModuleEventListener` + `LoadWizardModuleEventListener` |
+| Record-/sonstiges Modul | `ActiveTaskButtonBarEventListener::__invoke()` | `active-task-control.js` | `ActiveTaskButtonBarEventListener` |
 | Jede Backend-Seite (global) | `LoadWizardModuleEventListener::__invoke()` | `wizard.js` | `Styles.css` |
 
 ### 4.2 Vorgehen, um zu einem Klick den Code zu finden

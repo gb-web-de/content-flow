@@ -18,8 +18,8 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 /**
  * Dragging a Backlog/Planned task into Editing is now a start-work action, not
  * a dead end. Page tasks become the page's active task and send the editor to
- * the page module; record tasks jump straight to their record edit form and do
- * not hijack the whole page.
+ * the page module; record tasks jump straight to their record edit form and are
+ * active only for that exact record.
  */
 final class BoardStartEditingTest extends FunctionalTestCase
 {
@@ -110,7 +110,7 @@ final class BoardStartEditingTest extends FunctionalTestCase
     }
 
     #[Test]
-    public function droppingARecordTaskIntoEditingStartsItWithoutMakingTheWholePageActive(): void
+    public function droppingARecordTaskIntoEditingMakesOnlyThatRecordActive(): void
     {
         $taskUid = $this->createTask([
             'title' => 'Intro text',
@@ -136,6 +136,13 @@ final class BoardStartEditingTest extends FunctionalTestCase
         self::assertNull(
             $this->get(ActiveTaskSession::class)->resolve($GLOBALS['BE_USER'], 2),
             'editing one record must not route every later save on that page onto this task',
+        );
+        self::assertSame(
+            $taskUid,
+            $this->get(ActiveTaskSession::class)->resolveForEdit($GLOBALS['BE_USER'], 'tt_content', 10, 2),
+        );
+        self::assertNull(
+            $this->get(ActiveTaskSession::class)->resolveForEdit($GLOBALS['BE_USER'], 'tt_content', 11, 2),
         );
     }
 }

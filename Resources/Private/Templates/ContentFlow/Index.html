@@ -134,7 +134,7 @@
                     </h3>
                     <ul class="contentflow-column-cards" role="listbox" aria-multiselectable="true">
                         <f:for each="{column.cards}" as="card">
-                            <li class="contentflow-card {f:if(condition: card.foreignWorkspace, then: 'contentflow-card--foreign-workspace')} {card.dueDateCardClass}"
+                            <li class="contentflow-card {f:if(condition: card.foreignWorkspace, then: 'contentflow-card--foreign-workspace')} {f:if(condition: card.isActive, then: 'contentflow-card--active')} {card.dueDateCardClass}"
                                 draggable="{f:if(condition: card.foreignWorkspace, then: 'false', else: 'true')}"
                                 tabindex="0"
                                 role="option"
@@ -147,6 +147,7 @@
                                 data-contentflow-stage="{card.stage_uid}"
                                 data-contentflow-workspace="{card.workspace_uid}"
                                 data-contentflow-auto="{card.auto_created}"
+                                data-contentflow-active="{f:if(condition: card.isActive, then: 'true', else: 'false')}"
                                 data-contentflow-warned="{card.warnedCount}"
                                 data-contentflow-can-act="{f:if(condition: card.canAct, then: 'true', else: 'false')}">
                                 <div class="contentflow-card-header">
@@ -194,6 +195,11 @@
                                         <f:if condition="{card.auto_created}">
                                             <span class="badge badge-info contentflow-badge-auto" title="Created automatically when editing started">auto</span>
                                         </f:if>
+                                        <f:if condition="{card.isActive}">
+                                            <span class="badge contentflow-badge-active">
+                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:banner.active" default="you are working on this" />
+                                            </span>
+                                        </f:if>
                                         <f:if condition="{card.warnedCount} > 0">
                                             <span class="badge badge-warning" title="Contains elements referenced across pages">
                                                 <core:icon identifier="actions-info" size="small" /> {card.warnedCount} shared
@@ -234,6 +240,28 @@
                                     </f:if>
 
                                     <div class="contentflow-card-actions">
+                                        <f:if condition="{card.subject_uid} > 0 && !{card.foreignWorkspace}">
+                                            <f:then>
+                                                <f:if condition="{card.isActive}">
+                                                    <f:then>
+                                                        <button type="button" class="btn btn-xs btn-warning"
+                                                                data-contentflow-stop-editing data-contentflow-task-uid="{card.uid}"
+                                                                data-contentflow-reload="true">
+                                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:active.stop" default="Stop editing" />
+                                                        </button>
+                                                    </f:then>
+                                                    <f:else>
+                                                        <button type="button" class="btn btn-xs btn-default"
+                                                                data-contentflow-set-active="{card.uid}"
+                                                                data-contentflow-context-table="{card.subject_table}"
+                                                                data-contentflow-context-uid="{card.subject_uid}"
+                                                                data-contentflow-reload="true">
+                                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:active.start" default="Work on this task" />
+                                                        </button>
+                                                    </f:else>
+                                                </f:if>
+                                            </f:then>
+                                        </f:if>
                                         <f:if condition="{card.workspace_uid} > 0 && !{card.foreignWorkspace}">
                                             <button type="button" class="btn btn-xs btn-primary contentflow-action-publish"
                                                     data-task-uid="{card.uid}" data-task-title="{card.title}">

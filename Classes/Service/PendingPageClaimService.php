@@ -51,7 +51,7 @@ final readonly class PendingPageClaimService
             return;
         }
 
-        $this->taskRepository->attachCreatedSubject($taskUid, $pageUid);
+        $this->taskRepository->attachCreatedSubject($taskUid, 'pages', $pageUid, $pageUid);
         // A record created inside a workspace already sits in Editing; this only
         // makes the task's own bookkeeping say the same thing.
         $this->taskRepository->attachWorkspace($taskUid, $workspaceUid, StagesService::STAGE_EDIT_ID);

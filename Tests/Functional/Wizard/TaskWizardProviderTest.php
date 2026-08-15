@@ -59,6 +59,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
             $this->get(ActivityLogger::class),
             $this->get(\GbWeb\ContentFlow\Notification\AssignmentNotificationService::class),
             $this->get(\GbWeb\ContentFlow\Domain\Repository\CommentRepository::class),
+            $this->get(\GbWeb\ContentFlow\Service\RecordCreationTargetProvider::class),
             $this->get(UriBuilder::class),
             new NullLogger(),
         );
@@ -324,6 +325,62 @@ final class TaskWizardProviderTest extends FunctionalTestCase
             'mode' => 'create_pending_page',
             'parentPid' => 1,
             'title' => '',
+        ]))->jsonSerialize();
+
+        self::assertFalse($result['success']);
+        self::assertNotEmpty($result['errors']);
+    }
+
+    #[Test]
+    public function pendingRecordConfigurationStartsWithTypeAndTaskDetails(): void
+    {
+        $GLOBALS['BE_USER']->setWorkspace(1);
+
+        $configuration = $this->subject()->getConfiguration($this->configRequest([
+            'pending' => ['mode' => 'create_pending_record', 'parentPid' => 1],
+        ]))->jsonSerialize();
+
+        self::assertSame([
+            '@gb-web/content-flow/wizard/steps/record-type-step.js',
+            '@gb-web/content-flow/wizard/steps/task-details-step.js',
+        ], array_column($configuration['steps'], 'module'));
+        self::assertContains(
+            'tt_content',
+            array_column($configuration['steps'][0]['configurationData']['recordTypes'], 'table'),
+        );
+    }
+
+    #[Test]
+    public function creatingAPendingRecordTaskKeepsItsSubjectEmpty(): void
+    {
+        $GLOBALS['BE_USER']->setWorkspace(1);
+
+        $result = $this->subject()->handleSubmit($this->submitRequest([
+            'mode' => 'create_pending_record',
+            'parentPid' => 1,
+            'recordType' => 'tt_content',
+            'title' => 'New hero element',
+            'assignee' => 'me',
+        ]))->jsonSerialize();
+
+        self::assertTrue($result['success']);
+        $taskUid = (int)$result['finisher']['data']['task'];
+        $task = $this->fetchRow('tx_contentflow_task', $taskUid);
+        self::assertSame('tt_content', $task['subject_table']);
+        self::assertSame(0, (int)$task['subject_uid']);
+        self::assertSame(1, (int)$task['subject_pid']);
+    }
+
+    #[Test]
+    public function pendingRecordCreationRejectsANonCreatableTable(): void
+    {
+        $GLOBALS['BE_USER']->setWorkspace(1);
+
+        $result = $this->subject()->handleSubmit($this->submitRequest([
+            'mode' => 'create_pending_record',
+            'parentPid' => 1,
+            'recordType' => 'sys_log',
+            'title' => 'Impossible record',
         ]))->jsonSerialize();
 
         self::assertFalse($result['success']);

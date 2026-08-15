@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace GbWeb\ContentFlow\Service;
 
+use GbWeb\ContentFlow\Domain\Model\TaskState;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 
 /**
- * "This page's edits go to this task" - the declaration an editor makes in the
- * Visual Editor's task select before typing anything, kept in the backend
- * user's session so every later save can honour it.
+ * "This context's edits go to this task" - the declaration an editor makes
+ * before typing anything, kept in the backend user's session so every later
+ * save can honour it.
  *
  * It lives in a service of its own because two sides need the same answer and
  * must not disagree about it: TaskAjaxController writes it and reads it back to
@@ -19,10 +20,10 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
  * exist only inside TaskAutoCreationService, which left the select with no way
  * to show what the server was already doing.
  *
- * Resolution is deliberately strict: a choice only counts for the page it was
- * made on, and only while that task is still open. A task that was published or
- * closed in the meantime silently stops routing anything, rather than sending
- * edits onto a finished piece of work.
+ * Page contexts cover every editable record on that page. Record contexts cover
+ * exactly one record, so starting a dedicated content-element task cannot hijack
+ * later saves of its siblings. A task that was published or closed silently
+ * stops routing anything.
  */
 final readonly class ActiveTaskSession
 {
@@ -39,8 +40,22 @@ final readonly class ActiveTaskSession
 
     public function remember(BackendUserAuthentication $backendUser, int $pageUid, int $taskUid): void
     {
+        $this->rememberForContext($backendUser, 'pages', $pageUid, $taskUid);
+    }
+
+    public function rememberForContext(
+        BackendUserAuthentication $backendUser,
+        string $table,
+        int $uid,
+        int $taskUid,
+    ): void {
+        if ($table === '' || $uid < 1 || $taskUid < 1) {
+            throw new \InvalidArgumentException('An active task requires a record context and task uid.');
+        }
+
         $backendUser->setAndSaveSessionData(self::SESSION_KEY, [
-            'pageUid' => $pageUid,
+            'table' => $table,
+            'uid' => $uid,
             'taskUid' => $taskUid,
         ]);
     }
@@ -54,26 +69,78 @@ final readonly class ActiveTaskSession
         $backendUser->setAndSaveSessionData(self::SESSION_KEY, null);
     }
 
+    public function forgetIfTask(BackendUserAuthentication $backendUser, int $taskUid): bool
+    {
+        $active = $this->current($backendUser);
+        if ($active === null || $active['taskUid'] !== $taskUid) {
+            return false;
+        }
+
+        $this->forget($backendUser);
+        return true;
+    }
+
     public function resolve(BackendUserAuthentication $backendUser, int $pageUid): ?int
     {
+        $active = $this->current($backendUser);
+        if ($active === null || $active['table'] !== 'pages' || $active['uid'] !== $pageUid) {
+            return null;
+        }
+
+        return $active['taskUid'];
+    }
+
+    public function resolveForEdit(
+        BackendUserAuthentication $backendUser,
+        string $table,
+        int $recordUid,
+        int $pageUid,
+    ): ?int {
+        $active = $this->current($backendUser);
+        if ($active === null) {
+            return null;
+        }
+
+        if ($active['table'] === 'pages' && $active['uid'] === $pageUid) {
+            return $active['taskUid'];
+        }
+        if ($active['table'] === $table && $active['uid'] === $recordUid) {
+            return $active['taskUid'];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{table: string, uid: int, taskUid: int}|null
+     */
+    public function current(BackendUserAuthentication $backendUser): ?array
+    {
         $active = $backendUser->getSessionData(self::SESSION_KEY);
-        if (!is_array($active) || (int)($active['pageUid'] ?? 0) !== $pageUid) {
+        if (!is_array($active)) {
             return null;
         }
+
+        // Sessions written before record-scoped activation used pageUid only.
+        $table = (string)($active['table'] ?? 'pages');
+        $uid = (int)($active['uid'] ?? $active['pageUid'] ?? 0);
         $taskUid = (int)($active['taskUid'] ?? 0);
-        if ($taskUid < 1) {
+        if ($table === '' || $uid < 1 || $taskUid < 1) {
+            $this->forget($backendUser);
             return null;
         }
+
         $task = $this->taskRepository->findByUid($taskUid);
         if (
             $task === null
             || (int)$task['closed'] === 1
-            || (string)$task['state'] === \GbWeb\ContentFlow\Domain\Model\TaskState::DONE->value
+            || (string)$task['state'] === TaskState::DONE->value
             || (int)$task['workspace_uid'] !== (int)$backendUser->workspace
         ) {
+            $this->forget($backendUser);
             return null;
         }
 
-        return $taskUid;
+        return ['table' => $table, 'uid' => $uid, 'taskUid' => $taskUid];
     }
 }

@@ -26,6 +26,15 @@ return [
         'path' => '/contentflow/task/cancel-page-wizard',
         'target' => TaskAjaxController::class . '::cancelPageWizardAction',
     ],
+    // Pending record task: choose a valid page and open core FormEngine there.
+    'contentflow_task_record_creation_targets' => [
+        'path' => '/contentflow/task/record-creation-targets',
+        'target' => TaskAjaxController::class . '::recordCreationTargetsAction',
+    ],
+    'contentflow_task_start_record_creation' => [
+        'path' => '/contentflow/task/start-record-creation',
+        'target' => TaskAjaxController::class . '::startRecordCreationAction',
+    ],
     // "Select to task": move selected records onto a task.
     'contentflow_task_attach' => [
         'path' => '/contentflow/task/attach',
@@ -70,6 +79,15 @@ return [
     'contentflow_task_set_active_for_page' => [
         'path' => '/contentflow/task/set-active-for-page',
         'target' => TaskAjaxController::class . '::setActiveTaskForPageAction',
+    ],
+    // Shared active-task control for Board, Layout and record edit forms.
+    'contentflow_task_active_context' => [
+        'path' => '/contentflow/task/active-context',
+        'target' => TaskAjaxController::class . '::activeTaskContextAction',
+    ],
+    'contentflow_task_set_active_context' => [
+        'path' => '/contentflow/task/set-active-context',
+        'target' => TaskAjaxController::class . '::setActiveTaskForContextAction',
     ],
     // Visual Editor hover markers: which task already claims which record on a page.
     'contentflow_task_list_member_markers' => [

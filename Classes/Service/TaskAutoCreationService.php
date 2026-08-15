@@ -81,14 +81,15 @@ final class TaskAutoCreationService
         $beUserId = (int)($dataHandler->BE_USER->user['uid'] ?? 0);
         $pageUid = $this->derivePid($table, $liveUid);
 
-        // 0. The editor already declared "this page's edits go to this task"
-        // via the Visual Editor's persistent task select
-        // (TaskAjaxController::setActiveTaskForPageAction()) - honour it for
-        // an edit on ANY surface (Visual Editor, Layout, Records), not only
-        // the one the choice was made from. The choice is explicit and
-        // proactive, so it outranks the automatic routing below entirely -
-        // there is nothing left to ask, and no pending wizard to queue.
-        $activeTaskUid = $this->activeTaskSession->resolve($dataHandler->BE_USER, $pageUid);
+        // 0. An explicit active task outranks automatic routing. Page-scoped
+        // choices cover the whole page; record-scoped choices only match the
+        // exact live record being saved.
+        $activeTaskUid = $this->activeTaskSession->resolveForEdit(
+            $dataHandler->BE_USER,
+            $table,
+            $liveUid,
+            $pageUid,
+        );
         if ($activeTaskUid !== null) {
             $homePid = $this->derivePid($table, $liveUid);
             $shared = $this->referenceInspector->isSharedAcrossPages($table, $liveUid, $homePid);
