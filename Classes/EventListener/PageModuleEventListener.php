@@ -61,7 +61,7 @@ final class PageModuleEventListener
         // the Visual Editor is marked as theirs, the same distinction the
         // editor's own bubbles make there.
         $tasks = $this->taskRepository->findAllOpenForPage($pageUid);
-        $activeTaskUid = $this->activeTaskSession->current($this->getBackendUser())['taskUid'] ?? 0;
+        $activeTaskUid = ($this->activeTaskSession->current($this->getBackendUser()) ?? [])['taskUid'] ?? 0;
         if (!in_array($activeTaskUid, array_map(static fn (array $task): int => (int)$task['uid'], $tasks), true)) {
             $activeTaskUid = 0;
         }
