@@ -171,31 +171,12 @@
 .contentflow-record-type-option {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 10px;
+    align-items: flex-start;    gap: 10px;
     padding: 10px 12px;
     border: 1px solid var(--typo3-component-border-color, #d1d5db);
     border-radius: var(--contentflow-card-radius);
     cursor: pointer;
-    min-width: 0;
-}
-
-.contentflow-record-type-option:has(input:checked) {
-    border-color: var(--contentflow-accent);
-    background: color-mix(in srgb, var(--contentflow-accent) 8%, transparent);
-}
-
-.contentflow-record-type-option span {
-    flex: 1 1 auto;
-    min-width: 160px;
-}
-
-.contentflow-record-type-option small {
-    flex: 1 0 100%;
-    margin-left: 26px;
-    opacity: .6;
-    overflow-wrap: anywhere;
-}
+    min-width: 0;}
 
 .contentflow-record-ref--pending {
     font-style: italic;
@@ -343,7 +324,6 @@
 .contentflow-stage-notify[open] .contentflow-stage-notify-summary {
     margin-bottom: 10px;
 }
-
 .contentflow-stage-active-choice .form-text {
     margin-left: 24px;
 }
