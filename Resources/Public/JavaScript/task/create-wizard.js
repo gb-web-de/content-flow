@@ -1,6 +1,6 @@
 /*
- * The "+" flow: four entry points (plan a new page, pick an existing page,
- * pick any record, create a new record via core's own wizard), each ending
+ * The "+" flow: five entry points grouped by what an editor means:
+ * page (`pages`), content element (`tt_content`) and other records; each ending
  * up collecting task details through the same native wizard shell the
  * post-save routing wizard uses (see wizard/task-wizard.js,
  * Classes/Wizard/TaskWizardProvider.php) - a synthetic pending payload rather
@@ -18,6 +18,8 @@ import { WIZARD_MODAL_SIZE } from '@gb-web/content-flow/wizard/task-wizard.js'
 import { taskContextTitle } from '@gb-web/content-flow/task/task-context-title.js'
 
 const ELEMENT_BROWSER_FIELD_REFERENCE_PREFIX = 'contentflow-create-target'
+const PAGE_TABLE = 'pages'
+const CONTENT_ELEMENT_TABLE = 'tt_content'
 
 // The extension's name, not a sentence - it stays out of the label file.
 const NOTIFICATION_TITLE = 'Content Flow'
@@ -25,14 +27,19 @@ const NOTIFICATION_TITLE = 'Content Flow'
 function getAllowedCreateTables() {
   const configuredTables = TYPO3.settings.ContentFlow?.createTargetTables
   if (!Array.isArray(configuredTables) || configuredTables.length === 0) {
-    return ['pages']
+    return [PAGE_TABLE]
   }
 
   const tables = configuredTables
     .map((table) => String(table).trim())
     .filter((table) => table !== '')
 
-  return tables.length > 0 ? [...new Set(tables)] : ['pages']
+  return tables.length > 0 ? [...new Set(tables)] : [PAGE_TABLE]
+}
+
+function getAllowedRecordTables() {
+  return getAllowedCreateTables()
+    .filter((table) => table !== PAGE_TABLE && table !== CONTENT_ELEMENT_TABLE)
 }
 
 function parseSelectedRecord(value) {
@@ -113,7 +120,7 @@ function openPendingRecordWizard() {
   })
 }
 
-function openRecordPicker(allowedTypesOverride) {
+function openRecordPicker(allowedTypesOverride, titleLabelKey = 'entry.recordPicker.title') {
   const baseUrl = TYPO3.settings.ContentFlow?.elementBrowserUrl
   if (!baseUrl) {
     Notification.error(NOTIFICATION_TITLE, labels.get('wizard.error.elementBrowserMissing'))
@@ -122,6 +129,11 @@ function openRecordPicker(allowedTypesOverride) {
 
   const currentPageId = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
   const allowedTypes = allowedTypesOverride || getAllowedCreateTables()
+  if (allowedTypes.length === 0) {
+    Notification.warning(NOTIFICATION_TITLE, labels.get('entry.record.empty'))
+    return
+  }
+
   const params = new URLSearchParams({
     mode: 'db',
     allowedTypes: allowedTypes.join(','),
@@ -134,7 +146,7 @@ function openRecordPicker(allowedTypesOverride) {
 
   const modal = Modal.advanced({
     type: Modal.types.iframe,
-    title: labels.get('entry.recordPicker.title'),
+    title: labels.get(titleLabelKey),
     content: baseUrl + (baseUrl.includes('?') ? '&' : '?') + params.toString(),
     size: Modal.sizes.large,
     severity: SeverityEnum.notice,
@@ -158,58 +170,96 @@ function openRecordPicker(allowedTypesOverride) {
 }
 
 function openEntryChoiceWizard() {
-  const choices = [
+  const sections = [
     {
-      label: labels.get('entry.newPage.label'),
-      description: labels.get('entry.newPage.description'),
-      action: () => openPendingPageWizard(),
+      title: labels.get('entry.section.page'),
+      choices: [
+        {
+          label: labels.get('entry.newPage.label'),
+          description: labels.get('entry.newPage.description'),
+          action: () => openPendingPageWizard(),
+        },
+        {
+          label: labels.get('entry.existingPage.label'),
+          description: labels.get('entry.existingPage.description'),
+          action: () => openRecordPicker([PAGE_TABLE], 'entry.pagePicker.title'),
+        },
+      ],
     },
     {
-      label: labels.get('entry.existingPage.label'),
-      description: labels.get('entry.existingPage.description'),
-      action: () => openRecordPicker(['pages']),
+      title: labels.get('entry.section.contentElement'),
+      choices: [
+        {
+          label: labels.get('entry.contentElement.label'),
+          description: labels.get('entry.contentElement.description'),
+          action: () => openRecordPicker([CONTENT_ELEMENT_TABLE], 'entry.contentElementPicker.title'),
+        },
+      ],
     },
     {
-      label: labels.get('entry.record.label'),
-      description: labels.get('entry.record.description'),
-      action: () => openRecordPicker(),
-    },
-    {
-      label: labels.get('entry.newRecord.label'),
-      description: labels.get('entry.newRecord.description'),
-      action: () => openPendingRecordWizard(),
+      title: labels.get('entry.section.record'),
+      choices: [
+        {
+          label: labels.get('entry.record.label'),
+          description: labels.get('entry.record.description'),
+          action: () => openRecordPicker(getAllowedRecordTables(), 'entry.recordPicker.title'),
+        },
+        {
+          label: labels.get('entry.newRecord.label'),
+          description: labels.get('entry.newRecord.description'),
+          action: () => openPendingRecordWizard(),
+        },
+      ],
     },
   ]
 
-  const list = document.createElement('div')
-  list.className = 'contentflow-entry-choices'
-
   let modal
-  choices.forEach(({ label, description, action }) => {
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.className = 'btn btn-default contentflow-entry-choice'
 
-    const title = document.createElement('span')
-    title.className = 'contentflow-entry-choice-title'
-    title.textContent = label
+  const content = document.createElement('div')
+  content.className = 'contentflow-entry-chooser'
 
-    const hint = document.createElement('span')
-    hint.className = 'contentflow-entry-choice-hint'
-    hint.textContent = description
+  const buildChoiceSection = ({ title, choices }) => {
+    const section = document.createElement('section')
+    section.className = 'contentflow-entry-section'
+    section.setAttribute('aria-label', title)
 
-    button.append(title, hint)
-    button.addEventListener('click', () => {
-      modal.hideModal()
-      action()
+    const heading = document.createElement('h3')
+    heading.className = 'contentflow-entry-section-title'
+    heading.textContent = title
+
+    const list = document.createElement('div')
+    list.className = 'contentflow-entry-choices'
+    choices.forEach(({ label, description, action }) => {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = 'btn btn-default contentflow-entry-choice'
+
+      const title = document.createElement('span')
+      title.className = 'contentflow-entry-choice-title'
+      title.textContent = label
+
+      const hint = document.createElement('span')
+      hint.className = 'contentflow-entry-choice-hint'
+      hint.textContent = description
+
+      button.append(title, hint)
+      button.addEventListener('click', () => {
+        modal.hideModal()
+        action()
+      })
+      list.append(button)
     })
-    list.append(button)
-  })
+
+    section.append(heading, list)
+    return section
+  }
+
+  sections.forEach((section) => content.append(buildChoiceSection(section)))
 
   modal = Modal.advanced({
     type: Modal.types.default,
     title: labels.get('entry.title'),
-    content: list,
+    content,
     severity: SeverityEnum.notice,
     buttons: [
       {

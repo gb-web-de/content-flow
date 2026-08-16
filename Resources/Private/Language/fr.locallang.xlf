@@ -147,6 +147,18 @@
                 <source>Cancel</source>
                 <target>Annuler</target>
             </trans-unit>
+            <trans-unit id="entry.section.page" xml:space="preserve">
+                <source>Page</source>
+                <target>Page</target>
+            </trans-unit>
+            <trans-unit id="entry.section.contentElement" xml:space="preserve">
+                <source>Content element</source>
+                <target>Élément de contenu</target>
+            </trans-unit>
+            <trans-unit id="entry.section.record" xml:space="preserve">
+                <source>Record</source>
+                <target>Enregistrement</target>
+            </trans-unit>
             <trans-unit id="entry.newPage.label" xml:space="preserve">
                 <source>Create a new page</source>
                 <target>Créer une nouvelle page</target>
@@ -163,25 +175,45 @@
                 <source>Pick an existing page from the page tree.</source>
                 <target>Sélectionnez une page existante dans l’arborescence.</target>
             </trans-unit>
+            <trans-unit id="entry.contentElement.label" xml:space="preserve">
+                <source>Select a content element</source>
+                <target>Sélectionner un élément de contenu</target>
+            </trans-unit>
+            <trans-unit id="entry.contentElement.description" xml:space="preserve">
+                <source>Pick an existing content element from the page tree.</source>
+                <target>Sélectionnez un élément de contenu existant dans l’arborescence.</target>
+            </trans-unit>
             <trans-unit id="entry.record.label" xml:space="preserve">
                 <source>Select a record</source>
                 <target>Sélectionner un enregistrement</target>
             </trans-unit>
             <trans-unit id="entry.record.description" xml:space="preserve">
-                <source>Pick any record - page, content element or other.</source>
-                <target>Sélectionnez un enregistrement quelconque : page, élément de contenu ou autre.</target>
+                <source>Pick an existing record that is not a page or content element.</source>
+                <target>Sélectionnez un enregistrement existant qui n’est ni une page ni un élément de contenu.</target>
             </trans-unit>
             <trans-unit id="entry.newRecord.label" xml:space="preserve">
                 <source>Create a new record</source>
                 <target>Créer un nouvel enregistrement</target>
             </trans-unit>
             <trans-unit id="entry.newRecord.description" xml:space="preserve">
-                <source>Create a new record with TYPO3's own record wizard.</source>
-                <target>Créez un nouvel enregistrement avec l’assistant d’enregistrement de TYPO3.</target>
+                <source>Plan a new record - choose the record type now, then create it when this task moves into Editing.</source>
+                <target>Planifiez un nouvel enregistrement : choisissez le type maintenant, puis créez-le lorsque cette tâche passe dans Modification.</target>
+            </trans-unit>
+            <trans-unit id="entry.pagePicker.title" xml:space="preserve">
+                <source>Select a page</source>
+                <target>Sélectionner une page</target>
+            </trans-unit>
+            <trans-unit id="entry.contentElementPicker.title" xml:space="preserve">
+                <source>Select a content element</source>
+                <target>Sélectionner un élément de contenu</target>
             </trans-unit>
             <trans-unit id="entry.recordPicker.title" xml:space="preserve">
-                <source>Select a page, content element or record</source>
-                <target>Sélectionner une page, un élément de contenu ou un enregistrement</target>
+                <source>Select a record</source>
+                <target>Sélectionner un enregistrement</target>
+            </trans-unit>
+            <trans-unit id="entry.record.empty" xml:space="preserve">
+                <source>No record tables are available for task creation.</source>
+                <target>Aucune table d’enregistrements n’est disponible pour la création de tâches.</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.title" xml:space="preserve">
                 <source>Task details</source>
@@ -198,6 +230,18 @@
             <trans-unit id="step.recordType.empty" xml:space="preserve">
                 <source>No record type can be created in the current workspace.</source>
                 <target>Aucun type d’enregistrement ne peut être créé dans l’espace de travail actuel.</target>
+            </trans-unit>
+            <trans-unit id="step.recordType.search" xml:space="preserve">
+                <source>Search</source>
+                <target>Rechercher</target>
+            </trans-unit>
+            <trans-unit id="step.recordType.searchPlaceholder" xml:space="preserve">
+                <source>Filter record types</source>
+                <target>Filtrer les types d’enregistrement</target>
+            </trans-unit>
+            <trans-unit id="step.recordType.noResults" xml:space="preserve">
+                <source>No record types match your search.</source>
+                <target>Aucun type d’enregistrement ne correspond à votre recherche.</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.field.title" xml:space="preserve">
                 <source>Title</source>

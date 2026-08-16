@@ -20,6 +20,8 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 final class PendingRecordTicketMovesTest extends FunctionalTestCase
 {
+    private const RECORD_TABLE = 'sys_category';
+
     /**
      * @var string[]
      */
@@ -70,8 +72,8 @@ final class PendingRecordTicketMovesTest extends FunctionalTestCase
 
     private function createPendingRecordTask(): int
     {
-        $task = $this->get(TaskRepository::class)->createPendingSubjectTask(1, 'tt_content', [
-            'title' => 'New hero element',
+        $task = $this->get(TaskRepository::class)->createPendingSubjectTask(1, self::RECORD_TABLE, [
+            'title' => 'New category',
             'state' => TaskState::PLANNED->value,
             'workspace_uid' => 0,
             'closed' => 0,
@@ -100,7 +102,7 @@ final class PendingRecordTicketMovesTest extends FunctionalTestCase
         $move = $this->moveIntoEditing($taskUid);
         self::assertTrue($move['success']);
         self::assertTrue($move['requiresRecordTarget']);
-        self::assertSame('tt_content', $move['recordTable']);
+        self::assertSame(self::RECORD_TABLE, $move['recordTable']);
 
         $targets = $this->decode($this->subject()->recordCreationTargetsAction($this->request([
             'task' => $taskUid,
@@ -114,7 +116,7 @@ final class PendingRecordTicketMovesTest extends FunctionalTestCase
     {
         $this->getConnectionPool()->getConnectionForTable('pages')->update(
             'pages',
-            ['TSconfig' => 'mod.web_list.deniedNewTables = tt_content'],
+            ['TSconfig' => 'mod.web_list.deniedNewTables = ' . self::RECORD_TABLE],
             ['uid' => 2],
         );
         $taskUid = $this->createPendingRecordTask();
@@ -144,10 +146,10 @@ final class PendingRecordTicketMovesTest extends FunctionalTestCase
         self::assertTrue($start['success']);
         self::assertNotSame('', $start['redirectUrl']);
 
-        $recordUid = $this->createContentThroughDataHandler(2, 'Hero');
+        $recordUid = $this->createCategoryThroughDataHandler(2, 'Hero category');
         $task = $this->get(TaskRepository::class)->findByUid($taskUid);
 
-        self::assertSame('tt_content', $task['subject_table']);
+        self::assertSame(self::RECORD_TABLE, $task['subject_table']);
         self::assertSame($recordUid, (int)$task['subject_uid']);
         self::assertSame(2, (int)$task['subject_pid']);
         self::assertSame(1, (int)$task['workspace_uid']);
@@ -155,7 +157,7 @@ final class PendingRecordTicketMovesTest extends FunctionalTestCase
         self::assertSame(TaskState::IN_PROGRESS->value, $task['state']);
         self::assertSame(
             $taskUid,
-            (int)$this->get(TaskRepository::class)->findOpenTaskByMember('tt_content', $recordUid)['uid'],
+            (int)$this->get(TaskRepository::class)->findOpenTaskByMember(self::RECORD_TABLE, $recordUid)['uid'],
         );
         self::assertNull($this->get(PendingSubjectHandoff::class)->resolve($GLOBALS['BE_USER']));
     }
@@ -173,10 +175,10 @@ final class PendingRecordTicketMovesTest extends FunctionalTestCase
         ]));
         self::assertSame(303, $response->getStatusCode());
 
-        $recordUid = $this->createContentThroughDataHandler(2, 'Unrelated');
+        $recordUid = $this->createCategoryThroughDataHandler(2, 'Unrelated');
         $task = $this->get(TaskRepository::class)->findByUid($taskUid);
         self::assertSame(0, (int)$task['subject_uid']);
-        self::assertNull($this->get(TaskRepository::class)->findOpenTaskByMember('tt_content', $recordUid));
+        self::assertNull($this->get(TaskRepository::class)->findOpenTaskByMember(self::RECORD_TABLE, $recordUid));
     }
 
     #[Test]
@@ -212,17 +214,16 @@ final class PendingRecordTicketMovesTest extends FunctionalTestCase
         $handoff = $this->get(PendingSubjectHandoff::class)->resolve($GLOBALS['BE_USER']);
         self::assertIsArray($handoff);
         self::assertSame($taskUid, $handoff['taskUid']);
-        self::assertSame('tt_content', $handoff['subjectTable']);
+        self::assertSame(self::RECORD_TABLE, $handoff['subjectTable']);
     }
 
-    private function createContentThroughDataHandler(int $pageUid, string $header): int
+    private function createCategoryThroughDataHandler(int $pageUid, string $title): int
     {
         $placeholder = StringUtility::getUniqueId('NEW');
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
-        $dataHandler->start(['tt_content' => [$placeholder => [
+        $dataHandler->start([self::RECORD_TABLE => [$placeholder => [
             'pid' => $pageUid,
-            'header' => $header,
-            'CType' => 'text',
+            'title' => $title,
         ]]], []);
         $dataHandler->process_datamap();
 

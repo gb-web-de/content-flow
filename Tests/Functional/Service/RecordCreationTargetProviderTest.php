@@ -38,14 +38,15 @@ final class RecordCreationTargetProviderTest extends FunctionalTestCase
     }
 
     #[Test]
-    public function recordTypesContainEligibleWorkspaceTablesButNeverPages(): void
+    public function recordTypesContainEligibleWorkspaceTablesButNeverPagesOrContentElements(): void
     {
         $types = $this->get(RecordCreationTargetProvider::class)
             ->getCreatableRecordTypes($GLOBALS['BE_USER']);
         $tables = array_column($types, 'table');
 
-        self::assertContains('tt_content', $tables);
+        self::assertContains('sys_category', $tables);
         self::assertNotContains('pages', $tables);
+        self::assertNotContains('tt_content', $tables);
         self::assertNotContains('sys_log', $tables);
     }
 
@@ -54,12 +55,12 @@ final class RecordCreationTargetProviderTest extends FunctionalTestCase
     {
         $this->getConnectionPool()->getConnectionForTable('pages')->update(
             'pages',
-            ['TSconfig' => 'mod.web_list.deniedNewTables = tt_content'],
+            ['TSconfig' => 'mod.web_list.deniedNewTables = sys_category'],
             ['uid' => 2],
         );
 
         $targets = $this->get(RecordCreationTargetProvider::class)
-            ->getEligiblePages('tt_content', $GLOBALS['BE_USER']);
+            ->getEligiblePages('sys_category', $GLOBALS['BE_USER']);
         $pageUids = array_column($targets, 'uid');
 
         self::assertContains(1, $pageUids, 'the root of the accessible page tree is a valid target');
@@ -71,7 +72,7 @@ final class RecordCreationTargetProviderTest extends FunctionalTestCase
     {
         $this->setUpBackendUser(2);
         $GLOBALS['BE_USER']->workspace = 1;
-        $GLOBALS['BE_USER']->groupData['tables_modify'] = 'tt_content';
+        $GLOBALS['BE_USER']->groupData['tables_modify'] = 'sys_category';
         $this->getConnectionPool()->getConnectionForTable('pages')->update(
             'pages',
             ['perms_everybody' => 17],
@@ -79,7 +80,7 @@ final class RecordCreationTargetProviderTest extends FunctionalTestCase
         );
 
         $targets = $this->get(RecordCreationTargetProvider::class)
-            ->getEligiblePages('tt_content', $GLOBALS['BE_USER']);
+            ->getEligiblePages('sys_category', $GLOBALS['BE_USER']);
 
         self::assertSame([], $targets);
     }

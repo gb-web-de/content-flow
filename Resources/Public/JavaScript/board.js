@@ -23,6 +23,7 @@ import { SeverityEnum } from '@typo3/backend/enum/severity.js';
 import Workspaces from '@typo3/workspaces/workspaces.js';
 import { topLevelModuleImport } from '@typo3/backend/utility/top-level-module-import.js';
 import labels from '~labels/content_flow.messages';
+import workspacesLabels from '~labels/workspaces.messages';
 
 import { registerFilters } from '@gb-web/content-flow/board/filters.js';
 import { registerScopeControls } from '@gb-web/content-flow/board/scope.js';
@@ -277,7 +278,10 @@ class ContentFlowBoard {
       await topLevelModuleImport('@typo3/backend/page-wizard/page-wizard.js');
       const { openPageWizardModal } = await import('@typo3/backend/page-wizard/helper/wizard-helper.js');
 
-      await openPageWizardModal({ positionData: result.positionData });
+      // Core auto-advances from Step 1 (Position) to Step 2 (Type) when
+      // configuration.positionData is present. Content Flow must *start* at
+      // Step 1 and must not preselect the position.
+      await openPageWizardModal({});
       this.announce(`Creating the page for ${cardTitle}.`);
       this.dropPageWizardClaimWhenClosed();
     } catch (error) {
@@ -394,101 +398,99 @@ class ContentFlowBoard {
 
   async openStageTransitionModal(taskUid, targetStageUid, columnTitle, cardTitle, askToDeactivate = false) {
     try {
-      // TYPO3.Modal is reused from the parent frame when this board runs inside
-      // the backend's content iframe (see modal.js), so the dialog is built in
-      // the parent's realm. A plain `import` here would only register
-      // <typo3-workspaces-send-to-stage-form> in this iframe's realm and the
-      // element would stay undefined where it actually renders. Core's own
-      // iframe-hosted caller of this API (workspaces/backend.js) resolves this
-      // the same way: dispatch the import to the parent frame and let it
-      // register there.
-      await topLevelModuleImport('@typo3/workspaces/renderable/send-to-stage-form.js');
-
       const response = await this.workspaceUi.sendRemoteRequest(
         this.workspaceUi.generateRemotePayloadBody('sendToSpecificStageWindow', [targetStageUid]),
         '.contentflow-board',
       );
       const payload = await response.resolve();
 
-      if (payload?.[0]?.result?.success === false) {
+      const stageDialogData = payload?.[0]?.result;
+      if (!stageDialogData || stageDialogData.success === false) {
         Notification.error('Content Flow', 'TYPO3 refused to open the workspace stage dialog.');
         return;
       }
 
-      const modal = this.workspaceUi.renderSendToStageWindow(payload);
-      const appendChoice = () => {
-        const form = modal.querySelector('form');
-        if (askToDeactivate && form !== null && form.querySelector('[name="deactivateActiveTask"]') === null) {
-          this.appendActiveTaskChoice(form);
-        }
-      };
-      appendChoice();
-      modal.addEventListener('typo3-modal-shown', appendChoice, { once: true });
-      modal.addEventListener('button.clicked', async (event) => {
-        if (event.target.name !== 'ok') {
-          return;
-        }
+      const form = this.buildStageTransitionForm(stageDialogData, askToDeactivate);
+      const modal = Modal.advanced({
+        type: Modal.types.default,
+        title: workspacesLabels.get('actionSendToStage'),
+        content: form,
+        severity: SeverityEnum.info,
+        staticBackdrop: true,
+        buttons: [
+          {
+            text: workspacesLabels.get('cancel'),
+            active: true,
+            btnClass: 'btn-default',
+            name: 'cancel',
+            trigger: (event, currentModal) => currentModal.hideModal(),
+          },
+          {
+            text: workspacesLabels.get('ok'),
+            btnClass: 'btn-primary',
+            name: 'ok',
+            trigger: async (event, currentModal) => {
+              if (currentModal.dataset.contentflowSubmitting === '1') {
+                return;
+              }
 
-        // Not `instanceof HTMLFormElement`: TYPO3.Modal is reused from the parent
-        // frame when the board runs inside the backend content iframe (see
-        // modal.js), so the dialog's nodes belong to the parent's realm and
-        // would never match this frame's HTMLFormElement constructor.
-        const form = modal.querySelector('form');
-        if (form === null || form.tagName !== 'FORM') {
-          Notification.error('Content Flow', 'The workspace stage dialog could not be rendered.');
-          return;
-        }
+              const currentForm = currentModal.querySelector('form');
+              if (currentForm === null || currentForm.tagName !== 'FORM') {
+                Notification.error('Content Flow', 'The workspace stage dialog could not be rendered.');
+                return;
+              }
 
-        if (modal.dataset.contentflowSubmitting === '1') {
-          return;
-        }
+              currentModal.dataset.contentflowSubmitting = '1';
+              event.target.disabled = true;
 
-        modal.dataset.contentflowSubmitting = '1';
-        const submitButton = modal.querySelector('button[name="ok"]');
-        if (submitButton !== null) {
-          submitButton.disabled = true;
-        }
+              try {
+                const dialogValues = this.readStageTransitionForm(currentForm);
+                const result = await this.postJson(TYPO3.settings.ajaxUrls.contentflow_task_execute_stage, {
+                  task: taskUid,
+                  stageUid: targetStageUid,
+                  comment: dialogValues.comment,
+                  recipients: dialogValues.recipients,
+                  additional: dialogValues.additional,
+                  deactivateActiveTask: dialogValues.deactivateActiveTask,
+                });
+                if (result.success !== true) {
+                  Notification.error('Content Flow', result.message || 'Could not move the task to that stage.');
+                  return;
+                }
 
-        try {
-          const dialogValues = this.readStageTransitionForm(form);
-          const result = await this.postJson(TYPO3.settings.ajaxUrls.contentflow_task_execute_stage, {
-            task: taskUid,
-            stageUid: targetStageUid,
-            comment: dialogValues.comment,
-            recipients: dialogValues.recipients,
-            additional: dialogValues.additional,
-            deactivateActiveTask: dialogValues.deactivateActiveTask,
-          });
-          if (result.success !== true) {
-            Notification.error('Content Flow', result.message || 'Could not move the task to that stage.');
-            return;
-          }
-
-          modal.hideModal();
-          this.announce(`Moved ${cardTitle} to ${columnTitle}.`);
-          Notification.success('Content Flow', `${cardTitle} moved to ${columnTitle}.`);
-          // Soft warning, never a block: core already decided the move itself
-          // is allowed, this only flags that the stage being left had unchecked
-          // review items.
-          if (result.incompleteChecklistItems > 0) {
-            Notification.warning(
-              'Content Flow',
-              `${result.incompleteChecklistItems} checklist item(s) were left unchecked in the previous stage.`,
-            );
-          }
-          window.location.reload();
-        } catch (error) {
-          Notification.error(
-            'Content Flow',
-            await this.extractErrorMessage(error, 'Could not move the task to that stage.'),
-          );
-        } finally {
-          delete modal.dataset.contentflowSubmitting;
-          if (submitButton !== null) {
-            submitButton.disabled = false;
-          }
-        }
+                currentModal.hideModal();
+                this.announce(`Moved ${cardTitle} to ${columnTitle}.`);
+                Notification.success('Content Flow', `${cardTitle} moved to ${columnTitle}.`);
+                // Soft warning, never a block: core already decided the move itself
+                // is allowed, this only flags that the stage being left had unchecked
+                // review items.
+                if (result.incompleteChecklistItems > 0) {
+                  Notification.warning(
+                    'Content Flow',
+                    `${result.incompleteChecklistItems} checklist item(s) were left unchecked in the previous stage.`,
+                  );
+                }
+                window.location.reload();
+              } catch (error) {
+                Notification.error(
+                  'Content Flow',
+                  await this.extractErrorMessage(error, 'Could not move the task to that stage.'),
+                );
+              } finally {
+                delete currentModal.dataset.contentflowSubmitting;
+                event.target.disabled = false;
+              }
+            },
+          },
+        ],
       });
+
+      modal.addEventListener('typo3-modal-shown', () => {
+        const comment = modal.querySelector('#comments');
+        if (comment && typeof comment.focus === 'function') {
+          comment.focus();
+        }
+      }, { once: true });
     } catch (error) {
       Notification.error(
         'Content Flow',
@@ -578,6 +580,160 @@ class ContentFlowBoard {
     hint.textContent = labels.get('stage.deactivate.hint');
     section.append(wrapper, hint);
     form.append(section);
+  }
+
+  buildStageTransitionForm(stageDialogData, askToDeactivate) {
+    const wrapper = document.createElement('div');
+
+    const form = document.createElement('form');
+    form.className = 'contentflow-stage-dialog';
+    wrapper.append(form);
+
+    if (Array.isArray(stageDialogData.sendMailTo) && stageDialogData.sendMailTo.length > 0) {
+      const details = document.createElement('details');
+      details.className = 'contentflow-stage-notify';
+
+      const summary = document.createElement('summary');
+      summary.className = 'contentflow-stage-notify-summary';
+      details.append(summary);
+
+      const recipientSection = document.createElement('div');
+      recipientSection.className = 'contentflow-stage-notify-body';
+
+      const controls = document.createElement('div');
+      controls.className = 'form-group';
+
+      const selectAll = document.createElement('button');
+      selectAll.type = 'button';
+      selectAll.className = 'btn btn-default btn-xs';
+      selectAll.textContent = workspacesLabels.get('window.sendToNextStageWindow.selectAll');
+
+      const uncheckAll = document.createElement('button');
+      uncheckAll.type = 'button';
+      uncheckAll.className = 'btn btn-default btn-xs';
+      uncheckAll.textContent = workspacesLabels.get('window.sendToNextStageWindow.deselectAll');
+
+      controls.append(selectAll, document.createTextNode(' '), uncheckAll);
+
+      const list = document.createElement('div');
+      list.className = 'form-group';
+
+      stageDialogData.sendMailTo.forEach((recipient) => {
+        const row = document.createElement('div');
+        row.className = 'form-check';
+
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.className = 'form-check-input';
+        input.name = 'recipients';
+        input.value = String(recipient.value);
+        input.id = String(recipient.name);
+        input.checked = recipient.checked === true;
+        input.disabled = recipient.disabled === true;
+
+        const label = document.createElement('label');
+        label.className = 'form-check-label';
+        label.htmlFor = input.id;
+        label.textContent = String(recipient.label || recipient.value);
+
+        row.append(input, label);
+        list.append(row);
+      });
+
+      const updateSummary = () => {
+        const enabled = Array.from(list.querySelectorAll('input[name="recipients"]'))
+          .filter((input) => !input.disabled);
+        const checked = enabled.filter((input) => input.checked);
+        summary.textContent = `${workspacesLabels.get('window.sendToNextStageWindow.itemsWillBeSentTo')} (${checked.length}/${enabled.length})`;
+      };
+
+      const toggleAll = (checked) => {
+        list.querySelectorAll('input[name="recipients"]').forEach((input) => {
+          if (input.disabled) {
+            return;
+          }
+          input.checked = checked;
+        });
+        updateSummary();
+      };
+
+      selectAll.addEventListener('click', () => toggleAll(true));
+      uncheckAll.addEventListener('click', () => toggleAll(false));
+      list.addEventListener('change', updateSummary);
+      updateSummary();
+
+      recipientSection.append(controls, list);
+
+      if (stageDialogData.additional !== undefined) {
+        const additionalGroup = document.createElement('div');
+        additionalGroup.className = 'form-group';
+
+        const additionalLabel = document.createElement('label');
+        additionalLabel.className = 'form-label';
+        additionalLabel.htmlFor = 'additional';
+        additionalLabel.textContent = workspacesLabels.get('window.sendToNextStageWindow.additionalRecipients');
+
+        const additional = document.createElement('textarea');
+        additional.className = 'form-control';
+        additional.name = 'additional';
+        additional.id = 'additional';
+        additional.value = String(stageDialogData.additional?.value || '');
+
+        const additionalHint = document.createElement('div');
+        additionalHint.className = 'form-text';
+        additionalHint.textContent = workspacesLabels.get('window.sendToNextStageWindow.additionalRecipients.hint');
+
+        additionalGroup.append(additionalLabel, additional, additionalHint);
+        recipientSection.append(additionalGroup);
+      }
+
+      details.append(recipientSection);
+      form.append(details);
+    } else if (stageDialogData.additional !== undefined) {
+      const additionalGroup = document.createElement('div');
+      additionalGroup.className = 'form-group';
+
+      const additionalLabel = document.createElement('label');
+      additionalLabel.className = 'form-label';
+      additionalLabel.htmlFor = 'additional';
+      additionalLabel.textContent = workspacesLabels.get('window.sendToNextStageWindow.additionalRecipients');
+
+      const additional = document.createElement('textarea');
+      additional.className = 'form-control';
+      additional.name = 'additional';
+      additional.id = 'additional';
+      additional.value = String(stageDialogData.additional?.value || '');
+
+      const additionalHint = document.createElement('div');
+      additionalHint.className = 'form-text';
+      additionalHint.textContent = workspacesLabels.get('window.sendToNextStageWindow.additionalRecipients.hint');
+
+      additionalGroup.append(additionalLabel, additional, additionalHint);
+      form.append(additionalGroup);
+    }
+
+    const commentGroup = document.createElement('div');
+    commentGroup.className = 'form-group';
+
+    const commentLabel = document.createElement('label');
+    commentLabel.className = 'form-label';
+    commentLabel.htmlFor = 'comments';
+    commentLabel.textContent = workspacesLabels.get('window.sendToNextStageWindow.comments');
+
+    const comment = document.createElement('textarea');
+    comment.className = 'form-control';
+    comment.name = 'comments';
+    comment.id = 'comments';
+    comment.value = String(stageDialogData.comments?.value || '');
+
+    commentGroup.append(commentLabel, comment);
+    form.append(commentGroup);
+
+    if (askToDeactivate) {
+      this.appendActiveTaskChoice(form);
+    }
+
+    return wrapper;
   }
 
   parseStageUid(rawValue) {

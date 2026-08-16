@@ -94,7 +94,7 @@ final class ContentElementTaskBadgeListener
             return $this->claimsByPage[$pageUid];
         }
 
-        $activeTaskUid = $this->activeTaskSession->current($this->getBackendUser())['taskUid'] ?? 0;
+        $activeTaskUid = ($this->activeTaskSession->current($this->getBackendUser()) ?? [])['taskUid'] ?? 0;
 
         $claims = [];
         foreach ($this->taskRepository->findAllOpenForPage($pageUid) as $task) {

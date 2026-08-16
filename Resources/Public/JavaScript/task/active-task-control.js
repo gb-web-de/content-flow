@@ -20,7 +20,12 @@ class ActiveTaskControl {
 
   registerActions() {
     document.addEventListener('click', async (event) => {
-      const stopButton = event.target.closest('[data-contentflow-stop-editing]');
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) {
+        return;
+      }
+
+      const stopButton = target.closest('[data-contentflow-stop-editing]');
       if (stopButton !== null) {
         event.preventDefault();
         event.stopPropagation();
@@ -28,7 +33,7 @@ class ActiveTaskControl {
         return;
       }
 
-      const activateButton = event.target.closest('[data-contentflow-set-active]');
+      const activateButton = target.closest('[data-contentflow-set-active]');
       if (activateButton === null) {
         return;
       }

@@ -73,13 +73,16 @@ wurden.
 ```
 Configuration/Backend/Modules.php
   'web_contentflow' => [
-      'parent' => 'web',
+      'parent' => 'content',
+      'position' => ['after' => 'records'],
+      'navigationComponent' => '@typo3/backend/tree/page-tree-element',
       'controllerActions' => [ ContentFlowController::class => ['index'] ],
   ]
 ```
 
-Ein Klick auf den Menüpunkt „Content Flow" im Web-Modul-Baum ruft
-`GET /module/web/contentflow?id=<pageUid>` auf, was auf
+Ein Klick auf den Menüpunkt „Content Flow" im Content-Modulbereich zeigt den
+TYPO3-PageTree links und ruft weiterhin über die Modulkennung
+`web_contentflow` `GET /module/web/contentflow?id=<pageUid>` auf, was auf
 [Classes/Controller/ContentFlowController.php](Classes/Controller/ContentFlowController.php):`indexAction()`
 (Zeile 48) routet.
 
@@ -226,12 +229,11 @@ Gleicher Start wie b), aber `targetStageUid !== null`:
 
 ```
 board.handleCardDrop() → board.openStageTransitionModal()   [board.js:301]
- → topLevelModuleImport('@typo3/workspaces/renderable/send-to-stage-form.js')
-   (Import im PARENT-Frame, nicht im Iframe — sonst bleibt das Custom
-   Element <typo3-workspaces-send-to-stage-form> dort undefiniert)
  → Workspaces.sendRemoteRequest('sendToSpecificStageWindow', …)  (Core-API)
- → Core rendert den "An Stage senden"-Dialog (Kommentar, Empfänger)
- → ist der Task aktiv und verlässt Editing: Content Flow ergänzt die
+ → Content Flow baut daraus einen schlanken TYPO3-Modal-Dialog:
+    Kommentar, Benachrichtigungen als aufklappbarer Bereich, zusätzliche
+    Empfänger und dieselben Core-Labels wie EXT:workspaces
+ → ist der Task aktiv und verlässt Editing: der Dialog ergänzt die
    vorausgewählte Option „aktive Bearbeitung beenden" samt Lifecycle-Hinweis
  → Klick auf "OK" im Dialog
  → readStageTransitionForm(form) liest comment/recipients/additional/deactivateActiveTask
@@ -257,7 +259,10 @@ TaskAjaxController::moveStageAction() → requestPageWizard($task)
  → board.moveTaskToColumn() erkennt requiresPageWizard === true
  → board.openPageWizard(result, cardTitle)   [board.js:261]
     → topLevelModuleImport('@typo3/backend/page-wizard/page-wizard.js')
-    → openPageWizardModal({ positionData })   — Core-Seitenassistent
+    → openPageWizardModal({})   — Core-Seitenassistent startet in Step 1
+      "Position"; Content Flow übergibt bewusst keine `positionData`, damit
+      keine Position vorselektiert wird und Core nicht direkt zu Step 2
+      "Seitentyp" springt
     → Editor legt Seite an (oder bricht ab)
     → modal 'typo3-modal-hidden' → dropPageWizardClaimWhenClosed()
        → falls abgebrochen: POST contentflow_task_cancel_page_wizard
@@ -283,17 +288,27 @@ TaskAjaxController::moveStageAction() → requestRecordTarget($task)
 ```
 Klick auf [data-contentflow-action="create-task"] (ohne data-contentflow-page)
  → create-wizard.js: registerCreateButton() → openEntryChoiceWizard()  [Zeile 169]
-    Auswahl-Dialog mit 4 Optionen:
+    Auswahl-Dialog mit 3 Gruppen und 5 Optionen:
+      Gruppe „Page"
       1. „Neue Seite" → openPendingPageWizard()
            → <contentflow-task-wizard .pending={mode:'create_pending_page', parentPid}>
       2. „Bestehende Seite" → openRecordPicker(['pages'])
-      3. „Datensatz auswählen" → openRecordPicker()
+
+      Gruppe „Content element"
+      3. „Inhaltselement auswählen" → openRecordPicker(['tt_content'])
+
+      Gruppe „Record"
+      4. „Datensatz auswählen" → openRecordPicker(<alle erlaubten Tabellen
+         außer pages und tt_content>)
            → Core Element-Browser (Modal.types.iframe, elementBrowserUrl)
            → Event 'typo3:element-browser:message' → openNewTaskWizard(table, uid, label)
-      4. „Neuen Datensatz anlegen" → openPendingRecordWizard()
+      5. „Neuen Datensatz anlegen" → openPendingRecordWizard()
            → <contentflow-task-wizard .pending={mode:'create_pending_record', parentPid}>
            → Record-Typ + Task-Details werden gesammelt; der echte Record
-             entsteht erst beim Wechsel des Tickets nach Editing (Abschnitt d)
+             entsteht erst beim Wechsel des Tickets nach Editing (Abschnitt d).
+             `pages` und `tt_content` sind hier ausgeschlossen: Pages laufen
+             über den Page-Wizard, Content-Elemente über die eigene
+             Content-Element-Auswahl.
  → <contentflow-task-wizard> ist Core-eigene Wizard-Shell
    (@typo3/backend/wizard/wizard.js), Schritte in wizard/steps/*.js,
    siehe Classes/Wizard/TaskWizardProvider.php für die Server-Logik.

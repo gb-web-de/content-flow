@@ -127,6 +127,15 @@
             <trans-unit id="entry.cancel" xml:space="preserve">
                 <source>Cancel</source>
             </trans-unit>
+            <trans-unit id="entry.section.page" xml:space="preserve">
+                <source>Page</source>
+            </trans-unit>
+            <trans-unit id="entry.section.contentElement" xml:space="preserve">
+                <source>Content element</source>
+            </trans-unit>
+            <trans-unit id="entry.section.record" xml:space="preserve">
+                <source>Record</source>
+            </trans-unit>
             <trans-unit id="entry.newPage.label" xml:space="preserve">
                 <source>Create a new page</source>
             </trans-unit>
@@ -139,20 +148,35 @@
             <trans-unit id="entry.existingPage.description" xml:space="preserve">
                 <source>Pick an existing page from the page tree.</source>
             </trans-unit>
+            <trans-unit id="entry.contentElement.label" xml:space="preserve">
+                <source>Select a content element</source>
+            </trans-unit>
+            <trans-unit id="entry.contentElement.description" xml:space="preserve">
+                <source>Pick an existing content element from the page tree.</source>
+            </trans-unit>
             <trans-unit id="entry.record.label" xml:space="preserve">
                 <source>Select a record</source>
             </trans-unit>
             <trans-unit id="entry.record.description" xml:space="preserve">
-                <source>Pick any record - page, content element or other.</source>
+                <source>Pick an existing record that is not a page or content element.</source>
             </trans-unit>
             <trans-unit id="entry.newRecord.label" xml:space="preserve">
                 <source>Create a new record</source>
             </trans-unit>
             <trans-unit id="entry.newRecord.description" xml:space="preserve">
-                <source>Create a new record with TYPO3's own record wizard.</source>
+                <source>Plan a new record - choose the record type now, then create it when this task moves into Editing.</source>
+            </trans-unit>
+            <trans-unit id="entry.pagePicker.title" xml:space="preserve">
+                <source>Select a page</source>
+            </trans-unit>
+            <trans-unit id="entry.contentElementPicker.title" xml:space="preserve">
+                <source>Select a content element</source>
             </trans-unit>
             <trans-unit id="entry.recordPicker.title" xml:space="preserve">
-                <source>Select a page, content element or record</source>
+                <source>Select a record</source>
+            </trans-unit>
+            <trans-unit id="entry.record.empty" xml:space="preserve">
+                <source>No record tables are available for task creation.</source>
             </trans-unit>
 
             <trans-unit id="step.taskDetails.title" xml:space="preserve">
@@ -166,6 +190,15 @@
             </trans-unit>
             <trans-unit id="step.recordType.empty" xml:space="preserve">
                 <source>No record type can be created in the current workspace.</source>
+            </trans-unit>
+            <trans-unit id="step.recordType.search" xml:space="preserve">
+                <source>Search</source>
+            </trans-unit>
+            <trans-unit id="step.recordType.searchPlaceholder" xml:space="preserve">
+                <source>Filter record types</source>
+            </trans-unit>
+            <trans-unit id="step.recordType.noResults" xml:space="preserve">
+                <source>No record types match your search.</source>
             </trans-unit>
             <trans-unit id="step.taskDetails.field.title" xml:space="preserve">
                 <source>Title</source>
