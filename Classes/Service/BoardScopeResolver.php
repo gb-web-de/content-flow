@@ -7,6 +7,8 @@ namespace GbWeb\ContentFlow\Service;
 use TYPO3\CMS\Backend\Tree\Repository\PageTreeRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Database\Connection;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
@@ -27,6 +29,11 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  */
 final class BoardScopeResolver
 {
+    public function __construct(
+        private readonly ConnectionPool $connectionPool,
+    ) {
+    }
+
     /**
      * @return list<int>
      */
@@ -57,7 +64,9 @@ final class BoardScopeResolver
         $workspace = BackendUtility::getRecord('sys_workspace', $workspaceUid, 'db_mountpoints');
         $mountpoints = GeneralUtility::intExplode(',', (string)($workspace['db_mountpoints'] ?? ''), true);
         if ($mountpoints === []) {
-            return [];
+            // No db_mountpoints configured (the common case) - fall back to the
+            // installation's actual root pages instead of surfacing nothing.
+            return $this->resolveFallbackRootPageUids($backendUser);
         }
 
         $pageUids = [];
@@ -68,6 +77,49 @@ final class BoardScopeResolver
         }
 
         return array_values(array_unique($pageUids));
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function resolveFallbackRootPageUids(BackendUserAuthentication $backendUser): array
+    {
+        $pageUids = $this->queryRootCandidates('pid');
+        if ($pageUids === []) {
+            $pageUids = $this->queryRootCandidates('is_siteroot');
+        }
+
+        $subtreeUids = [];
+        foreach ($pageUids as $pageUid) {
+            $subtreeUids = array_merge($subtreeUids, $this->resolvePageUids($pageUid, 999, $backendUser));
+        }
+
+        return array_values(array_unique($subtreeUids));
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function queryRootCandidates(string $criterion): array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('pages');
+        $queryBuilder->getRestrictions()->removeAll();
+
+        $condition = $criterion === 'pid'
+            ? $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT))
+            : $queryBuilder->expr()->eq('is_siteroot', $queryBuilder->createNamedParameter(1, Connection::PARAM_INT));
+
+        $rows = $queryBuilder
+            ->select('uid')
+            ->from('pages')
+            ->where(
+                $condition,
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+            )
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        return array_values(array_unique(array_map(static fn (array $row): int => (int)$row['uid'], $rows)));
     }
 
     /**

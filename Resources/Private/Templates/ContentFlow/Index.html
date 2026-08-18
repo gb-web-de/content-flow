@@ -34,38 +34,6 @@
                 </button>
             </div>
 
-            <f:comment>
-                Scope: how far the board looks beyond the exact selected page.
-                "From workspace root" and the depth select are mutually exclusive in
-                the UI (board/scope.js hides the depth select while root mode is on,
-                and sets both controls' initial value/checked state from
-                TYPO3.settings.ContentFlow.depth/fromWorkspaceRoot on load - no
-                server-rendered selected/checked/hidden attributes here to avoid
-                duplicating that state in two places).
-            </f:comment>
-            <div class="contentflow-scope">
-                <label class="form-label contentflow-scope-label" for="cf-depth">Depth</label>
-                <select id="cf-depth" class="form-select form-control">
-                    <option value="0">This page only</option>
-                    <option value="1">1 level</option>
-                    <option value="2">2 levels</option>
-                    <option value="3">3 levels</option>
-                    <option value="4">4 levels</option>
-                    <option value="999">Infinite</option>
-                </select>
-
-                <label class="contentflow-scope-checkbox">
-                    <input type="checkbox" id="cf-wsroot" />
-                    From workspace root
-                </label>
-
-                <f:if condition="{fromWorkspaceRoot} && {workspaceHasNoRootPages}">
-                    <span class="contentflow-scope-note" title="Set the workspace's root page(s) on the sys_workspace record's Mountpoints tab to use this">
-                        <core:icon identifier="actions-info" size="small" /> This workspace has no root page configured - showing the current page only.
-                    </span>
-                </f:if>
-            </div>
-
             <div class="contentflow-filters">
                 <div class="input-group">
                     <label class="form-label visually-hidden" for="cf-search-input">Search tasks</label>

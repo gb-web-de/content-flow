@@ -49,8 +49,10 @@ use TYPO3\CMS\Core\Type\Bitmask\Permission;
  *    0) instead of one tied to an existing record. See TaskRepository::
  *    createPendingPageTask() and TaskAjaxController::materializePendingPage()
  *    for how the page itself gets created later.
- *  - create_pending_record: record type followed by task details. The target
- *    page is chosen when the resulting card enters Editing.
+ *  - create_pending_record: task details only - the record type is already
+ *    chosen client-side by openRecordTypePicker() (create-wizard.js) before this
+ *    wizard even opens, through TYPO3 core's own <typo3-backend-new-record-wizard>
+ *    component. The target page is chosen when the resulting card enters Editing.
  *  - regression_comment: a single comment-textarea step, letting the editor
  *    refine the auto-generated "reopened for editing" comment B5's regression
  *    already wrote - the transition itself already happened.
@@ -98,11 +100,6 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
 
         if ($mode === 'create_pending_record') {
             return Configuration::create([
-                Step::create('@gb-web/content-flow/wizard/steps/record-type-step.js')
-                    ->withConfigurationData([
-                        'recordTypes' => $this->recordCreationTargetProvider
-                            ->getCreatableRecordTypes($this->getBackendUser()),
-                    ]),
                 $this->taskDetailsStep('', showExtraFields: true),
             ]);
         }
@@ -366,7 +363,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
     private function submitCreatePendingRecord(array $body): SubmissionResult
     {
         $subjectPid = (int)($body['parentPid'] ?? 0);
-        $subjectTable = trim((string)($body['recordType'] ?? ''));
+        $subjectTable = trim((string)($body['table'] ?? ''));
         $planningPage = $subjectPid > 0 ? BackendUtility::getRecord('pages', $subjectPid) : null;
         if ($planningPage === null || !$this->getBackendUser()->doesUserHaveAccess($planningPage, Permission::PAGE_SHOW)) {
             return $this->reject($this->translate('wizard.error.noPlanningPageGiven'), ['subjectPid' => $subjectPid]);

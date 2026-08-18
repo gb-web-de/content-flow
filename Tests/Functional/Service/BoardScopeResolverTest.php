@@ -38,7 +38,7 @@ final class BoardScopeResolverTest extends FunctionalTestCase
 
     private function subject(): BoardScopeResolver
     {
-        return new BoardScopeResolver();
+        return new BoardScopeResolver($this->getConnectionPool());
     }
 
     #[Test]
@@ -63,11 +63,15 @@ final class BoardScopeResolverTest extends FunctionalTestCase
     }
 
     #[Test]
-    public function resolveWorkspaceRootPageUidsReturnsNothingWhenNoMountpointsAreConfigured(): void
+    public function resolveWorkspaceRootPageUidsFallsBackToPidZeroPagesWhenNoMountpointsAreConfigured(): void
     {
         // Fixture workspace 1 "Editorial" has no db_mountpoints set - the common
-        // case, per BoardScopeResolver's own docblock.
-        self::assertSame([], $this->subject()->resolveWorkspaceRootPageUids(1, $GLOBALS['BE_USER']));
+        // case, per BoardScopeResolver's own docblock. Falls back to page 1
+        // "Home" (pid=0) and its subtree, rather than surfacing nothing.
+        self::assertEqualsCanonicalizing(
+            [1, 2],
+            $this->subject()->resolveWorkspaceRootPageUids(1, $GLOBALS['BE_USER']),
+        );
     }
 
     #[Test]

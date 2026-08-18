@@ -31,6 +31,11 @@ return [
         'path' => '/contentflow/task/record-creation-targets',
         'target' => TaskAjaxController::class . '::recordCreationTargetsAction',
     ],
+    // "+" button, "Create a new record": grouped/iconed table choices for the picker.
+    'contentflow_task_record_type_categories' => [
+        'path' => '/contentflow/task/record-type-categories',
+        'target' => TaskAjaxController::class . '::recordTypeCategoriesAction',
+    ],
     'contentflow_task_start_record_creation' => [
         'path' => '/contentflow/task/start-record-creation',
         'target' => TaskAjaxController::class . '::startRecordCreationAction',

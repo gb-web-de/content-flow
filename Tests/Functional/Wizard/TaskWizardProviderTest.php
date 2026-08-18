@@ -332,21 +332,17 @@ final class TaskWizardProviderTest extends FunctionalTestCase
     }
 
     #[Test]
-    public function pendingRecordConfigurationStartsWithTypeAndTaskDetails(): void
+    public function pendingRecordConfigurationIsTaskDetailsOnlyOnceTheTypeIsAlreadyChosen(): void
     {
         $GLOBALS['BE_USER']->setWorkspace(1);
 
         $configuration = $this->subject()->getConfiguration($this->configRequest([
-            'pending' => ['mode' => 'create_pending_record', 'parentPid' => 1],
+            'pending' => ['mode' => 'create_pending_record', 'parentPid' => 1, 'table' => 'sys_category'],
         ]))->jsonSerialize();
 
         self::assertSame([
-            '@gb-web/content-flow/wizard/steps/record-type-step.js',
             '@gb-web/content-flow/wizard/steps/task-details-step.js',
         ], array_column($configuration['steps'], 'module'));
-        $tables = array_column($configuration['steps'][0]['configurationData']['recordTypes'], 'table');
-        self::assertContains('sys_category', $tables);
-        self::assertNotContains('tt_content', $tables);
     }
 
     #[Test]
@@ -357,7 +353,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
         $result = $this->subject()->handleSubmit($this->submitRequest([
             'mode' => 'create_pending_record',
             'parentPid' => 1,
-            'recordType' => 'sys_category',
+            'table' => 'sys_category',
             'title' => 'New category',
             'assignee' => 'me',
         ]))->jsonSerialize();
@@ -378,7 +374,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
         $result = $this->subject()->handleSubmit($this->submitRequest([
             'mode' => 'create_pending_record',
             'parentPid' => 1,
-            'recordType' => 'sys_log',
+            'table' => 'sys_log',
             'title' => 'Impossible record',
         ]))->jsonSerialize();
 

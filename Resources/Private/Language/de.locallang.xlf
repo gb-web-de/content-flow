@@ -175,6 +175,14 @@
                 <source>Pick an existing page from the page tree.</source>
                 <target>Wählen Sie eine vorhandene Seite aus dem Seitenbaum.</target>
             </trans-unit>
+            <trans-unit id="entry.newContentElement.label" xml:space="preserve">
+                <source>Create a new content element</source>
+                <target>Neues Inhaltselement erstellen</target>
+            </trans-unit>
+            <trans-unit id="entry.newContentElement.description" xml:space="preserve">
+                <source>Add new page content using TYPO3's own content wizard.</source>
+                <target>Neuen Seiteninhalt mit dem TYPO3-eigenen Inhaltsassistenten hinzufügen.</target>
+            </trans-unit>
             <trans-unit id="entry.contentElement.label" xml:space="preserve">
                 <source>Select a content element</source>
                 <target>Inhaltselement auswählen</target>
@@ -218,30 +226,6 @@
             <trans-unit id="step.taskDetails.title" xml:space="preserve">
                 <source>Task details</source>
                 <target>Aufgabendetails</target>
-            </trans-unit>
-            <trans-unit id="step.recordType.title" xml:space="preserve">
-                <source>Record type</source>
-                <target>Datensatztyp</target>
-            </trans-unit>
-            <trans-unit id="step.recordType.description" xml:space="preserve">
-                <source>What kind of record should be created for this task?</source>
-                <target>Welche Art von Datensatz soll für diese Aufgabe erstellt werden?</target>
-            </trans-unit>
-            <trans-unit id="step.recordType.empty" xml:space="preserve">
-                <source>No record type can be created in the current workspace.</source>
-                <target>Im aktuellen Arbeitsbereich kann kein Datensatztyp erstellt werden.</target>
-            </trans-unit>
-            <trans-unit id="step.recordType.search" xml:space="preserve">
-                <source>Search</source>
-                <target>Suchen</target>
-            </trans-unit>
-            <trans-unit id="step.recordType.searchPlaceholder" xml:space="preserve">
-                <source>Filter record types</source>
-                <target>Datensatztypen filtern</target>
-            </trans-unit>
-            <trans-unit id="step.recordType.noResults" xml:space="preserve">
-                <source>No record types match your search.</source>
-                <target>Keine Datensatztypen passen zu Ihrer Suche.</target>
             </trans-unit>
             <trans-unit id="step.taskDetails.field.title" xml:space="preserve">
                 <source>Title</source>
@@ -430,6 +414,14 @@
             <trans-unit id="wizard.error.elementBrowserMissing" xml:space="preserve">
                 <source>The element browser is not configured. (CF-1024)</source>
                 <target>Der Elementbrowser ist nicht konfiguriert. (CF-1024)</target>
+            </trans-unit>
+            <trans-unit id="wizard.error.recordTypeCategoriesMissing" xml:space="preserve">
+                <source>Could not load the list of record types. (CF-1038)</source>
+                <target>Die Liste der Datensatztypen konnte nicht geladen werden. (CF-1038)</target>
+            </trans-unit>
+            <trans-unit id="wizard.error.newContentElementWizardMissing" xml:space="preserve">
+                <source>Select a page before creating a new content element. (CF-1039)</source>
+                <target>Wählen Sie eine Seite aus, bevor Sie ein neues Inhaltselement erstellen. (CF-1039)</target>
             </trans-unit>
             <trans-unit id="wizard.error.recordUnidentified" xml:space="preserve">
                 <source>The selected record could not be identified. (CF-1025)</source>

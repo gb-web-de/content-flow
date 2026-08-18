@@ -40,41 +40,6 @@
     gap: 10px;
 }
 
-.contentflow-scope {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 10px;
-    background: var(--contentflow-col-bg);
-    border: 1px solid var(--contentflow-col-border);
-    border-radius: 6px;
-}
-
-.contentflow-scope-label {
-    margin: 0;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    opacity: 0.7;
-}
-
-.contentflow-scope-checkbox {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.contentflow-scope-note {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    opacity: 0.75;
-}
-
 .contentflow-filters .input-group {
     display: flex;
     align-items: stretch;
@@ -161,22 +126,6 @@
     font-size: 12px;
     opacity: 0.75;
 }
-
-.contentflow-record-type-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 8px;
-}
-
-.contentflow-record-type-option {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;    gap: 10px;
-    padding: 10px 12px;
-    border: 1px solid var(--typo3-component-border-color, #d1d5db);
-    border-radius: var(--contentflow-card-radius);
-    cursor: pointer;
-    min-width: 0;}
 
 .contentflow-record-ref--pending {
     font-style: italic;

@@ -54,8 +54,8 @@ final class ContentFlowController extends ActionController
         $queryParams = $this->request->getQueryParams();
         $pageUid = (int)($queryParams['id'] ?? 0);
         $workspaceUid = (int)$backendUser->workspace;
-        $depth = (int)($queryParams['depth'] ?? 0);
-        $fromWorkspaceRoot = (bool)($queryParams['wsroot'] ?? false);
+        $depth = (int)($queryParams['depth'] ?? 999);
+        $fromWorkspaceRoot = (bool)($queryParams['wsroot'] ?? true);
 
         // Own workspaces the user has access to, live workspace excluded (it is
         // never "other" for the purposes of the cross-workspace badge/filter) and
@@ -83,16 +83,13 @@ final class ContentFlowController extends ActionController
             ['id' => $pageUid],
         );
 
-        $board = $this->buildBoard($backendUser, $workspaceUid, $pageUid, $depth, $fromWorkspaceRoot);
+        $columns = $this->buildBoard($backendUser, $workspaceUid, $pageUid, $depth, $fromWorkspaceRoot);
 
         $moduleTemplate->assignMultiple([
             'pageUid' => $pageUid,
             'pageSelected' => $pageUid > 0,
             'workspaceUid' => $workspaceUid,
-            'columns' => $board['columns'],
-            'depth' => $depth,
-            'fromWorkspaceRoot' => $fromWorkspaceRoot,
-            'workspaceHasNoRootPages' => $board['workspaceHasNoRootPages'],
+            'columns' => $columns,
             'otherWorkspaces' => $otherWorkspaces,
         ]);
 
@@ -110,6 +107,17 @@ final class ContentFlowController extends ActionController
             'ContentFlow',
             'elementBrowserUrl',
             (string)$this->backendUriBuilder->buildUriFromRoute('wizard_element_browser'),
+        );
+        // "Create a new content element": core's own New Content Element wizard
+        // (the one behind the page module's "+Content" button), opened as-is in
+        // an ajax modal - no bespoke type picker needed here either. Base route
+        // URL only, same reasoning as elementBrowserUrl above: id/uid_pid/
+        // returnUrl depend on which page is selected on the board, so
+        // create-wizard.js appends them client-side.
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'newContentElementWizardUrl',
+            (string)$this->backendUriBuilder->buildUriFromRoute('new_content_element_wizard'),
         );
         $this->pageRenderer->addInlineSetting(
             'ContentFlow',
@@ -146,14 +154,6 @@ final class ContentFlowController extends ActionController
             'canPublish',
             $workspaceUid > 0 && $this->workspacePublishGate->isGranted($backendUser, $workspaceUid),
         );
-        // Read by board/scope.js to restore the toolbar's depth/root controls after
-        // a reload, and to know which query params to rebuild the module URL with.
-        // effectiveDepth, not the raw $depth GET param: when the workspace-root
-        // fallback narrows the query (see buildBoard()), this reflects what was
-        // actually queried instead of a now-stale requested value.
-        $this->pageRenderer->addInlineSetting('ContentFlow', 'depth', $board['effectiveDepth']);
-        $this->pageRenderer->addInlineSetting('ContentFlow', 'fromWorkspaceRoot', $fromWorkspaceRoot);
-
         return $moduleTemplate->renderResponse('ContentFlow/Index');
     }
 
@@ -175,7 +175,7 @@ final class ContentFlowController extends ActionController
     }
 
     /**
-     * @return array{columns: list<array<string, mixed>>, workspaceHasNoRootPages: bool, effectiveDepth: int}
+     * @return list<array<string, mixed>>
      */
     private function buildBoard(
         BackendUserAuthentication $backendUser,
@@ -186,23 +186,16 @@ final class ContentFlowController extends ActionController
     ): array {
         $columns = $this->boardColumnRegistry->getColumns($backendUser, $workspaceUid);
         if ($pageUid < 1) {
-            return ['columns' => $columns, 'workspaceHasNoRootPages' => false, 'effectiveDepth' => $depth];
+            return $columns;
         }
 
-        $workspaceHasNoRootPages = false;
-        $effectiveDepth = $depth;
         if ($fromWorkspaceRoot && $workspaceUid > 0) {
             $pageUids = $this->boardScopeResolver->resolveWorkspaceRootPageUids($workspaceUid, $backendUser);
-            $workspaceHasNoRootPages = $pageUids === [];
-            if ($workspaceHasNoRootPages) {
-                // This workspace has no db_mountpoints configured (the common case -
-                // see BoardScopeResolver's docblock) - fall back to "just the
-                // selected page" rather than showing nothing or silently ignoring
-                // the checkbox. Index.html surfaces this fallback explicitly, and
-                // effectiveDepth carries the real depth back to the client so the
-                // (currently hidden) DEPTH select doesn't keep showing a stale value
-                // if "From workspace root" is unchecked again afterwards.
-                $effectiveDepth = 0;
+            if ($pageUids === []) {
+                // BoardScopeResolver already falls back from an empty db_mountpoints
+                // to the installation's pid=0/is_siteroot pages, so this only fires
+                // when even that yields nothing accessible - fall back to "just the
+                // selected page" rather than showing nothing.
                 $pageUids = $this->boardScopeResolver->resolvePageUids($pageUid, 0, $backendUser);
             }
         } else {
@@ -297,7 +290,7 @@ final class ContentFlowController extends ActionController
             $board[] = $column;
         }
 
-        return ['columns' => $board, 'workspaceHasNoRootPages' => $workspaceHasNoRootPages, 'effectiveDepth' => $effectiveDepth];
+        return $board;
     }
 
     /**

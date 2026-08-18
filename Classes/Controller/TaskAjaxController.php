@@ -1350,6 +1350,22 @@ final class TaskAjaxController
         ]);
     }
 
+    /**
+     * Grouped/iconed creatable record types for the "Create a new record" entry
+     * point's picker (openRecordTypePicker() in create-wizard.js), which renders
+     * them through TYPO3 core's own <typo3-backend-new-record-wizard> component -
+     * the same one behind the page module's "+Content" wizard. An AJAX round
+     * trip rather than an inline setting because the list depends on the current
+     * backend user's live table/page permissions, not static configuration.
+     */
+    public function recordTypeCategoriesAction(): ResponseInterface
+    {
+        return new JsonResponse([
+            'success' => true,
+            'categories' => $this->recordCreationTargetProvider->getCreatableRecordTypeCategories($this->getBackendUser()),
+        ]);
+    }
+
     public function startRecordCreationAction(ServerRequestInterface $request): ResponseInterface
     {
         $body = $this->getBody($request);

@@ -26,7 +26,6 @@ import labels from '~labels/content_flow.messages';
 import workspacesLabels from '~labels/workspaces.messages';
 
 import { registerFilters } from '@gb-web/content-flow/board/filters.js';
-import { registerScopeControls } from '@gb-web/content-flow/board/scope.js';
 import { registerDragAndDrop } from '@gb-web/content-flow/board/drag-drop.js';
 import { registerAssignButtons } from '@gb-web/content-flow/task/assign.js';
 import { registerTicketButtons } from '@gb-web/content-flow/task/ticket.js';
@@ -76,7 +75,6 @@ class ContentFlowBoard {
     this.registerCardEvents();
     registerDragAndDrop(this);
     registerFilters(this);
-    registerScopeControls();
     registerPublishButtons(this);
     registerChecklistManagement();
   }

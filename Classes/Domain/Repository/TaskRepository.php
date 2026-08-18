@@ -572,7 +572,10 @@ final class TaskRepository
             // already carries this record's closed history; this one adds
             // nothing, so it is superseded row by row instead of closed: the
             // records that CAN close still do, and only the genuine collisions
-            // fall back to being marked deleted.
+            // fall back further - same three-step retirement as
+            // RepairTaskDataCommand::retireItem(), because marking just
+            // `deleted => 1` here can itself collide with an older row already
+            // sitting on (record_table, record_uid, closed=0, deleted=1).
             foreach ($this->findMembers($taskUid) as $member) {
                 $itemUid = (int)$member['uid'];
                 try {
@@ -581,13 +584,24 @@ final class TaskRepository
                         ['closed' => 1, 'tstamp' => $GLOBALS['EXEC_TIME']],
                         ['uid' => $itemUid],
                     );
+                    continue;
                 } catch (UniqueConstraintViolationException) {
+                }
+
+                try {
                     $itemConnection->update(
                         self::TABLE_ITEM,
-                        ['deleted' => 1, 'tstamp' => $GLOBALS['EXEC_TIME']],
+                        ['closed' => 1, 'deleted' => 1, 'tstamp' => $GLOBALS['EXEC_TIME']],
                         ['uid' => $itemUid],
                     );
+                    continue;
+                } catch (UniqueConstraintViolationException) {
                 }
+
+                // Nothing about this row is worth keeping: the record's history
+                // already lives on the rows it collided with, and a claim
+                // nobody can see must not keep blocking the record.
+                $itemConnection->delete(self::TABLE_ITEM, ['uid' => $itemUid]);
             }
         }
     }

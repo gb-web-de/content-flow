@@ -8,7 +8,10 @@ use TYPO3\CMS\Backend\Tree\Repository\PageTreeRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\DataHandling\PageDoktypeRegistry;
+use TYPO3\CMS\Core\Imaging\IconFactory;
+use TYPO3\CMS\Core\Package\PackageManager;
 use TYPO3\CMS\Core\Schema\Capability\TcaSchemaCapability;
+use TYPO3\CMS\Core\Schema\TcaSchema;
 use TYPO3\CMS\Core\Schema\TcaSchemaFactory;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -21,9 +24,18 @@ final readonly class RecordCreationTargetProvider
     private const PAGE_TABLE = 'pages';
     private const CONTENT_ELEMENT_TABLE = 'tt_content';
 
+    /**
+     * Custom event the "New page content"-style picker dispatches on the
+     * chosen <typo3-backend-new-record-wizard> item - see
+     * Resources/Public/JavaScript/task/create-wizard.js's openRecordTypePicker().
+     */
+    private const RECORD_TYPE_CHOSEN_EVENT = 'contentflow:record-type-chosen';
+
     public function __construct(
         private TcaSchemaFactory $tcaSchemaFactory,
         private PageDoktypeRegistry $pageDoktypeRegistry,
+        private IconFactory $iconFactory,
+        private PackageManager $packageManager,
     ) {
     }
 
@@ -49,6 +61,52 @@ final readonly class RecordCreationTargetProvider
 
         usort($types, static fn (array $left, array $right): int => strnatcasecmp($left['label'], $right['label']));
         return $types;
+    }
+
+    /**
+     * Same creatable tables as getCreatableRecordTypes(), grouped and iconed for
+     * TYPO3 core's own <typo3-backend-new-record-wizard> web component (the
+     * "New page content" wizard's UI, reused as-is for the "New record" picker -
+     * see openRecordTypePicker() in create-wizard.js). Shape matches that
+     * component's Categories/Category/WizardItem JSON contract: an object keyed
+     * by group identifier, each holding {identifier, label, items}.
+     *
+     * @return array<string, array{identifier: string, label: string, items: list<array<string, mixed>>}>
+     */
+    public function getCreatableRecordTypeCategories(BackendUserAuthentication $backendUser): array
+    {
+        $pages = $this->getAccessiblePages($backendUser);
+        $groups = [];
+        foreach ($this->tcaSchemaFactory->all() as $table => $schema) {
+            if (!$this->isCreatableRecordTable($table, $backendUser) || !$this->hasEligiblePage($table, $pages, $backendUser)) {
+                continue;
+            }
+
+            [$groupIdentifier, $groupLabel] = $this->resolveRecordTypeGroup($table, $schema);
+            $groups[$groupIdentifier]['identifier'] ??= $groupIdentifier;
+            $groups[$groupIdentifier]['label'] ??= $groupLabel;
+            $groups[$groupIdentifier]['items'][] = [
+                'identifier' => $table,
+                'label' => $schema->getTitle($this->translate(...)),
+                'description' => $table,
+                'icon' => $this->iconFactory->mapRecordTypeToIconIdentifier($table, [], $schema),
+                'iconOverlay' => null,
+                'url' => null,
+                'requestType' => 'event',
+                'event' => self::RECORD_TYPE_CHOSEN_EVENT,
+                'defaultValues' => [],
+                'saveAndClose' => false,
+            ];
+        }
+
+        foreach ($groups as &$group) {
+            usort($group['items'], static fn (array $left, array $right): int => strnatcasecmp($left['label'], $right['label']));
+        }
+        unset($group);
+
+        uasort($groups, static fn (array $left, array $right): int => strnatcasecmp($left['label'], $right['label']));
+
+        return $groups;
     }
 
     public function isCreatableRecordTable(string $table, BackendUserAuthentication $backendUser): bool
@@ -192,6 +250,33 @@ final readonly class RecordCreationTargetProvider
                 $this->flattenTree($child, $pages);
             }
         }
+    }
+
+    /**
+     * A simplified version of core's own NewRecordController::getNewRecordControls()
+     * grouping (TCA ctrl.groupName, falling back to the table's owning extension
+     * key) - close enough for a nicer picker without chasing every edge case
+     * (per-extension icon files, LLL-vs-plain title detection) that method
+     * carries for its own, differently-shaped rendering.
+     *
+     * @return array{0: string, 1: string} [group identifier, group label]
+     */
+    private function resolveRecordTypeGroup(string $table, TcaSchema $schema): array
+    {
+        $groupIdentifier = (string)($schema->getRawConfiguration()['groupName'] ?? '');
+        if ($groupIdentifier === '') {
+            $nameParts = explode('_', $table);
+            $groupIdentifier = $nameParts[1] ?? '';
+        }
+
+        if ($groupIdentifier === '' || !$this->packageManager->isPackageActive($groupIdentifier)) {
+            return ['system', $this->translate('LLL:EXT:core/Resources/Private/Language/locallang_misc.xlf:system_records')];
+        }
+
+        $metaData = $this->packageManager->getPackage($groupIdentifier)->getPackageMetaData();
+        $groupLabel = $metaData->getTitle() ?: ucwords($groupIdentifier);
+
+        return [$groupIdentifier, $groupLabel];
     }
 
     private function translate(string $label): string

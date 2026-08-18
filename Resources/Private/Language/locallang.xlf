@@ -148,6 +148,12 @@
             <trans-unit id="entry.existingPage.description" xml:space="preserve">
                 <source>Pick an existing page from the page tree.</source>
             </trans-unit>
+            <trans-unit id="entry.newContentElement.label" xml:space="preserve">
+                <source>Create a new content element</source>
+            </trans-unit>
+            <trans-unit id="entry.newContentElement.description" xml:space="preserve">
+                <source>Add new page content using TYPO3's own content wizard.</source>
+            </trans-unit>
             <trans-unit id="entry.contentElement.label" xml:space="preserve">
                 <source>Select a content element</source>
             </trans-unit>
@@ -181,24 +187,6 @@
 
             <trans-unit id="step.taskDetails.title" xml:space="preserve">
                 <source>Task details</source>
-            </trans-unit>
-            <trans-unit id="step.recordType.title" xml:space="preserve">
-                <source>Record type</source>
-            </trans-unit>
-            <trans-unit id="step.recordType.description" xml:space="preserve">
-                <source>What kind of record should be created for this task?</source>
-            </trans-unit>
-            <trans-unit id="step.recordType.empty" xml:space="preserve">
-                <source>No record type can be created in the current workspace.</source>
-            </trans-unit>
-            <trans-unit id="step.recordType.search" xml:space="preserve">
-                <source>Search</source>
-            </trans-unit>
-            <trans-unit id="step.recordType.searchPlaceholder" xml:space="preserve">
-                <source>Filter record types</source>
-            </trans-unit>
-            <trans-unit id="step.recordType.noResults" xml:space="preserve">
-                <source>No record types match your search.</source>
             </trans-unit>
             <trans-unit id="step.taskDetails.field.title" xml:space="preserve">
                 <source>Title</source>
@@ -354,6 +342,12 @@
             <!-- Raised by the wizard's JavaScript rather than by the provider. -->
             <trans-unit id="wizard.error.elementBrowserMissing" xml:space="preserve">
                 <source>The element browser is not configured. (CF-1024)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.recordTypeCategoriesMissing" xml:space="preserve">
+                <source>Could not load the list of record types. (CF-1038)</source>
+            </trans-unit>
+            <trans-unit id="wizard.error.newContentElementWizardMissing" xml:space="preserve">
+                <source>Select a page before creating a new content element. (CF-1039)</source>
             </trans-unit>
             <trans-unit id="wizard.error.recordUnidentified" xml:space="preserve">
                 <source>The selected record could not be identified. (CF-1025)</source>

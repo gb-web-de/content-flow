@@ -51,6 +51,29 @@ final class RecordCreationTargetProviderTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function recordTypeCategoriesGroupCreatableTablesWithAnIconEach(): void
+    {
+        $categories = $this->get(RecordCreationTargetProvider::class)
+            ->getCreatableRecordTypeCategories($GLOBALS['BE_USER']);
+
+        $tables = [];
+        foreach ($categories as $identifier => $group) {
+            self::assertSame($identifier, $group['identifier']);
+            self::assertNotSame('', $group['label']);
+            foreach ($group['items'] as $item) {
+                self::assertNotSame('', $item['icon'], sprintf('table "%s" has no icon', $item['identifier']));
+                self::assertSame('event', $item['requestType']);
+                $tables[] = $item['identifier'];
+            }
+        }
+
+        self::assertContains('sys_category', $tables);
+        self::assertNotContains('pages', $tables);
+        self::assertNotContains('tt_content', $tables);
+        self::assertNotContains('sys_log', $tables);
+    }
+
+    #[Test]
     public function eligiblePagesCoverTheAccessibleTreeAndHonorPageTsRestrictions(): void
     {
         $this->getConnectionPool()->getConnectionForTable('pages')->update(

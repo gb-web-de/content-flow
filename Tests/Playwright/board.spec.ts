@@ -10,10 +10,9 @@ test.describe('the Content Flow board module', () => {
     }
   })
 
-  test('offers the scope, search and filter controls', async ({ page }) => {
+  test('offers the search and filter controls', async ({ page }) => {
     const board = await openBoard(page)
 
-    await expect(board.locator('#cf-depth')).toBeVisible()
     await expect(board.locator('#cf-search-input')).toBeVisible()
     await expect(board.locator('#cf-filter-assignee')).toBeVisible()
     await expect(board.locator('#cf-filter-status')).toBeVisible()

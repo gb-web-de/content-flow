@@ -68,6 +68,36 @@ final class TaskRepositoryTest extends FunctionalTestCase
         );
     }
 
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    private function addRawMember(int $taskUid, int $recordUid, array $overrides = []): int
+    {
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task_item');
+        $connection->insert('tx_contentflow_task_item', array_merge([
+            'task' => $taskUid,
+            'record_table' => 'tt_content',
+            'record_uid' => $recordUid,
+            'pid' => 2,
+            'home_pid' => 2,
+            'closed' => 0,
+            'deleted' => 0,
+        ], $overrides));
+
+        return (int)$connection->lastInsertId();
+    }
+
+    /**
+     * @return array<string, mixed>|false
+     */
+    private function findItem(int $itemUid): array|false
+    {
+        return $this->getConnectionPool()
+            ->getConnectionForTable('tx_contentflow_task_item')
+            ->select(['closed', 'deleted'], 'tx_contentflow_task_item', ['uid' => $itemUid])
+            ->fetchAssociative();
+    }
+
     #[Test]
     public function findByUidDoesNotReturnASoftDeletedTask(): void
     {
@@ -153,6 +183,33 @@ final class TaskRepositoryTest extends FunctionalTestCase
         self::assertSame(0, (int)$task['stage_uid']);
         self::assertSame('done', $task['state']);
         self::assertSame(1, (int)$task['closed']);
+    }
+
+    /**
+     * The publish AJAX endpoint 500'd on this: closing collided with a member
+     * row closed earlier under a different task, and the two-step fallback
+     * (retry with `deleted => 1` alone) itself collided with a row already
+     * soft-deleted while still open - because `one_open_task_per_record`
+     * covers `closed` and `deleted` together. The same fallback chain as
+     * RepairTaskDataCommand::retireItem() is needed: closed -> closed+deleted
+     * -> hard delete, the last of which can never collide.
+     */
+    #[Test]
+    public function closeFallsThroughToHardDeleteWhenEveryOtherSlotIsTaken(): void
+    {
+        $history = $this->createTask(['title' => 'long finished', 'closed' => 1]);
+        // Every escape route for tt_content:10 is already occupied: closed,
+        // soft-deleted while open, and both at once.
+        $this->addRawMember($history, 10, ['closed' => 1]);
+        $this->addRawMember($history, 10, ['closed' => 0, 'deleted' => 1]);
+        $this->addRawMember($history, 10, ['closed' => 1, 'deleted' => 1]);
+
+        $taskUid = $this->createTask();
+        $stranded = $this->addRawMember($taskUid, 10);
+
+        $this->subject()->close($taskUid, 1);
+
+        self::assertFalse($this->findItem($stranded), 'the row that could go nowhere else is gone');
     }
 
     #[Test]

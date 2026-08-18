@@ -15,7 +15,6 @@ export class TaskWizardSubmissionService {
     const body = {
       mode: store.pending?.mode,
       ...store.pending,
-      ...(store.recordType ? { recordType: store.recordType } : {}),
       destination: store.destination,
       ...store.taskDetails,
       stageChoice: store.stage,

@@ -11,6 +11,8 @@ import Modal from '@typo3/backend/modal.js'
 import Notification from '@typo3/backend/notification.js'
 import { SeverityEnum } from '@typo3/backend/enum/severity.js'
 import { html } from 'lit'
+import AjaxRequest from '@typo3/core/ajax/ajax-request.js'
+import { Categories } from '@typo3/backend/new-record-wizard.js'
 
 import labels from '~labels/content_flow.messages'
 
@@ -100,10 +102,15 @@ function openPendingPageWizard() {
   })
 }
 
-function openPendingRecordWizard() {
+/*
+ * The record type is already known by the time this opens - chosen in
+ * openRecordTypePicker() below, through TYPO3 core's own "New page content"
+ * wizard component. Nothing left to collect here but task details.
+ */
+function openPendingRecordWizard(table, label) {
   const parentPid = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
-  const pending = { mode: 'create_pending_record', parentPid }
-  const modal = Modal.advanced({
+  const pending = { mode: 'create_pending_record', parentPid, table, recordTypeLabel: label }
+  Modal.advanced({
     type: Modal.types.default,
     title: taskContextTitle(pending, labels),
     content: html`<contentflow-task-wizard .pending=${pending}></contentflow-task-wizard>`,
@@ -112,11 +119,134 @@ function openPendingRecordWizard() {
     staticBackdrop: true,
     buttons: [],
   })
-  modal.addEventListener('contentflow:record-type-selected', (event) => {
-    modal.modalTitle = taskContextTitle({
-      ...pending,
-      recordTypeLabel: event.detail?.label || '',
-    }, labels)
+}
+
+/*
+ * "Create a new record": a grouped, iconed picker for which table to plan -
+ * TYPO3 core's own <typo3-backend-new-record-wizard> component (the "New page
+ * content" wizard's UI), fed content_flow's own creatable-tables data. That
+ * component acts on a click immediately (dispatches its configured event, then
+ * dismisses its own modal) rather than sitting inside a multi-step sequence, so
+ * it gets its own standalone modal here - same shape as openRecordPicker()
+ * below, which hands off to openNewTaskWizard() the same way once a record is
+ * chosen in the iframe browser.
+ */
+async function openRecordTypePicker() {
+  const url = TYPO3.settings?.ajaxUrls?.contentflow_task_record_type_categories
+  if (!url) {
+    Notification.error(NOTIFICATION_TITLE, labels.get('wizard.error.recordTypeCategoriesMissing'))
+    return
+  }
+
+  let categories
+  try {
+    const response = await new AjaxRequest(url).get()
+    const result = await response.resolve()
+    if (result.success !== true) {
+      throw new Error('request rejected')
+    }
+    categories = Categories.fromData(result.categories || {})
+  } catch {
+    Notification.error(NOTIFICATION_TITLE, labels.get('wizard.error.recordTypeCategoriesMissing'))
+    return
+  }
+
+  if (categories.items.length === 0) {
+    Notification.warning(NOTIFICATION_TITLE, labels.get('entry.record.empty'))
+    return
+  }
+
+  // Built imperatively rather than through a lit `html` content template: the
+  // component dispatches its selection event on itself without `bubbles: true`
+  // (unlike content_flow's own now-removed record-type-step.js, which set that
+  // explicitly), so the listener has to sit on this exact element, not on the
+  // modal wrapper a few DOM levels up.
+  //
+  // Created via `top.document`, not this frame's own `document`: Modal.advanced()
+  // renders its content in the outer chrome document, not inside this module's
+  // iframe. A plain element created here would still work once moved there (a
+  // cross-document appendChild silently adopts it), but this custom element
+  // carries a Shadow DOM with a Lit-constructed stylesheet tied to the realm
+  // that defined its class - adopting that stylesheet into a shadow root that
+  // ends up owned by a *different* document throws "Sharing constructed
+  // stylesheets in multiple documents is not allowed". Creating the element
+  // through the same document the modal actually lives in avoids the mismatch
+  // - the same reason core's own new-record-wizard.js reaches through `top` for
+  // TYPO3.ModuleMenu rather than assuming its own frame's globals apply.
+  const picker = top.document.createElement('typo3-backend-new-record-wizard')
+  picker.categories = categories
+  picker.setAttribute('store-name', 'contentflow-new-record-type')
+  picker.addEventListener('contentflow:record-type-chosen', (event) => {
+    const item = event.detail?.item
+    if (!item?.identifier) {
+      return
+    }
+    openPendingRecordWizard(item.identifier, item.label)
+  })
+
+  // top.TYPO3.Modal, not this frame's own imported Modal, for the same reason
+  // `picker` itself is created via `top.document` above: the component's own
+  // click handling calls `Modal.dismiss()` against *its own* realm's Modal
+  // singleton (top's, since the element's class is top's), so opening the
+  // modal through a different singleton left it never actually closing -
+  // functionally harmless here since this picker's own event listener above
+  // is what really drives the flow, but still wrong and worth matching.
+  top.TYPO3.Modal.advanced({
+    type: top.TYPO3.Modal.types.default,
+    title: labels.get('entry.newRecord.label'),
+    content: picker,
+    severity: SeverityEnum.notice,
+    size: top.TYPO3.Modal.sizes.large,
+    staticBackdrop: true,
+  })
+}
+
+/*
+ * "Create a new content element": TYPO3 core's own "+Content" wizard
+ * (NewContentElementController), the exact same one the page module's own
+ * "+Content" button opens - reused as-is rather than rebuilt, the same way
+ * openRecordTypePicker() above reuses <typo3-backend-new-record-wizard>.
+ * Unlike a planned page or record, a content element always has a real page
+ * to sit on already (the one selected on the board), so there is no "pending"
+ * step here: core creates the record immediately through its own FormEngine
+ * flow, and TaskAutoCreationDataHandlerHook - which already auto-creates or
+ * advances a task for any record edited in a workspace (see ARCHITECTURE.md)
+ * - picks it up from there, no explicit task-creation call needed on return.
+ *
+ * `colPos` is deliberately left unset: core's own wizard then shows its
+ * position-map step first (matching whatever backend layout the page
+ * actually has) before the content-type picker, exactly like clicking
+ * "+Content" without a fixed column would in the page module itself.
+ */
+function openNewContentElementWizard() {
+  const baseUrl = TYPO3.settings.ContentFlow?.newContentElementWizardUrl
+  const pageId = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
+  if (!baseUrl || pageId < 1) {
+    Notification.error(NOTIFICATION_TITLE, labels.get('wizard.error.newContentElementWizardMissing'))
+    return
+  }
+
+  const params = new URLSearchParams({
+    id: String(pageId),
+    uid_pid: String(pageId),
+    returnUrl: window.location.href,
+  })
+
+  // top.TYPO3.Modal, not this frame's own imported Modal: the ajax-fetched
+  // content includes core's own <typo3-backend-new-record-wizard>, already
+  // registered against the outer chrome document (see openRecordTypePicker()
+  // above for the same cross-document reasoning). Its own click handling
+  // reaches for `Modal.currentModal` to swap in the position-map step and
+  // finally to dismiss itself - calling .advanced() through this frame's
+  // Modal singleton would open the modal fine, but leave *that* singleton's
+  // currentModal set rather than the outer chrome's, so the component's own
+  // follow-up step silently fails to find anything to update.
+  top.TYPO3.Modal.advanced({
+    type: top.TYPO3.Modal.types.ajax,
+    title: labels.get('entry.newContentElement.label'),
+    content: baseUrl + (baseUrl.includes('?') ? '&' : '?') + params.toString(),
+    severity: SeverityEnum.notice,
+    size: top.TYPO3.Modal.sizes.large,
   })
 }
 
@@ -190,6 +320,11 @@ function openEntryChoiceWizard() {
       title: labels.get('entry.section.contentElement'),
       choices: [
         {
+          label: labels.get('entry.newContentElement.label'),
+          description: labels.get('entry.newContentElement.description'),
+          action: () => openNewContentElementWizard(),
+        },
+        {
           label: labels.get('entry.contentElement.label'),
           description: labels.get('entry.contentElement.description'),
           action: () => openRecordPicker([CONTENT_ELEMENT_TABLE], 'entry.contentElementPicker.title'),
@@ -207,7 +342,7 @@ function openEntryChoiceWizard() {
         {
           label: labels.get('entry.newRecord.label'),
           description: labels.get('entry.newRecord.description'),
-          action: () => openPendingRecordWizard(),
+          action: () => openRecordTypePicker(),
         },
       ],
     },
