@@ -256,6 +256,68 @@ final class TaskAutoCreationService
     }
 
     /**
+     * Same routing captureEdit() applies to a live editor's save, driven instead by
+     * a workspace version that already existed before Content Flow was installed.
+     * The upgrade wizard `MigrateExistingWorkspaceChangesToTasksUpdate` is this
+     * method's only caller.
+     *
+     * Deliberately narrower than captureEdit(): there is no DataHandler to hang a
+     * follow-up wizard on, no active task session (nobody is mid-save), and nothing
+     * to regress past - a version already sitting in Review/Ready just means the
+     * task is created straight into that state, not walked back to Editing.
+     */
+    public function captureExistingVersion(string $table, int $liveUid, int $versionUid, int $workspaceUid): void
+    {
+        if (!$this->subjectRegistry->isTrackable($table)) {
+            return;
+        }
+
+        $stageUid = (int)(BackendUtility::getRecord($table, $versionUid, 't3ver_stage')['t3ver_stage'] ?? 0);
+        $pageUid = $this->derivePid($table, $liveUid);
+
+        $existing = $this->taskRepository->findOpenTaskByMember($table, $liveUid);
+        if ($existing !== null) {
+            $this->attachExistingVersionWorkspace($existing, $workspaceUid, $stageUid);
+            return;
+        }
+
+        $pageTask = $this->taskRepository->findOpenBySubject('pages', $pageUid);
+        if ($pageTask !== null && !$this->subjectRegistry->isSubject($table)) {
+            $this->attachExistingVersionWorkspace($pageTask, $workspaceUid, $stageUid);
+            $homePid = $this->derivePid($table, $liveUid);
+            $this->taskRepository->addMemberIfUnclaimed(
+                (int)$pageTask['uid'],
+                $table,
+                $liveUid,
+                TaskRepository::ORIGIN_AUTO,
+                $homePid,
+                $this->referenceInspector->isSharedAcrossPages($table, $liveUid, $homePid),
+            );
+            return;
+        }
+
+        $resolvedTask = $this->resolveTask($table, $liveUid, $workspaceUid, $stageUid, 0);
+        if ($resolvedTask === null) {
+            return;
+        }
+        $this->attachExistingVersionWorkspace($resolvedTask['task'], $workspaceUid, $stageUid);
+    }
+
+    /**
+     * @param array<string, mixed> $task
+     */
+    private function attachExistingVersionWorkspace(array $task, int $workspaceUid, int $stageUid): void
+    {
+        if ((int)($task['workspace_uid'] ?? 0) !== 0) {
+            // Another pending version on the same subject already attached the
+            // workspace - core's t3ver_stage is the per-record source of truth,
+            // this cached column only needs one of them to have set it.
+            return;
+        }
+        $this->taskRepository->attachWorkspace((int)$task['uid'], $workspaceUid, $stageUid);
+    }
+
+    /**
      * Work out which live record this edit was really about, and which version now
      * holds it.
      *
