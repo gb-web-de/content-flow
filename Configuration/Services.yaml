@@ -22,6 +22,9 @@ services:
   GbWeb\ContentFlow\Hooks\TaskAutoCreationDataHandlerHook:
     public: true
 
+  GbWeb\ContentFlow\Updates\MigrateExistingWorkspaceChangesToTasksUpdate:
+    public: true
+
   GbWeb\ContentFlow\Dashboard\Widget\TaskOverviewWidget:
     tags:
       - name: dashboard.widget
