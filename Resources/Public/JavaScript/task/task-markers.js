@@ -57,22 +57,33 @@ export function elementIdentifiers(element) {
 
 /**
  * Build the lookup the marker pass reads: every identifier a member can appear
- * under, pointing at the task that claims it.
+ * under, pointing at the task that claims it - and at the record's own LIVE
+ * table/uid.
  *
- * @param members {Array<{taskUid: number, table: string, uid: number, identifiers?: string[]}>}
- * @returns {Map<string, number>}
+ * The live identity is carried along rather than derived from the element,
+ * because it cannot be: in a workspace the element usually spells the VERSION
+ * uid, while every write endpoint (attach, detach) works on the live one. The
+ * server already knows both and sends both.
+ *
+ * @param members {Array<{taskUid: number, table: string, uid: number, title?: string, identifiers?: string[]}>}
+ * @returns {Map<string, {taskUid: number, table: string, uid: number, title: string}>}
  */
 export function claimsByIdentifier(members) {
   const claims = new Map()
 
   for (const member of members) {
-    const taskUid = Number(member.taskUid)
+    const claim = {
+      taskUid: Number(member.taskUid),
+      table: String(member.table),
+      uid: Number(member.uid),
+      title: String(member.title ?? ''),
+    }
     const identifiers = Array.isArray(member.identifiers) && member.identifiers.length > 0
       ? member.identifiers
       : [identifier(member.table, member.uid)]
 
     for (const value of identifiers) {
-      claims.set(String(value), taskUid)
+      claims.set(String(value), claim)
     }
   }
 
@@ -88,16 +99,25 @@ export function claimsByIdentifier(members) {
  * when a page is split across three tasks is which parts you have already
  * taken. Both cases get a marker; they get *different* markers.
  *
- * @returns {{taskUid: number, isActive: boolean}|null} null when unclaimed
+ * `table` and `uid` are the record's LIVE identity, which is what the split and
+ * move endpoints need and what the element itself does not reliably carry.
+ *
+ * @returns {{taskUid: number, isActive: boolean, table: string, uid: number, title: string}|null} null when unclaimed
  */
 export function claimFor(element, claims, activeTaskUid) {
   for (const value of elementIdentifiers(element)) {
-    const taskUid = claims.get(value)
-    if (taskUid === undefined) {
+    const claim = claims.get(value)
+    if (claim === undefined) {
       continue
     }
 
-    return { taskUid, isActive: taskUid === Number(activeTaskUid) }
+    return {
+      taskUid: claim.taskUid,
+      isActive: claim.taskUid === Number(activeTaskUid),
+      table: claim.table,
+      uid: claim.uid,
+      title: claim.title,
+    }
   }
 
   return null

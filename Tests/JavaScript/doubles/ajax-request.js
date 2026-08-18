@@ -35,6 +35,20 @@ export default class AjaxRequest {
   async post(body) {
     recorded.body = body
 
+    return this.answer()
+  }
+
+  async get() {
+    return this.answer()
+  }
+
+  /*
+   * AjaxRequest throws on any non-2xx answer, and what it throws still carries
+   * the response body - which is how a caller reads the code and message the
+   * server rejected with. `rejectWith` therefore stands in for both: a thrown
+   * AjaxResponse, and a genuine transport failure.
+   */
+  async answer() {
     if (behaviour.rejectWith !== null) {
       throw behaviour.rejectWith
     }

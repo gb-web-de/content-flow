@@ -567,6 +567,101 @@
                 <source>You do not have access to this page. (CF-1035)</source>
                 <target>Sie haben keinen Zugriff auf diese Seite. (CF-1035)</target>
             </trans-unit>
+
+            <!--
+                Splitting a record out of its task and moving it onto another
+                one. Both are membership changes only - the workspace version
+                belongs to the record - so every text here says so rather than
+                leaving an editor to wonder whether their changes survive.
+            -->
+            <trans-unit id="membership.split.button" xml:space="preserve">
+                <source>Split off</source>
+                <target>Abspalten</target>
+            </trans-unit>
+            <trans-unit id="membership.split.title" xml:space="preserve">
+                <source>Split from task</source>
+                <target>Aus der Aufgabe herauslösen</target>
+            </trans-unit>
+            <trans-unit id="membership.split.intro" xml:space="preserve">
+                <source>%s gets a task of its own. Its pending changes stay with it.</source>
+                <target>%s bekommt eine eigene Aufgabe. Die vorgemerkten Änderungen bleiben erhalten.</target>
+            </trans-unit>
+            <trans-unit id="membership.split.field.title" xml:space="preserve">
+                <source>Title</source>
+                <target>Titel</target>
+            </trans-unit>
+            <trans-unit id="membership.split.field.description" xml:space="preserve">
+                <source>Description</source>
+                <target>Beschreibung</target>
+            </trans-unit>
+            <trans-unit id="membership.split.field.assignment" xml:space="preserve">
+                <source>Assigned to</source>
+                <target>Zugewiesen an</target>
+            </trans-unit>
+            <trans-unit id="membership.split.submit" xml:space="preserve">
+                <source>Split off</source>
+                <target>Abspalten</target>
+            </trans-unit>
+            <trans-unit id="membership.split.success" xml:space="preserve">
+                <source>%s now has a task of its own.</source>
+                <target>%s hat jetzt eine eigene Aufgabe.</target>
+            </trans-unit>
+            <trans-unit id="membership.move.button" xml:space="preserve">
+                <source>Move to task</source>
+                <target>Verschieben</target>
+            </trans-unit>
+            <trans-unit id="membership.move.title" xml:space="preserve">
+                <source>Move to another task</source>
+                <target>In eine andere Aufgabe verschieben</target>
+            </trans-unit>
+            <trans-unit id="membership.move.intro" xml:space="preserve">
+                <source>Pick the task %s should belong to. Its pending changes move with it.</source>
+                <target>Wählen Sie die Aufgabe, zu der %s gehören soll. Die vorgemerkten Änderungen wandern mit.</target>
+            </trans-unit>
+            <trans-unit id="membership.move.current" xml:space="preserve">
+                <source>Currently in: %s</source>
+                <target>Derzeit in: %s</target>
+            </trans-unit>
+            <trans-unit id="membership.move.empty" xml:space="preserve">
+                <source>There is no other open task this record could move to. Split it into a task of its own instead.</source>
+                <target>Es gibt keine andere offene Aufgabe für diesen Datensatz. Spalten Sie ihn stattdessen in eine eigene Aufgabe ab.</target>
+            </trans-unit>
+            <trans-unit id="membership.move.submit" xml:space="preserve">
+                <source>Move</source>
+                <target>Verschieben</target>
+            </trans-unit>
+            <trans-unit id="membership.move.success" xml:space="preserve">
+                <source>%s moved to %s.</source>
+                <target>%s wurde nach %s verschoben.</target>
+            </trans-unit>
+            <trans-unit id="membership.move.toActive" xml:space="preserve">
+                <source>Move to the active task</source>
+                <target>In die aktive Aufgabe holen</target>
+            </trans-unit>
+            <trans-unit id="membership.menu.label" xml:space="preserve">
+                <source>Task actions</source>
+                <target>Aufgabenaktionen</target>
+            </trans-unit>
+            <trans-unit id="membership.cancel" xml:space="preserve">
+                <source>Cancel</source>
+                <target>Abbrechen</target>
+            </trans-unit>
+            <trans-unit id="membership.error.otherWorkspace" xml:space="preserve">
+                <source>This task belongs to another workspace, so its records cannot be reached from here. Switch workspace first. (CF-1040)</source>
+                <target>Diese Aufgabe gehört zu einem anderen Workspace, ihre Datensätze sind von hier aus nicht erreichbar. Wechseln Sie zuerst den Workspace. (CF-1040)</target>
+            </trans-unit>
+            <trans-unit id="membership.error.failed" xml:space="preserve">
+                <source>This record could not be moved. (CF-1041)</source>
+                <target>Dieser Datensatz konnte nicht verschoben werden. (CF-1041)</target>
+            </trans-unit>
+            <trans-unit id="membership.error.server" xml:space="preserve">
+                <source>Could not reach the server. (CF-1042)</source>
+                <target>Der Server war nicht erreichbar. (CF-1042)</target>
+            </trans-unit>
+            <trans-unit id="membership.error.targetsFailed" xml:space="preserve">
+                <source>The tasks this record could move to could not be loaded. (CF-1043)</source>
+                <target>Die möglichen Zielaufgaben konnten nicht geladen werden. (CF-1043)</target>
+            </trans-unit>
             <trans-unit id="autoCreation.comment.reopened" xml:space="preserve">
                 <source>Automatically reopened for editing - %1$s:%2$d was modified.</source>
                 <target>Automatisch erneut zur Bearbeitung geöffnet - %1$s:%2$d wurde geändert.</target>

@@ -12,6 +12,7 @@ use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Backend\View\Event\AfterPageContentPreviewRenderedEvent;
 use TYPO3\CMS\Backend\View\PageLayoutContext;
 use TYPO3\CMS\Core\Domain\RecordFactory;
+use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 /**
@@ -43,6 +44,11 @@ final class ContentElementTaskBadgeListenerTest extends FunctionalTestCase
         $this->importCSVDataSet(__DIR__ . '/../Fixtures/pages.csv');
         $this->setUpBackendUser(1);
         $GLOBALS['BE_USER']->setWorkspace(1);
+        // The badge names the element the split/move buttons act on, and
+        // BackendUtility::getRecordTitle() resolves labels through LANG. Always
+        // present in a real Page module request, never in a synthetic one.
+        $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)
+            ->createFromUserPreferences($GLOBALS['BE_USER']);
     }
 
     private function subject(): ContentElementTaskBadgeListener
@@ -140,6 +146,45 @@ final class ContentElementTaskBadgeListenerTest extends FunctionalTestCase
         $output = $this->renderPreviewFor(10);
 
         self::assertStringContainsString('contentflow-element-badge--active', $output);
+    }
+
+    /**
+     * "Meet editors where they are": the badge answers who owns this element,
+     * and the two follow-up questions are answered right there rather than only
+     * inside the ticket. The buttons carry nothing but data - the behaviour is
+     * task/membership.js', which board.js already registers in this module.
+     */
+    #[Test]
+    public function theBadgeOffersSplittingAndMovingTheElement(): void
+    {
+        $taskUid = $this->createTask();
+        $this->addMember($taskUid, 10);
+
+        $output = $this->renderPreviewFor(10);
+
+        self::assertStringContainsString('data-contentflow-split="1"', $output);
+        self::assertStringContainsString('data-contentflow-move="1"', $output);
+        self::assertStringContainsString('data-table="tt_content"', $output);
+        self::assertStringContainsString('data-uid="10"', $output);
+        // The dialogs say which record they are about, so the badge has to name it.
+        self::assertStringContainsString('data-title="Intro text"', $output);
+    }
+
+    /**
+     * A task cannot be split from its own subject - detachAction() refuses it
+     * with cannot-split-task-from-itself - so the button that would produce
+     * exactly that error is not rendered. Moving it elsewhere is still fine.
+     */
+    #[Test]
+    public function anElementThatIsItsOwnTasksSubjectCannotBeSplitFromIt(): void
+    {
+        $taskUid = $this->createTask(['subject_table' => 'tt_content', 'subject_uid' => 10]);
+        $this->addMember($taskUid, 10);
+
+        $output = $this->renderPreviewFor(10);
+
+        self::assertStringNotContainsString('data-contentflow-split', $output);
+        self::assertStringContainsString('data-contentflow-move="1"', $output);
     }
 
     #[Test]

@@ -207,6 +207,23 @@ final class TaskAjaxController
             return $task;
         }
 
+        // Checked once rather than per record: whether a task can receive work
+        // at all is a property of that task, not of any record handed to it. A
+        // pending version lives in the editor's workspace, so moving it onto a
+        // task bound to a different one would leave its changes unreachable -
+        // the ticket could only offer "switch to that workspace to act on
+        // this". Same rule openTasksForContext() applies when it offers tasks.
+        $workspaceUid = (int)$this->getBackendUser()->workspace;
+        $taskWorkspaceUid = (int)($task['workspace_uid'] ?? 0);
+        if ($taskWorkspaceUid !== 0 && $taskWorkspaceUid !== $workspaceUid) {
+            return $this->reject(
+                'task-in-other-workspace',
+                $this->label('membership.error.otherWorkspace'),
+                ['taskUid' => $taskUid, 'taskWorkspaceUid' => $taskWorkspaceUid, 'workspaceUid' => $workspaceUid],
+            );
+        }
+
+        $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
         $moved = [];
         $refused = [];
         foreach ($records as $record) {
@@ -220,7 +237,14 @@ final class TaskAjaxController
             }
 
             $homePid = $this->derivePid($table, $uid);
-            if ($this->taskRepository->findOpenTaskByMember($table, $uid) !== null) {
+            $currentTask = $this->taskRepository->findOpenTaskByMember($table, $uid);
+            if ($currentTask !== null) {
+                if ((int)$currentTask['uid'] === $taskUid) {
+                    // Already where it was asked to go. Not an error, and not
+                    // worth an activity entry saying nothing happened.
+                    $moved[] = ['table' => $table, 'uid' => $uid];
+                    continue;
+                }
                 $this->taskRepository->moveMemberToTask($table, $uid, $taskUid);
             } else {
                 $this->taskRepository->addMemberIfUnclaimed(
@@ -232,6 +256,15 @@ final class TaskAjaxController
                     $this->referenceInspector->isSharedAcrossPages($table, $uid, $homePid),
                 );
             }
+
+            $this->logMembershipChange(
+                ActivityLogger::EVENT_MEMBER_MOVED,
+                $table,
+                $uid,
+                $currentTask !== null ? (int)$currentTask['uid'] : 0,
+                $taskUid,
+                $beUserId,
+            );
             $moved[] = ['table' => $table, 'uid' => $uid];
         }
 
@@ -248,6 +281,15 @@ final class TaskAjaxController
      * The escape hatch from page aggregation - one banner really being its own
      * piece of work. The board can route any trackable record back to its edit
      * form, so an editor may promote even page-bound content into its own task.
+     *
+     * Nothing the record carries is at stake here: the workspace version hangs
+     * on the record, and detachIntoOwnTask() only re-points the membership row.
+     * The new task inherits the old one's state, stage and workspace, so the
+     * split-off card appears in the same column showing the same diffs.
+     *
+     * `title`, `description` and `assignee` are optional: the split dialog
+     * collects them, while callers that just want the record out (and the
+     * existing wizard route) keep the derived title and the acting editor.
      */
     public function detachAction(ServerRequestInterface $request): ResponseInterface
     {
@@ -276,21 +318,147 @@ final class TaskAjaxController
             );
         }
 
+        $title = trim((string)($body['title'] ?? ''));
+        if ($title === '') {
+            $title = $this->deriveTitle($table, $uid);
+        }
+        $description = trim((string)($body['description'] ?? ''));
+        $assignee = $this->resolveRequestedAssignee($body['assignee'] ?? 'me');
+        $beUserId = (int)($this->getBackendUser()->user['uid'] ?? 0);
+
         $task = $this->taskRepository->detachIntoOwnTask($table, $uid, [
-            'title' => $this->deriveTitle($table, $uid),
+            'title' => $title,
+            'description' => $description,
             'subject_pid' => $this->derivePid($table, $uid),
             'state' => (string)$current['state'],
             'stage_uid' => (int)$current['stage_uid'],
             'workspace_uid' => (int)$current['workspace_uid'],
-            'assignee' => (int)($this->getBackendUser()->user['uid'] ?? 0),
+            'assignee' => $assignee,
             'auto_created' => 0,
         ]);
+        $taskUid = (int)$task['uid'];
+
+        $this->activityLogger->log($taskUid, ActivityLogger::EVENT_TASK_CREATED, $beUserId, [
+            'subjectTable' => $table,
+            'subjectUid' => $uid,
+            'split' => true,
+        ]);
+        $this->logMembershipChange(
+            ActivityLogger::EVENT_MEMBER_SPLIT,
+            $table,
+            $uid,
+            (int)$current['uid'],
+            $taskUid,
+            $beUserId,
+        );
+        $this->notifyAssignment($taskUid, $title, $table, $uid, $assignee);
 
         return new JsonResponse([
             'success' => true,
-            'task' => (int)$task['uid'],
+            'task' => $taskUid,
             'from' => (int)$current['uid'],
         ]);
+    }
+
+    /**
+     * Which other open tasks this record could be moved onto.
+     *
+     * Not openTasksForContext(): that one narrows to the record's own subject
+     * and member tasks, which for a content element is precisely the task it
+     * already sits in - it would offer the editor a list of one wrong answer.
+     * The useful candidates are the open tasks around the record instead: those
+     * on the page it lives on, plus those on the page its current task is about
+     * (the two differ exactly in the cross-page case a move is there to
+     * resolve).
+     */
+    public function moveTargetsAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $query = $request->getQueryParams();
+        $table = trim((string)($query['table'] ?? ''));
+        $uid = (int)($query['uid'] ?? 0);
+
+        // The table/uid pair is the client's claim, so the record's own edit
+        // permission gates the answer - without it this lists the open tasks,
+        // titles and stages around any record in the installation.
+        $error = $this->assertMayEdit($table, $uid);
+        if ($error !== null) {
+            return $this->error($error);
+        }
+
+        $current = $this->taskRepository->findOpenTaskByMember($table, $uid);
+        if ($current === null) {
+            return $this->reject(
+                'record-not-in-open-task',
+                'This record does not belong to an open task, so there is nothing to move.',
+                ['table' => $table, 'uid' => $uid],
+            );
+        }
+
+        $workspaceUid = (int)$this->getBackendUser()->workspace;
+        $currentTaskUid = (int)$current['uid'];
+
+        $candidates = array_merge(
+            $this->taskRepository->findAllOpenForPage($this->derivePid($table, $uid)),
+            $this->taskRepository->findAllOpenForPage((int)$current['subject_pid']),
+        );
+
+        $tasks = [];
+        foreach ($candidates as $candidate) {
+            $candidateUid = (int)$candidate['uid'];
+            if ($candidateUid === $currentTaskUid || isset($tasks[$candidateUid])) {
+                continue;
+            }
+            // Same rule attachAction() enforces on the way in, applied here so
+            // the picker never offers a target the write endpoint would refuse.
+            $candidateWorkspaceUid = (int)$candidate['workspace_uid'];
+            if ($candidateWorkspaceUid !== 0 && $candidateWorkspaceUid !== $workspaceUid) {
+                continue;
+            }
+
+            $tasks[$candidateUid] = [
+                'uid' => $candidateUid,
+                'title' => (string)$candidate['title'],
+                'state' => (string)$candidate['state'],
+                'stageLabel' => $this->stageLabelFor($candidate),
+            ];
+        }
+
+        return new JsonResponse([
+            'success' => true,
+            'currentTask' => $currentTaskUid,
+            'currentTaskTitle' => (string)$current['title'],
+            'tasks' => array_values($tasks),
+        ]);
+    }
+
+    /**
+     * One membership change, written to both tasks involved.
+     *
+     * The source entry is the point: without it a task's trail simply loses an
+     * element, with no record of where it went - and this trail has to outlive
+     * sys_history's 30-day garbage collection, which is the only other place
+     * the move would show up at all.
+     */
+    private function logMembershipChange(
+        string $event,
+        string $table,
+        int $recordUid,
+        int $fromTaskUid,
+        int $toTaskUid,
+        int $beUserId,
+    ): void {
+        $payload = [
+            'table' => $table,
+            'recordUid' => $recordUid,
+            'recordTitle' => $this->deriveTitle($table, $recordUid),
+            'fromTask' => $fromTaskUid,
+            'toTask' => $toTaskUid,
+        ];
+
+        if ($fromTaskUid > 0) {
+            $this->activityLogger->log($fromTaskUid, $event, $beUserId, $payload);
+        }
+        $this->activityLogger->log($toTaskUid, $event, $beUserId, $payload);
     }
 
     /**
@@ -992,6 +1160,11 @@ final class TaskAjaxController
                     'table' => $table,
                     'uid' => $liveUid,
                     'taskUid' => $taskUid,
+                    // Named here rather than read off the rendered element: the
+                    // frontend markup carries the record's identity, not its
+                    // backend title, and the marker's own actions ("give THIS
+                    // its own task") have to say which record they mean.
+                    'title' => $this->deriveTitle($table, $liveUid),
                     'identifiers' => $this->memberIdentifiers($table, $liveUid, $workspaceUid),
                 ];
             }
@@ -1775,14 +1948,20 @@ final class TaskAjaxController
     }
 
     /**
-     * The Visual Editor actions' own editor-facing texts, through the same
-     * `content_flow.messages` domain the wizard uses (TaskWizardProvider::
-     * translate()). Only these actions are covered so far - the rest of this
-     * controller still answers in English literals, which is a separate job.
+     * An editor-facing text, through the same `content_flow.messages` domain the
+     * wizard uses (TaskWizardProvider::translate()). Only some actions are
+     * covered so far - the rest of this controller still answers in English
+     * literals, which is a separate job.
      */
-    private function veLabel(string $key): string
+    private function label(string $key): string
     {
         return $this->getLanguageService()->sL('content_flow.messages:' . $key);
+    }
+
+    /** The Visual Editor actions' own texts, from that same domain. */
+    private function veLabel(string $key): string
+    {
+        return $this->label($key);
     }
 
     /**

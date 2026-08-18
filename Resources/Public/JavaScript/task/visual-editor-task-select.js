@@ -166,7 +166,10 @@ class VisualEditorTaskSelect {
     this.pageUid = pageUid
     this.activeTaskUid = 0
     this.select = null
-    this.markers = new TaskMarkers(doc)
+    // The markers' own membership actions refresh through here rather than
+    // reloading: this runs in the backend chrome, and a reload would drop the
+    // whole editing session for something one request can bring up to date.
+    this.markers = new TaskMarkers(doc, () => this.reloadMarkers())
     this.dismissCommentPopover = null
     this.remounting = false
   }

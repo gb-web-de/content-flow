@@ -561,6 +561,33 @@
     font-weight: 600;
 }
 
+/*
+ * Split / move, right on the badge. Kept quiet on purpose: the badge answers
+ * "who owns this", and these are the two follow-up questions, not a call to
+ * action competing with the page module's own controls.
+ */
+.contentflow-element-actions {
+    display: inline-flex;
+    gap: 4px;
+    margin-left: 6px;
+}
+
+.contentflow-element-action {
+    padding: 0 4px;
+    border: 1px solid hsl(var(--contentflow-task-hue, 0), 70%, 45%, .5);
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 10px;
+    line-height: 1.6;
+    cursor: pointer;
+}
+
+.contentflow-element-action:hover,
+.contentflow-element-action:focus-visible {
+    background: hsl(var(--contentflow-task-hue, 0), 70%, 45%, .2);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .contentflow-card,
     .contentflow-column {
@@ -824,6 +851,49 @@
 .contentflow-member-actions {
     display: flex;
     gap: 6px;
+    margin-left: auto;
+}
+
+/*
+ * The split and move dialogs. Both open from the ticket, the page module and
+ * the Visual Editor, and all three render into the same top-level backend
+ * document, so one set of rules covers every entry point.
+ */
+.contentflow-membership-dialog .form-group {
+    margin-bottom: 12px;
+}
+
+.contentflow-membership-current {
+    font-size: 12px;
+    opacity: 0.75;
+}
+
+.contentflow-membership-targets {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 40vh;
+    overflow-y: auto;
+}
+
+/* The whole row is the label, so the hit area is the row and not the radio. */
+.contentflow-membership-target {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--typo3-component-border-color, #ddd);
+    border-radius: 4px;
+    font-weight: normal;
+    cursor: pointer;
+}
+
+.contentflow-membership-target:hover,
+.contentflow-membership-target:focus-within {
+    background: var(--typo3-component-hover-bg, rgba(0, 0, 0, .04));
+}
+
+.contentflow-membership-target .badge {
     margin-left: auto;
 }
 

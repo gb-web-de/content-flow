@@ -24,11 +24,15 @@ import Modal from '@typo3/backend/modal.js'
 import { SeverityEnum } from '@typo3/backend/enum/severity.js'
 import labels from '~labels/content_flow.messages'
 import { claimFor, hueForTaskUid, legendEntries } from '@gb-web/content-flow/task/task-markers.js'
+import { openMoveDialog, openSplitDialog, moveToTask } from '@gb-web/content-flow/task/membership.js'
 
 const CONTENT_ELEMENT_SELECTOR = 've-content-element'
 const CONTENT_FRAME_SELECTOR = 'iframe.visual-editor-iframe'
 
 const BUBBLE_CLASS = 'contentflow-task-bubble'
+const ACTIONS_CLASS = 'contentflow-task-actions'
+const MENU_TOGGLE_CLASS = 'contentflow-task-menu-toggle'
+const MENU_CLASS = 'contentflow-task-menu'
 const CLAIMED_CLASS = 'contentflow-task-claimed'
 const ACTIVE_CLASS = 'contentflow-task-claimed-active'
 const HIGHLIGHT_CLASS = 'contentflow-task-highlight'
@@ -74,11 +78,17 @@ const MARKER_STYLES = `
  * over that reads as part of the design. The right edge is where the eye finds
  * a status mark and where nothing of the page usually is.
  */
-.${BUBBLE_CLASS} {
+.${ACTIONS_CLASS} {
   position: absolute;
   top: 4px;
   right: 4px;
   z-index: 11;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.${BUBBLE_CLASS} {
+  position: relative;
   width: 14px;
   height: 14px;
   padding: 0;
@@ -87,6 +97,59 @@ const MARKER_STYLES = `
   background: hsl(var(${HUE_PROPERTY}, 0), 70%, 45%);
   box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
   cursor: pointer;
+}
+/*
+ * The second affordance, deliberately separate from the dot: clicking the dot
+ * has meant "open this task" since the markers shipped, and quietly turning
+ * that into a menu would break a gesture editors already know. Not drag-only,
+ * not hover-only - a real button, so the menu is reachable by keyboard.
+ */
+.${MENU_TOGGLE_CLASS} {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 3px;
+  background: #1a1a1a;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+  font-family: sans-serif;
+  font-size: 9px;
+  line-height: 1;
+  cursor: pointer;
+}
+.${MENU_CLASS} {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: 4px;
+  border-radius: 3px;
+  background: #1a1a1a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
+}
+.${MENU_CLASS}[hidden] {
+  display: none;
+}
+.${MENU_CLASS} button {
+  padding: .35em .5em;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: #fff;
+  font-family: sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+.${MENU_CLASS} button:hover,
+.${MENU_CLASS} button:focus-visible {
+  background: hsl(var(${HUE_PROPERTY}, 0), 70%, 45%);
 }
 /*
  * The editor's own task reads as a ring rather than a filled dot: same colour,
@@ -152,8 +215,12 @@ export class TaskMarkers {
    * @param moduleDoc the EXT:visual_editor module document (holds the frames
    *                  and the toolbar)
    */
-  constructor(moduleDoc) {
+  constructor(moduleDoc, onMembershipChange = null) {
     this.doc = moduleDoc
+    // Called after a split or a move. Not window.location.reload(): this module
+    // runs in the backend chrome, so reloading would throw away the whole
+    // editing session for a marker the driver can simply re-fetch.
+    this.onMembershipChange = onMembershipChange ?? (() => {})
     this.claims = new Map()
     this.tasks = new Map()
     this.activeTaskUid = 0
@@ -216,12 +283,30 @@ export class TaskMarkers {
     injectStyles(doc, MARKER_STYLE_ID, MARKER_STYLES)
     this.markElements(doc)
     this.observeMutations(doc)
+    this.dismissMenusOnOutsideClick(doc)
+  }
+
+  /**
+   * A click anywhere else in the page closes an open menu - the behaviour every
+   * other menu in the backend has, and without it an editor has to find the
+   * chevron again to get rid of it. Registered once per document.
+   */
+  dismissMenusOnOutsideClick(doc) {
+    if (doc.body.dataset.contentflowMenuDismiss === '1') {
+      return
+    }
+    doc.body.dataset.contentflowMenuDismiss = '1'
+    doc.addEventListener('click', (event) => {
+      if (event.target?.closest?.('.' + ACTIONS_CLASS) === null) {
+        this.closeAllMenus()
+      }
+    })
   }
 
   markElements(doc) {
     doc.querySelectorAll(CONTENT_ELEMENT_SELECTOR).forEach((element) => {
       const claim = claimFor(element, this.claims, this.activeTaskUid)
-      const existing = element.querySelector(':scope > .' + BUBBLE_CLASS)
+      const existing = element.querySelector(':scope > .' + ACTIONS_CLASS)
 
       if (claim === null) {
         existing?.remove()
@@ -232,7 +317,8 @@ export class TaskMarkers {
 
       const task = this.tasks.get(claim.taskUid)
       const title = task?.title || '#' + claim.taskUid
-      const bubble = existing ?? this.createBubble(doc)
+      const actions = existing ?? this.createActions(doc)
+      const bubble = actions.querySelector('.' + BUBBLE_CLASS)
 
       element.style.setProperty(HUE_PROPERTY, String(hueForTaskUid(claim.taskUid)))
       element.classList.add(CLAIMED_CLASS)
@@ -247,10 +333,38 @@ export class TaskMarkers {
         (claim.isActive ? labels.get('ve.marker.yourTask') : labels.get('ve.marker.claimedBy'))
         + ' ' + title + ' - ' + labels.get('ve.marker.openTicket'),
       )
+
+      // Stamped on the group rather than closed over, so a re-render that keeps
+      // the existing nodes still acts on current data.
+      actions.dataset.contentflowTask = String(claim.taskUid)
+      actions.dataset.contentflowTable = claim.table
+      actions.dataset.contentflowUid = String(claim.uid)
+      actions.dataset.contentflowRecordTitle = claim.title || claim.table + ':' + claim.uid
+      actions.dataset.contentflowActive = claim.isActive ? '1' : '0'
+
       if (!existing) {
-        element.append(bubble)
+        element.append(actions)
       }
     })
+  }
+
+  /**
+   * The dot and its menu button, in one wrapper so both sit in the element's
+   * corner and the menu can be positioned against them.
+   */
+  createActions(doc) {
+    const actions = doc.createElement('span')
+    actions.className = ACTIONS_CLASS
+    // Everything we add sits inside editable content: it must not be typed
+    // over, and the mutation observer has to be able to tell our own nodes
+    // apart from a re-render, or marking would trigger marking.
+    actions.contentEditable = 'false'
+    actions.draggable = false
+    actions.dataset.contentflowMarker = '1'
+
+    actions.append(this.createBubble(doc), this.createMenuToggle(doc))
+
+    return actions
   }
 
   createBubble(doc) {
@@ -268,6 +382,117 @@ export class TaskMarkers {
     })
 
     return bubble
+  }
+
+  /**
+   * Opening the menu builds it from the group's current dataset, so a menu is
+   * never a stale copy of what the element was claimed by a re-render ago.
+   */
+  createMenuToggle(doc) {
+    const toggle = doc.createElement('button')
+    toggle.type = 'button'
+    toggle.className = MENU_TOGGLE_CLASS
+    toggle.contentEditable = 'false'
+    toggle.draggable = false
+    toggle.textContent = '\u25BE'
+    toggle.setAttribute('aria-haspopup', 'true')
+    toggle.setAttribute('aria-expanded', 'false')
+    toggle.setAttribute('aria-label', labels.get('membership.menu.label'))
+    toggle.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      this.toggleMenu(doc, toggle)
+    })
+
+    return toggle
+  }
+
+  toggleMenu(doc, toggle) {
+    const actions = toggle.parentElement
+    const open = actions.querySelector('.' + MENU_CLASS)
+    if (open !== null) {
+      this.closeMenu(actions)
+      return
+    }
+
+    this.closeAllMenus()
+    actions.append(this.createMenu(doc, actions))
+    toggle.setAttribute('aria-expanded', 'true')
+    actions.querySelector('.' + MENU_CLASS + ' button')?.focus()
+  }
+
+  closeMenu(actions) {
+    actions.querySelector('.' + MENU_CLASS)?.remove()
+    const toggle = actions.querySelector('.' + MENU_TOGGLE_CLASS)
+    toggle?.setAttribute('aria-expanded', 'false')
+    // Focus is never lost: it goes back to the control that opened the menu.
+    toggle?.focus()
+  }
+
+  closeAllMenus() {
+    this.contentFrames().forEach((frame) => {
+      frame.contentDocument?.querySelectorAll('.' + ACTIONS_CLASS).forEach((actions) => {
+        if (actions.querySelector('.' + MENU_CLASS) !== null) {
+          this.closeMenu(actions)
+        }
+      })
+    })
+  }
+
+  /**
+   * Three membership actions, all of them lossless: what an editor has typed
+   * lives on the record's workspace version, and none of these touches it.
+   */
+  createMenu(doc, actions) {
+    const menu = doc.createElement('div')
+    menu.className = MENU_CLASS
+    menu.setAttribute('role', 'menu')
+    menu.contentEditable = 'false'
+    menu.dataset.contentflowMarker = '1'
+
+    const table = actions.dataset.contentflowTable
+    const uid = Number(actions.dataset.contentflowUid)
+    const title = actions.dataset.contentflowRecordTitle || ''
+    const claimedBy = Number(actions.dataset.contentflowTask)
+    const onDone = () => this.onMembershipChange()
+
+    const entries = []
+    // Only when there is somewhere to move it TO: the editor has declared a
+    // task, and it is not the one already holding this element.
+    if (this.activeTaskUid > 0 && this.activeTaskUid !== claimedBy) {
+      entries.push([labels.get('membership.move.toActive'), () => moveToTask(table, uid, this.activeTaskUid, {
+        recordTitle: title,
+        taskTitle: this.tasks.get(this.activeTaskUid)?.title || '#' + this.activeTaskUid,
+        onDone,
+      })])
+    }
+    entries.push([labels.get('membership.split.button'), () => openSplitDialog(table, uid, title, { onDone })])
+    entries.push([labels.get('membership.move.button'), () => openMoveDialog(table, uid, title, { onDone })])
+
+    entries.forEach(([text, action]) => {
+      const item = doc.createElement('button')
+      item.type = 'button'
+      item.setAttribute('role', 'menuitem')
+      item.contentEditable = 'false'
+      item.textContent = text
+      item.addEventListener('click', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        this.closeMenu(actions)
+        action()
+      })
+      menu.append(item)
+    })
+
+    menu.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        this.closeMenu(actions)
+      }
+    })
+
+    return menu
   }
 
   /*
@@ -289,7 +514,7 @@ export class TaskMarkers {
       // Ignore the bubbles' own insertion and removal, or marking would trigger
       // marking.
       const relevant = mutations.some((mutation) => [...mutation.addedNodes, ...mutation.removedNodes].some(
-        (node) => node.nodeType === 1 && !node.classList?.contains(BUBBLE_CLASS),
+        (node) => node.nodeType === 1 && node.dataset?.contentflowMarker !== '1',
       ))
       if (!relevant || this.pendingPasses.get(doc)) {
         return

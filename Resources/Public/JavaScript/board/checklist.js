@@ -63,6 +63,109 @@ export function registerChecklistToggle() {
   });
 }
 
+/*
+ * Adding/removing items in the manage modal - delegated from the TOP document,
+ * same reasoning as registerChecklistToggle() above. openManageModal() builds the
+ * form and remove buttons before handing them to Modal.advanced(), and that hand-off
+ * does not preserve listeners bound beforehand (Modal renders `content` through a
+ * Lit property, which does not keep the original node's listeners intact) - a
+ * listener attached directly on those elements, as this code used to do, silently
+ * never fires. Binding here instead, and reading every value the handler needs back
+ * out of the DOM (dataset / sibling lookups), sidesteps that entirely.
+ */
+export function registerChecklistManageActions() {
+  topDocument().addEventListener('submit', async (event) => {
+    const form = event.target.closest('.contentflow-checklist-manage-add');
+    if (form === null) {
+      return;
+    }
+    event.preventDefault();
+
+    const workspaceUid = parseInt(form.dataset.workspaceUid, 10);
+    const stageUid = parseInt(form.dataset.stageUid, 10);
+    const input = form.querySelector('input');
+    const title = input.value.trim();
+    if (title === '') {
+      return;
+    }
+
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+
+    try {
+      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_checklist_add)
+        .post({ workspaceUid, stageUid, title });
+      const result = await response.resolve();
+      if (result.success !== true) {
+        Notification.error('Content Flow', result.message || 'Could not add that checklist item.');
+        return;
+      }
+      const list = form.closest('.contentflow-checklist-manage').querySelector('.contentflow-checklist-manage-list');
+      list.querySelector('.contentflow-empty')?.remove();
+      list.appendChild(buildManageItemRow(workspaceUid, result.item));
+      input.value = '';
+    } catch (error) {
+      Notification.error('Content Flow', 'Could not reach the server.');
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  topDocument().addEventListener('click', async (event) => {
+    const removeButton = event.target.closest('.contentflow-checklist-manage-remove');
+    if (removeButton === null) {
+      return;
+    }
+
+    const workspaceUid = parseInt(removeButton.dataset.workspaceUid, 10);
+    const itemUid = parseInt(removeButton.dataset.itemUid, 10);
+    removeButton.disabled = true;
+
+    try {
+      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_checklist_remove)
+        .post({ workspaceUid, itemUid });
+      const result = await response.resolve();
+      if (result.success !== true) {
+        Notification.error('Content Flow', result.message || 'Could not remove that checklist item.');
+        removeButton.disabled = false;
+        return;
+      }
+      const list = removeButton.closest('.contentflow-checklist-manage-list');
+      removeButton.closest('li').remove();
+      if (list.children.length === 0) {
+        list.appendChild(buildEmptyRow());
+      }
+    } catch (error) {
+      Notification.error('Content Flow', 'Could not reach the server.');
+      removeButton.disabled = false;
+    }
+  });
+}
+
+function buildEmptyRow() {
+  const empty = document.createElement('li');
+  empty.className = 'contentflow-empty';
+  empty.textContent = 'No checklist items yet.';
+  return empty;
+}
+
+function buildManageItemRow(workspaceUid, item) {
+  const row = document.createElement('li');
+  const title = document.createElement('span');
+  title.textContent = item.title;
+  row.appendChild(title);
+
+  const removeButton = document.createElement('button');
+  removeButton.type = 'button';
+  removeButton.className = 'btn btn-xs btn-default contentflow-checklist-manage-remove';
+  removeButton.dataset.workspaceUid = String(workspaceUid);
+  removeButton.dataset.itemUid = String(item.uid);
+  removeButton.textContent = 'Remove';
+  row.appendChild(removeButton);
+
+  return row;
+}
+
 function openManageModal(column) {
   const workspaceUid = parseInt(column.dataset.contentflowWorkspace || '0', 10);
   const stageUid = parseInt(column.dataset.contentflowStage || '0', 10);
@@ -78,46 +181,20 @@ function openManageModal(column) {
 
   const list = document.createElement('ul');
   list.className = 'contentflow-checklist-manage-list';
+  if (items.length === 0) {
+    list.appendChild(buildEmptyRow());
+  } else {
+    items.forEach((item) => list.appendChild(buildManageItemRow(workspaceUid, item)));
+  }
   content.appendChild(list);
 
-  const renderItems = () => {
-    list.innerHTML = '';
-    if (items.length === 0) {
-      const empty = document.createElement('li');
-      empty.className = 'contentflow-empty';
-      empty.textContent = 'No checklist items yet.';
-      list.appendChild(empty);
-      return;
-    }
-    items.forEach((item) => {
-      const row = document.createElement('li');
-      const title = document.createElement('span');
-      title.textContent = item.title;
-      row.appendChild(title);
-
-      const removeButton = document.createElement('button');
-      removeButton.type = 'button';
-      removeButton.className = 'btn btn-xs btn-default';
-      removeButton.textContent = 'Remove';
-      removeButton.addEventListener('click', async () => {
-        const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_checklist_remove)
-          .post({ workspaceUid, itemUid: item.uid });
-        const result = await response.resolve();
-        if (result.success !== true) {
-          Notification.error('Content Flow', result.message || 'Could not remove that checklist item.');
-          return;
-        }
-        items = items.filter((candidate) => candidate.uid !== item.uid);
-        renderItems();
-      });
-      row.appendChild(removeButton);
-      list.appendChild(row);
-    });
-  };
-  renderItems();
-
+  // No listeners bound here - registerChecklistManageActions() handles submit/click
+  // via top-document delegation, since Modal.advanced() does not preserve listeners
+  // bound to `content` before the hand-off (see that function's comment).
   const form = document.createElement('form');
   form.className = 'contentflow-checklist-manage-add';
+  form.dataset.workspaceUid = String(workspaceUid);
+  form.dataset.stageUid = String(stageUid);
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'form-control';
@@ -128,23 +205,6 @@ function openManageModal(column) {
   submit.textContent = 'Add';
   form.appendChild(input);
   form.appendChild(submit);
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const title = input.value.trim();
-    if (title === '') {
-      return;
-    }
-    const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_checklist_add)
-      .post({ workspaceUid, stageUid, title });
-    const result = await response.resolve();
-    if (result.success !== true) {
-      Notification.error('Content Flow', result.message || 'Could not add that checklist item.');
-      return;
-    }
-    items.push(result.item);
-    input.value = '';
-    renderItems();
-  });
   content.appendChild(form);
 
   Modal.advanced({

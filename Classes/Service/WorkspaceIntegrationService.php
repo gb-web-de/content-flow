@@ -55,7 +55,13 @@ final class WorkspaceIntegrationService
         $comments = $this->getTaskComments($taskUid);
         $activities = $this->activityLogger->findByTask($taskUid);
         $workspaceUid = (int)$task['workspace_uid'];
-        $decoratedMembers = $this->decorateMembers($members, (int)$task['subject_pid'], $workspaceUid);
+        $decoratedMembers = $this->decorateMembers(
+            $members,
+            (int)$task['subject_pid'],
+            $workspaceUid,
+            $subjectTable,
+            $subjectUid,
+        );
         // The subject is always a member of its own task (see
         // TaskRepository::findOrCreateOpenForSubject()), so aggregating diffs across
         // every member already covers the subject too - no separate subject-only
@@ -302,8 +308,13 @@ final class WorkspaceIntegrationService
      * @param list<array<string, mixed>> $members
      * @return list<array<string, mixed>>
      */
-    private function decorateMembers(array $members, int $subjectPid, int $workspaceUid): array
-    {
+    private function decorateMembers(
+        array $members,
+        int $subjectPid,
+        int $workspaceUid,
+        string $subjectTable = '',
+        int $subjectUid = 0,
+    ): array {
         $decorated = [];
         foreach ($members as $member) {
             $table = (string)$member['record_table'];
@@ -325,6 +336,11 @@ final class WorkspaceIntegrationService
             // before anyone has touched it in this workspace).
             $member['hasPendingVersion'] = $workspaceUid > 0
                 && BackendUtility::getWorkspaceVersionOfRecord($workspaceUid, $table, $uid, 'uid') !== false;
+            // Gates the split/move buttons instead: a task's own subject cannot
+            // be pulled out of itself, and TaskAjaxController::detachAction()
+            // says so with `cannot-split-task-from-itself`. A button that is
+            // certain to be refused does not belong in the ticket at all.
+            $member['isSubject'] = $subjectTable !== '' && $table === $subjectTable && $uid === $subjectUid;
             $decorated[] = $member;
         }
 
@@ -395,6 +411,13 @@ final class WorkspaceIntegrationService
             return [];
         }
         $decoded = json_decode($payload, true);
+        // Rows written before ActivityLogger::log() stopped encoding the array
+        // itself are stored one layer deeper (see the comment there). They are
+        // archive records - an entry from last year has to stay readable, so the
+        // extra layer is peeled rather than the rows rewritten.
+        if (is_string($decoded)) {
+            $decoded = json_decode($decoded, true);
+        }
 
         return is_array($decoded) ? $decoded : [];
     }

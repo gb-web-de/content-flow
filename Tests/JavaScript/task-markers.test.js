@@ -45,17 +45,30 @@ describe('elementIdentifiers', () => {
 describe('claimsByIdentifier', () => {
   it('indexes every spelling the server sent for one member', () => {
     const claims = claimsByIdentifier([
-      { taskUid: 7, table: 'tt_content', uid: 12, identifiers: ['tt_content:12', 'tt_content:345'] },
+      { taskUid: 7, table: 'tt_content', uid: 12, title: 'Intro', identifiers: ['tt_content:12', 'tt_content:345'] },
     ])
 
-    expect(claims.get('tt_content:12')).toBe(7)
-    expect(claims.get('tt_content:345')).toBe(7)
+    expect(claims.get('tt_content:12')).toEqual({ taskUid: 7, table: 'tt_content', uid: 12, title: 'Intro' })
+    expect(claims.get('tt_content:345')).toEqual({ taskUid: 7, table: 'tt_content', uid: 12, title: 'Intro' })
+  })
+
+  /*
+   * The live uid is the point of carrying the identity at all: the split and
+   * move endpoints work on it, and under 'tt_content:345' the element itself
+   * only knows the version uid.
+   */
+  it('keeps the live identity under every spelling, including the version one', () => {
+    const claims = claimsByIdentifier([
+      { taskUid: 7, table: 'tt_content', uid: 12, identifiers: ['tt_content:345'] },
+    ])
+
+    expect(claims.get('tt_content:345').uid).toBe(12)
   })
 
   it('falls back to table:uid when a member carries no identifier list', () => {
     const claims = claimsByIdentifier([{ taskUid: 3, table: 'pages', uid: 2 }])
 
-    expect(claims.get('pages:2')).toBe(3)
+    expect(claims.get('pages:2')).toMatchObject({ taskUid: 3, table: 'pages', uid: 2 })
   })
 })
 
@@ -100,7 +113,7 @@ describe('foreignTaskUidFor', () => {
 
 describe('claimFor', () => {
   const claims = claimsByIdentifier([
-    { taskUid: 7, table: 'tt_content', uid: 12, identifiers: ['tt_content:12', 'tt_content:345'] },
+    { taskUid: 7, table: 'tt_content', uid: 12, title: 'Intro', identifiers: ['tt_content:12', 'tt_content:345'] },
   ])
 
   /*
@@ -113,14 +126,25 @@ describe('claimFor', () => {
     const mine = contentElement({ table: 'tt_content', uid: 12 })
     const nobodys = contentElement({ table: 'tt_content', uid: 99 })
 
-    expect(claimFor(mine, claims, 7)).toEqual({ taskUid: 7, isActive: true })
+    expect(claimFor(mine, claims, 7)).toMatchObject({ taskUid: 7, isActive: true })
     expect(claimFor(nobodys, claims, 7)).toBeNull()
   })
 
   it('reports a foreign claim as inactive', () => {
     const element = contentElement({ table: 'tt_content', uid: 345 })
 
-    expect(claimFor(element, claims, 9)).toEqual({ taskUid: 7, isActive: false })
+    expect(claimFor(element, claims, 9)).toMatchObject({ taskUid: 7, isActive: false })
+  })
+
+  /*
+   * What the bubble's split/move menu acts on. Reading table/uid off the
+   * element instead would hand the server the VERSION uid, which holds no
+   * membership row - the move would be refused with record-not-in-open-task.
+   */
+  it('hands back the live record identity, not the element\'s own spelling', () => {
+    const element = contentElement({ table: 'tt_content', uid: 345 })
+
+    expect(claimFor(element, claims, 9)).toMatchObject({ table: 'tt_content', uid: 12, title: 'Intro' })
   })
 })
 

@@ -118,6 +118,32 @@
                                             <core:icon identifier="actions-code-compare" size="small" /> Diff
                                         </button>
                                     </f:if>
+                                    <f:comment>
+                                        Both are membership changes only - the
+                                        workspace version belongs to the record -
+                                        so unlike Preview and Discard they are NOT
+                                        gated on hasPendingVersion: moving a record
+                                        that nobody has touched yet is planning,
+                                        which is the point. Only the task's own
+                                        subject is excluded, because it cannot be
+                                        split out of itself.
+                                    </f:comment>
+                                    <f:if condition="!{member.isSubject}">
+                                        <button type="button" class="btn btn-xs btn-default"
+                                                data-contentflow-split="1"
+                                                data-table="{member.record_table}" data-uid="{member.record_uid}"
+                                                data-title="{member.title}">
+                                            <core:icon identifier="actions-unlink" size="small" />
+                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:membership.split.button" default="Split off" />
+                                        </button>
+                                        <button type="button" class="btn btn-xs btn-default"
+                                                data-contentflow-move="1"
+                                                data-table="{member.record_table}" data-uid="{member.record_uid}"
+                                                data-title="{member.title}">
+                                            <core:icon identifier="actions-arrow-right-alt" size="small" />
+                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:membership.move.button" default="Move to task" />
+                                        </button>
+                                    </f:if>
                                     <f:if condition="{member.hasPendingVersion}">
                                         <f:if condition="{task.workspace_uid} > 0 && {task.workspace_uid} != {activeWorkspaceUid}">
                                             <f:then>

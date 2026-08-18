@@ -33,7 +33,8 @@ import { registerCreateButton } from '@gb-web/content-flow/task/create-wizard.js
 import { registerCommentForm } from '@gb-web/content-flow/task/comment.js';
 import { registerPublishButtons } from '@gb-web/content-flow/task/publish.js';
 import { registerMemberActions } from '@gb-web/content-flow/task/member-actions.js';
-import { registerChecklistManagement, registerChecklistToggle } from '@gb-web/content-flow/board/checklist.js';
+import { registerMembershipActions } from '@gb-web/content-flow/task/membership.js';
+import { registerChecklistManagement, registerChecklistManageActions, registerChecklistToggle } from '@gb-web/content-flow/board/checklist.js';
 
 /*
  * Core's own "Editing" stage (StagesService::STAGE_EDIT_ID), the one a record
@@ -65,7 +66,11 @@ class ContentFlowBoard {
     // Delegated from the document: the ticket form arrives with the modal.
     registerCommentForm();
     registerMemberActions();
+    // Same reasoning, and the same delegation: the split/move buttons appear in
+    // the ticket's member list and on the page module's element badge.
+    registerMembershipActions();
     registerChecklistToggle();
+    registerChecklistManageActions();
 
     this.board = document.querySelector('.contentflow-board');
     if (this.board === null) {

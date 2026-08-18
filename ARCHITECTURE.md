@@ -153,6 +153,15 @@ therefore not a second truth; it is the only durable one:
 | **Decisions** (assigned, moved from stage X to Y, with comment) | own table `tx_contentflow_activity`, append-only, written **when it happens** | these must outlive the 30-day GC. Kept small: who, when, from/to, comment. |
 | **Field-level before/after values** | **not copied** — `activity.history_uid` points at the `sys_history` row | bulky, and for the common case (one edit, straight to live) the row is still there. |
 
+One correction found while adding the membership entries: `ActivityLogger::log()` used to
+`json_encode()` the payload itself before handing it to the `payload` column. TYPO3's
+`Connection::insert()` applies the column's own schema type (`ensureDatabaseValueTypes()`),
+so Doctrine's `JsonType` encoded it a **second** time — every reader decoded one layer, got a
+string back, and gave up. Which is why a stage change's "from → to" line never appeared in a
+ticket, on any platform. The logger now hands over the array; `decodePayload()` peels the extra
+layer off rows written before that, because an entry from last year is an archive record and
+has to stay readable.
+
 The pointer is the part that makes both halves work, and it is exactly the right granularity:
 where the `sys_history` row still exists you get the full field-level detail for free; once the
 GC has taken it, the decision itself is still on record. **A dangling `history_uid` means
@@ -308,6 +317,30 @@ Both endpoints re-derive permissions server-side: the workspace comes from the b
 `recordEditAccessInternals()` are checked on the concrete record. A client-supplied workspace
 id was a real IDOR in the reviewed `AssignAjaxController`.
 
+`attach` additionally refuses a target task bound to **another workspace** - checked once on
+the task, since that is a property of the target rather than of any record handed to it. A
+pending version lives in the editor's workspace, so a record moved onto such a task would sit
+in a ticket that can only say "switch to that workspace to act on this". `move-targets`, which
+feeds the picker, filters by the same rule so nothing is ever offered that the write endpoint
+would then refuse. It deliberately does **not** reuse `openTasksForContext()`: that one narrows
+to a record's own subject and member tasks, which for a content element is precisely the task
+it already sits in.
+
+**Neither operation can lose work**, and that is structural rather than careful: the workspace
+version hangs on the *record*, and both endpoints only re-point a membership row. `detach`
+additionally copies the old task's state, stage and workspace, so the split-off card appears in
+the same column showing the same diffs. Discarding is a different endpoint, a different button,
+and red.
+
+Reachable from three surfaces, all of them driven by `task/membership.js` - the ticket's member
+list, the Page module's element badge (`ContentElementTaskBadgeListener`), and a menu on the
+Visual Editor's task bubble, which also offers "move to the active task" in one click. The
+badge and the ticket only carry `data-contentflow-split` / `data-contentflow-move` attributes;
+the Visual Editor calls the module directly, because its bubbles live inside the rendered
+frontend iframe where a delegated listener never sees a click. Both tasks involved get an
+activity entry (`member_moved` / `member_split`) - without one on the source, a task's trail
+would simply lose a record with no record of where it went.
+
 ## UX and accessibility commitments
 
 "Editors should barely have to think" is a design constraint, not a nice-to-have. Concretely,
@@ -419,6 +452,10 @@ Audited against the code on 2026-08-07, not written from memory.
   join that an earlier version's template referenced but never populated.
 - Page module banner via `ModifyPageLayoutContentEvent`.
 - Comment form in the ticket view, refused server-side on closed tasks.
+- Splitting a record into its own task and moving it onto another one, from the
+  ticket, the Page module badge and the Visual Editor bubble - with a dialog for
+  the new task's title/description/assignee, a server-built picker for the move,
+  the cross-workspace refusal above, and an activity entry on both tasks.
 - Ajax endpoints: create, attach, detach, move-stage, execute-stage, assign-me,
   details, ticket, comment, wizard-pending, wizard-submit - each re-deriving
   permissions server-side and logging every rejection with a stable code.

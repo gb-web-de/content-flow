@@ -46,6 +46,16 @@ final class ActivityLogger
     public const EVENT_CLOSED = 'closed';
     /** A member's pending version was thrown away; the record stays claimed. */
     public const EVENT_DISCARDED = 'discarded';
+    /**
+     * A record was re-pointed from one open task to another. Written on BOTH
+     * tasks: on the source, so its trail does not simply lose an element without
+     * saying where it went; on the target, so the element's arrival is explained.
+     * Nothing is lost by the move itself - the workspace version belongs to the
+     * record, not to the task - and that is exactly what this entry records.
+     */
+    public const EVENT_MEMBER_MOVED = 'member_moved';
+    /** Same, for a record pulled out into a task created for it on the spot. */
+    public const EVENT_MEMBER_SPLIT = 'member_split';
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,
@@ -67,7 +77,15 @@ final class ActivityLogger
             'event' => $event,
             'be_user' => $beUserId,
             'history_uid' => $historyUid,
-            'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
+            // The array, not a JSON string: `payload` is a `json` column, and
+            // TYPO3's Connection::insert() applies the column's schema type by
+            // itself (ensureDatabaseValueTypes()), so Doctrine's JsonType
+            // encodes it on the way in. Handing it an already-encoded string
+            // encoded it a second time, and every reader then decoded one layer
+            // and got a string back - which is why WorkspaceIntegrationService::
+            // decodePayload() silently returned nothing and the ticket never
+            // showed a stage change's from/to.
+            'payload' => $payload,
             'crdate' => $GLOBALS['EXEC_TIME'],
             'tstamp' => $GLOBALS['EXEC_TIME'],
         ]);

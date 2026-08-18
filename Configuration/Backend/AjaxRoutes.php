@@ -50,6 +50,11 @@ return [
         'path' => '/contentflow/task/detach',
         'target' => TaskAjaxController::class . '::detachAction',
     ],
+    // "Move to another task": the open tasks one record could be moved onto.
+    'contentflow_task_move_targets' => [
+        'path' => '/contentflow/task/move-targets',
+        'target' => TaskAjaxController::class . '::moveTargetsAction',
+    ],
     // Shareable preview link for one member's pending version.
     'contentflow_task_preview_member' => [
         'path' => '/contentflow/task/preview-member',

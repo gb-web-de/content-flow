@@ -267,11 +267,51 @@ final class TemplateRendersTest extends FunctionalTestCase
         // Reused content is flagged, because changing it changes other pages.
         self::assertStringContainsString('needs-attention', $output);
         self::assertStringContainsString('reused elsewhere', $output);
+        // ... and can be acted on right there: this member has no pending
+        // version in this fixture, and split/move are deliberately NOT gated on
+        // one - moving work that has not started yet is planning.
+        self::assertStringContainsString('data-contentflow-split="1"', $output);
+        self::assertStringContainsString('data-contentflow-move="1"', $output);
         // Comments are no longer a separate panel - they live inside the timeline
         // entry they explain, so there is no standalone "comments" list any more.
         self::assertStringNotContainsString('No comments yet', $output);
         // Core's rendered diff is shown, so the empty-state hint must NOT appear.
         self::assertStringNotContainsString('30 days', $output);
+    }
+
+    /**
+     * detachAction() refuses to split a task from its own subject, so the
+     * button that could only ever produce that error is left out.
+     */
+    #[Test]
+    public function theTaskSubjectItselfIsNotOfferedForSplitting(): void
+    {
+        $viewFactory = $this->get(ViewFactoryInterface::class);
+        $view = $viewFactory->create(new ViewFactoryData(
+            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
+        ));
+        $view->assignMultiple([
+            'task' => ['uid' => 1, 'state' => 'backlog', 'priority' => 2, 'workspace_uid' => 0, 'subject_pid' => 2],
+            'subject' => ['table' => 'pages', 'uid' => 2, 'title' => 'About us'],
+            'assignee' => null,
+            'editUrl' => '',
+            'members' => [
+                [
+                    'record_table' => 'pages', 'record_uid' => 2, 'home_pid' => 2,
+                    'title' => 'About us', 'icon' => '', 'isForeign' => false,
+                    'isShared' => false, 'needsAttention' => false, 'isSubject' => true,
+                ],
+            ],
+            'activities' => [],
+            'timeline' => [],
+            'diffs' => [],
+            'comments' => [],
+        ]);
+
+        $output = $view->render('ContentFlow/Ticket');
+
+        self::assertStringNotContainsString('data-contentflow-split', $output);
+        self::assertStringNotContainsString('data-contentflow-move', $output);
     }
 
     #[Test]
