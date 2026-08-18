@@ -27,7 +27,6 @@ describe('TaskWizardSubmissionService', () => {
   it('flattens pending, destination, details and stage into one body', async () => {
     const context = contextWith({
       pending: { mode: 'route_member', recordUid: 42 },
-      recordType: 'tt_content',
       destination: 7,
       taskDetails: { title: 'A task', priority: 'high' },
       stage: 'review',
@@ -38,7 +37,6 @@ describe('TaskWizardSubmissionService', () => {
     expect(recorded.body).toEqual({
       mode: 'route_member',
       recordUid: 42,
-      recordType: 'tt_content',
       destination: 7,
       title: 'A task',
       priority: 'high',
