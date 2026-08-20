@@ -15,10 +15,6 @@
                 <source>Done</source>
                 <target>Erledigt</target>
             </trans-unit>
-            <trans-unit id="column.other_workspaces" xml:space="preserve">
-                <source>Other workspaces</source>
-                <target>Andere Arbeitsbereiche</target>
-            </trans-unit>
             <trans-unit id="task.untitled" xml:space="preserve">
                 <source>Untitled task</source>
                 <target>Aufgabe ohne Titel</target>

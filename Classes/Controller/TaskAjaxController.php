@@ -1295,6 +1295,35 @@ final class TaskAjaxController
     }
 
     /**
+     * The same "does this task have anything pending" question
+     * executeStageAction() answers with a hard `no-pending-versions` rejection -
+     * asked up front instead, so the board can refuse the drop with an inline
+     * message (matching getDropRejectionMessage()'s other rules in board.js)
+     * rather than opening the "Send to stage" dialog for a transition that can
+     * only ever fail. A task whose subject has never been touched inside its
+     * workspace has nothing pending - see WorkspaceIntegrationService::
+     * decorateMembers()'s hasPendingVersion note.
+     */
+    public function checkStageTransitionEligibilityAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $body = $this->getBody($request);
+        $taskUid = (int)($body['task'] ?? 0);
+
+        $task = $this->findOpenTaskOrError($taskUid, 'change its stage');
+        if ($task instanceof ResponseInterface) {
+            return $task;
+        }
+
+        $workspaceUid = (int)$task['workspace_uid'];
+        if ($workspaceUid < 1) {
+            return new JsonResponse(['success' => true, 'hasPending' => false]);
+        }
+
+        $versionsByTable = $this->memberSynchronizer->findPendingVersionsByTable($taskUid, $workspaceUid);
+        return new JsonResponse(['success' => true, 'hasPending' => $versionsByTable !== []]);
+    }
+
+    /**
      * Publish everything a task still has pending, straight to live.
      *
      * Deliberately not a drop target - going live is irreversible, so the board

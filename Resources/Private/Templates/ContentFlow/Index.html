@@ -63,14 +63,35 @@
                     core's own checkWorkspace()) - a single-workspace editor never
                     sees a filter with nothing meaningful to filter.
                 </f:comment>
+                <f:comment>
+                    A checkbox multiselect, not a single-value select: several
+                    other workspaces' stages are now merged straight into the
+                    board's own stage columns (see BoardColumnRegistry), so
+                    narrowing "which other workspaces contribute cards" is no
+                    longer a single choice. Defaults to every workspace checked -
+                    board/filters.js reads these, never the server.
+                </f:comment>
                 <f:if condition="{otherWorkspaces}">
-                    <label class="form-label visually-hidden" for="cf-filter-workspace">Filter by workspace</label>
-                    <select id="cf-filter-workspace" class="form-select form-control">
-                        <option value="all">All Workspaces</option>
-                        <f:for each="{otherWorkspaces}" as="otherWorkspace">
-                            <option value="{otherWorkspace.uid}">{otherWorkspace.title}</option>
-                        </f:for>
-                    </select>
+                    <div class="dropdown" id="cf-filter-workspace">
+                        <button type="button" class="btn btn-default dropdown-toggle" popovertarget="cf-filter-workspace-menu">
+                            Workspaces
+                            <span class="badge badge-pill badge-secondary" id="cf-filter-workspace-count">{otherWorkspaces -> f:count()}</span>
+                        </button>
+                        <div id="cf-filter-workspace-menu" class="dropdown-menu" popover>
+                            <ul class="dropdown-list">
+                                <f:for each="{otherWorkspaces}" as="otherWorkspace">
+                                    <li>
+                                        <label class="dropdown-item">
+                                            <span class="form-check">
+                                                <input type="checkbox" class="form-check-input" value="{otherWorkspace.uid}" checked="checked" data-contentflow-filter-workspace>
+                                                <span class="form-check-label">{otherWorkspace.title}</span>
+                                            </span>
+                                        </label>
+                                    </li>
+                                </f:for>
+                            </ul>
+                        </div>
+                    </div>
                 </f:if>
 
                 <button type="button" id="cf-clear-filters" class="btn btn-default" title="Clear Filters" aria-label="Clear Filters">
@@ -89,8 +110,13 @@
                          data-contentflow-accepts-drop="{f:if(condition: column.acceptsDrop, then: 'true', else: 'false')}"
                          data-contentflow-checklist-items="{column.checklistItemsJson}"
                          aria-labelledby="cf-col-{column.key}">
-                    <h3 class="contentflow-column-header" id="cf-col-{column.key}">
+                    <h3 class="contentflow-column-header {f:if(condition: column.colorShared, then: 'contentflow-column-header--shared')} {f:if(condition: column.colorOwn, then: 'contentflow-column-header--own')}"
+                        id="cf-col-{column.key}"
+                        style="{column.style}">
                         <span class="contentflow-column-title">{column.label}</span>
+                        <f:if condition="{column.contributingWorkspaceTitles}">
+                            <span class="contentflow-column-subtitle" title="{column.contributingWorkspaceTitles}">{column.contributingWorkspaceTitles}</span>
+                        </f:if>
                         <span class="badge badge-pill badge-secondary">{column.cards -> f:count()}</span>
                         <f:if condition="{column.canManageChecklist}">
                             <button type="button" class="btn btn-xs btn-default contentflow-column-checklist-manage"

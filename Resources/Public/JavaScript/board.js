@@ -213,6 +213,19 @@ class ContentFlowBoard {
         return;
       }
 
+      // Asked before the dialog opens, not just at submit time: a task whose
+      // subject has never been touched inside this workspace has nothing to
+      // send to a review stage, and the dialog would only ever come back with
+      // executeStageAction()'s `no-pending-versions` rejection. Refusing here
+      // matches every other drop rule in getDropRejectionMessage() instead of
+      // opening a dialog that cannot succeed.
+      if (await this.hasNothingPendingForStageTransition(taskUid)) {
+        const message = `${cardTitle} has nothing pending in this workspace yet, so it cannot be sent to a review stage.`;
+        Notification.warning('Content Flow', message);
+        this.announce(message);
+        return;
+      }
+
       await this.openStageTransitionModal(
         taskUid,
         targetStageUid,
@@ -224,6 +237,25 @@ class ContentFlowBoard {
     }
 
     await this.moveTaskToColumn(taskUid, targetState, 0, columnTitle, cardTitle);
+  }
+
+  /*
+   * True only when the server confirms there is nothing pending - any check
+   * failure (missing route, network error, task already gone) falls back to
+   * false so the existing dialog-and-submit path still runs and reports its
+   * own, more specific error, rather than silently swallowing the drop here.
+   */
+  async hasNothingPendingForStageTransition(taskUid) {
+    const url = TYPO3.settings.ajaxUrls.contentflow_task_check_stage_transition;
+    if (!url) {
+      return false;
+    }
+    try {
+      const result = await this.postJson(url, { task: taskUid });
+      return result.success === true && result.hasPending === false;
+    } catch {
+      return false;
+    }
   }
 
   async moveTaskToColumn(taskUid, targetState, targetStageUid, columnTitle, cardTitle) {
@@ -480,6 +512,13 @@ class ContentFlowBoard {
                 }
                 window.location.reload();
               } catch (error) {
+                // Every rejection this endpoint sends is about the task's own
+                // state (closed, no workspace version, nothing pending, core
+                // itself refusing the move) - resubmitting the same form can
+                // never turn one into a success, so the dialog closes here
+                // too instead of sitting open for a retry that only stacks
+                // the same error toast again.
+                currentModal.hideModal();
                 Notification.error(
                   'Content Flow',
                   await this.extractErrorMessage(error, 'Could not move the task to that stage.'),

@@ -6,6 +6,7 @@ namespace GbWeb\ContentFlow\Service;
 
 use GbWeb\ContentFlow\Domain\Model\TaskState;
 use GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository;
+use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceRepository;
@@ -17,8 +18,8 @@ use TYPO3\CMS\Workspaces\Service\StagesService;
  *
  * A Content Flow board is:
  *
- *   [ Backlog ] [ Planned ]  |  [ In Progress ] [ ...custom stages... ] [ Ready ]  |  [ Done ]
- *   \___ Content Flow ____/     \_________ TYPO3 core workspace stages _________/     \_ CF _/
+ *   [ Backlog ] [ Planned ]  |  [ In Progress ] [ ...merged stages... ] [ Ready ]  |  [ Done ]
+ *   \___ Content Flow ____/     \___________ TYPO3 core workspace stages __________/     \_ CF _/
  *
  * The middle section is read straight from `sys_workspace_stage`, so an integrator
  * defines review steps exactly where TYPO3 already expects them (Workspace record ->
@@ -29,6 +30,16 @@ use TYPO3\CMS\Workspaces\Service\StagesService;
  * This also answers web-vision/kanban-workspaces#31 (custom stages before/after the
  * default ones) for free - "before editing" is Backlog/Planned, "after ready" is Done,
  * and everything in between is already freely definable in core.
+ *
+ * "Merged stages" means the middle section is never just the active workspace's own
+ * stage chain: every stage the current backend user's *other* accessible workspaces
+ * define is folded in too, one column per distinct stage title, so a step named
+ * "Editing" in three different workspaces is one column, not three. A task from a
+ * workspace other than the active one used to be exiled to a dedicated
+ * "other workspaces" sentinel column (removed - see git history); now it sits in the
+ * merged column its own stage belongs to, right where an editor scanning the board by
+ * step would look for it. See buildMergedStageColumns() for how a column's color is
+ * decided from this.
  */
 final class BoardColumnRegistry
 {
@@ -37,19 +48,19 @@ final class BoardColumnRegistry
         private readonly WorkspaceRepository $workspaceRepository,
         private readonly StagesService $stagesService,
         private readonly TaskChecklistRepository $checklistRepository,
+        private readonly WorkspaceColorResolver $workspaceColorResolver,
     ) {
     }
 
     /**
-     * @return list<array{
-     *     key: string,
-     *     label: string,
-     *     state: string,
-     *     stageUid: int|null,
-     *     acceptsDrop: bool
-     * }>
+     * @param list<int> $otherWorkspaceUids Workspaces the current backend user may
+     *        access besides $workspaceUid - see ContentFlowController::indexAction().
+     *        Their stages are merged into the board's middle section; live (0) is
+     *        never among them.
+     * @param list<int> $otherWorkspaceUids
+     * @return list<array<string, mixed>>
      */
-    public function getColumns(BackendUserAuthentication $backendUser, int $workspaceUid): array
+    public function getColumns(BackendUserAuthentication $backendUser, int $workspaceUid, array $otherWorkspaceUids = []): array
     {
         $columns = [
             $this->column('backlog', TaskState::BACKLOG, true),
@@ -57,52 +68,160 @@ final class BoardColumnRegistry
         ];
 
         $canManageChecklist = $this->canManageChecklist($backendUser, $workspaceUid);
-        foreach ($this->getStages($backendUser, $workspaceUid) as $stageUid) {
-            $checklistItems = array_map(
-                static fn (array $item): array => ['uid' => (int)$item['uid'], 'title' => (string)$item['title']],
-                $this->checklistRepository->findItemsForStage($workspaceUid, $stageUid),
-            );
-            $columns[] = [
-                'key' => 'stage-' . $stageUid,
-                'label' => $this->stagesService->getStageTitle($stageUid),
-                'state' => TaskState::fromStageId($stageUid)->value,
-                'stageUid' => $stageUid,
-                // Dropping here triggers a core stage transition, never a direct write.
-                'acceptsDrop' => true,
-                // Configuring a stage's checklist is workspace policy, not
-                // editorial work - restricted to whoever owns the workspace
-                // (or admin), same as publishing.
-                'canManageChecklist' => $canManageChecklist,
-                // Pre-encoded: checklist.js's manage modal reads this straight
-                // out of the column's dataset, and Fluid has no JSON format
-                // ViewHelper in this version to do it in the template instead.
-                'checklistItemsJson' => json_encode($checklistItems, JSON_THROW_ON_ERROR),
-            ];
+        foreach ($this->buildMergedStageColumns($backendUser, $workspaceUid, $otherWorkspaceUids, $canManageChecklist) as $stageColumn) {
+            $columns[] = $stageColumn;
         }
 
         // Publishing is an explicit, irreversible action - it is deliberately not a
         // drop target. Editors publish from the card, with a confirmation.
         $columns[] = $this->column('done', TaskState::DONE, false);
 
-        // A task whose workspace_uid points at a workspace other than the active
-        // one never matches a stage column above (stage uids are per-workspace) and
-        // never matches a Content Flow state column either (those require
-        // workspace_uid === 0) - it would silently vanish from the board once scope
-        // widens enough to reach it. This sentinel column is where
-        // ContentFlowController::belongsInColumn() routes it instead: visible,
-        // badged, read-only. Matched by 'key', not by state/stageUid, since those
-        // two are already spoken for by the distinction above.
-        $columns[] = [
-            'key' => 'other-workspaces',
-            'label' => $this->getLanguageService()->sL(
-                'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:column.other_workspaces'
-            ) ?: 'Other workspaces',
-            'state' => 'other_workspace',
-            'stageUid' => null,
-            'acceptsDrop' => false,
-        ];
-
         return $columns;
+    }
+
+    /**
+     * One merged column per distinct stage title across $workspaceUid and
+     * $otherWorkspaceUids, in board order.
+     *
+     * Grouping is by resolved title text, not by stage uid: `sys_workspace_stage`
+     * rows are per-workspace, so the same conceptual step ("Editing", a custom
+     * "Legal review", ...) has a different uid in every workspace that defines it.
+     * Title text is the only thing an editor actually compares across workspaces,
+     * and it is what the board is asked to merge on.
+     *
+     * A column's color is a fact about which workspaces contribute to it, not a
+     * per-card detail (ContentFlowController::belongsInColumn() still knows which
+     * task belongs where):
+     *   - only $workspaceUid contributes -> uncoloured, exactly like before this
+     *     merge existed at all - nothing to compare, nothing to say.
+     *   - 2+ distinct workspaces contribute -> 'shared', the board's one fixed
+     *     "several workspaces share this step" accent (already used for
+     *     foreign-workspace cards elsewhere on the board).
+     *   - exactly one workspace contributes and it is not $workspaceUid -> 'own',
+     *     that single workspace's own color (WorkspaceColorResolver).
+     *
+     * @param list<int> $otherWorkspaceUids
+     * @return list<array<string, mixed>>
+     */
+    private function buildMergedStageColumns(
+        BackendUserAuthentication $backendUser,
+        int $workspaceUid,
+        array $otherWorkspaceUids,
+        bool $canManageChecklist,
+    ): array {
+        $contributingWorkspaceUids = array_values(array_unique(array_filter(
+            $workspaceUid > 0 ? array_merge([$workspaceUid], $otherWorkspaceUids) : $otherWorkspaceUids,
+            static fn (int $uid): bool => $uid > 0,
+        )));
+
+        $stageUidsByWorkspace = [];
+        foreach ($contributingWorkspaceUids as $contributingWorkspaceUid) {
+            $stageUidsByWorkspace[$contributingWorkspaceUid] = $this->getOrderedStageUids($backendUser, $contributingWorkspaceUid);
+        }
+
+        /** @var array<string, array{label: string, position: int, workspaceUids: list<int>, stageUidByWorkspace: array<int, int>}> $groups */
+        $groups = [];
+        foreach ($stageUidsByWorkspace as $contributingWorkspaceUid => $stageUids) {
+            foreach ($stageUids as $position => $stageUid) {
+                $label = $this->stagesService->getStageTitle($stageUid);
+                $groups[$label] ??= [
+                    'label' => $label,
+                    'position' => $position,
+                    'workspaceUids' => [],
+                    'stageUidByWorkspace' => [],
+                ];
+                $groups[$label]['position'] = min($groups[$label]['position'], $position);
+                $groups[$label]['workspaceUids'][] = $contributingWorkspaceUid;
+                $groups[$label]['stageUidByWorkspace'][$contributingWorkspaceUid] = $stageUid;
+            }
+        }
+
+        usort(
+            $groups,
+            static fn (array $a, array $b): int => $a['position'] <=> $b['position'] ?: strcasecmp($a['label'], $b['label']),
+        );
+
+        return array_map(
+            fn (array $group): array => $this->buildStageColumn($group, $workspaceUid, $canManageChecklist),
+            $groups,
+        );
+    }
+
+    /**
+     * @param array{label: string, position: int, workspaceUids: list<int>, stageUidByWorkspace: array<int, int>} $group
+     * @return array<string, mixed>
+     */
+    private function buildStageColumn(array $group, int $workspaceUid, bool $canManageChecklist): array
+    {
+        $distinctWorkspaceUids = array_values(array_unique($group['workspaceUids']));
+        $shared = count($distinctWorkspaceUids) >= 2;
+        $foreignWorkspaceUids = array_values(array_diff($distinctWorkspaceUids, [$workspaceUid]));
+
+        $colorMode = 'none';
+        $style = '';
+        $contributingWorkspaceTitles = [];
+        if ($shared) {
+            $colorMode = 'shared';
+            $contributingWorkspaceTitles = array_map(
+                fn (int $uid): string => $this->resolveWorkspaceTitle($uid),
+                $distinctWorkspaceUids,
+            );
+        } elseif ($foreignWorkspaceUids !== []) {
+            // Not shared, and the sole contributor is not the active workspace:
+            // this step exists only in one other workspace. `$color` is always
+            // one of WorkspaceColorResolver::CORE_COLORS, never user input, so
+            // it is safe to interpolate straight into a custom property name.
+            $colorMode = 'own';
+            $color = $this->workspaceColorResolver->resolve($foreignWorkspaceUids[0]);
+            $style = sprintf(
+                '--contentflow-stage-color: var(--typo3-state-%1$s-bg); --contentflow-stage-color-text: var(--typo3-state-%1$s-color); --contentflow-stage-color-border: var(--typo3-state-%1$s-border-color);',
+                $color,
+            );
+            $contributingWorkspaceTitles = [$this->resolveWorkspaceTitle($foreignWorkspaceUids[0])];
+        }
+
+        $ownStageUid = $group['stageUidByWorkspace'][$workspaceUid] ?? null;
+        $checklistItems = $ownStageUid !== null
+            ? array_map(
+                static fn (array $item): array => ['uid' => (int)$item['uid'], 'title' => (string)$item['title']],
+                $this->checklistRepository->findItemsForStage($workspaceUid, $ownStageUid),
+            )
+            : [];
+
+        return [
+            'key' => $ownStageUid !== null ? 'stage-' . $ownStageUid : 'stage-foreign-' . md5($group['label']),
+            'label' => $group['label'],
+            'state' => $ownStageUid !== null ? TaskState::fromStageId($ownStageUid)->value : 'foreign_stage',
+            'stageUid' => $ownStageUid,
+            // Every contributing workspace's own stage uid for this merged step -
+            // ContentFlowController::belongsInColumn() matches a task against its
+            // own workspace's entry here, not against the scalar stageUid above
+            // (which only ever names the active workspace's stage).
+            'stageUidByWorkspace' => $group['stageUidByWorkspace'],
+            // Dropping here triggers a core stage transition for the active
+            // workspace's own tasks, never a direct write - and never at all when
+            // the active workspace has no stage of its own in this merged column.
+            'acceptsDrop' => $ownStageUid !== null,
+            // Configuring a stage's checklist is workspace policy, not
+            // editorial work - restricted to whoever owns the workspace
+            // (or admin), same as publishing. Never available on a column that
+            // is not the active workspace's own stage.
+            'canManageChecklist' => $ownStageUid !== null && $canManageChecklist,
+            // Pre-encoded: checklist.js's manage modal reads this straight
+            // out of the column's dataset, and Fluid has no JSON format
+            // ViewHelper in this version to do it in the template instead.
+            'checklistItemsJson' => json_encode($checklistItems, JSON_THROW_ON_ERROR),
+            'colorMode' => $colorMode,
+            // Plain booleans, not a string compare, for the Fluid template -
+            // matches every other card/column flag in this view (card.isActive,
+            // card.foreignWorkspace, ...). colorMode above is the one place that
+            // spells out which of the two (if either) applies, for PHP callers
+            // and tests.
+            'colorShared' => $colorMode === 'shared',
+            'colorOwn' => $colorMode === 'own',
+            'style' => $style,
+            'contributingWorkspaceTitles' => implode(', ', $contributingWorkspaceTitles),
+        ];
     }
 
     /**
@@ -123,13 +242,15 @@ final class BoardColumnRegistry
     }
 
     /**
-     * Stage uids for the workspace, in board order, excluding the internal
+     * Stage uids for the given workspace, in board order, excluding the internal
      * "publish execute" stage (-20) which is a core implementation detail and never
-     * a column an editor should see.
+     * a column an editor should see. Public: also used to fold every accessible
+     * *other* workspace's own stage chain into the merged middle section - see
+     * buildMergedStageColumns().
      *
      * @return list<int>
      */
-    private function getStages(BackendUserAuthentication $backendUser, int $workspaceUid): array
+    public function getOrderedStageUids(BackendUserAuthentication $backendUser, int $workspaceUid): array
     {
         if ($workspaceUid < 1) {
             return [];
@@ -168,8 +289,20 @@ final class BoardColumnRegistry
             ) ?: ucfirst($key),
             'state' => $state->value,
             'stageUid' => null,
+            'stageUidByWorkspace' => null,
             'acceptsDrop' => $acceptsDrop,
+            'colorMode' => 'none',
+            'colorShared' => false,
+            'colorOwn' => false,
+            'style' => '',
+            'contributingWorkspaceTitles' => '',
         ];
+    }
+
+    private function resolveWorkspaceTitle(int $workspaceUid): string
+    {
+        $record = BackendUtility::getRecord('sys_workspace', $workspaceUid, 'title');
+        return ($record['title'] ?? '') !== '' ? (string)$record['title'] : ('#' . $workspaceUid);
     }
 
     private function getLanguageService(): LanguageService

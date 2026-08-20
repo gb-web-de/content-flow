@@ -85,7 +85,8 @@ final class ContentFlowController extends ActionController
             ['id' => $pageUid],
         );
 
-        $columns = $this->buildBoard($backendUser, $workspaceUid, $pageUid, $depth, $fromWorkspaceRoot);
+        $otherWorkspaceUids = array_map(static fn (array $workspace): int => (int)$workspace['uid'], $otherWorkspaces);
+        $columns = $this->buildBoard($backendUser, $workspaceUid, $pageUid, $depth, $fromWorkspaceRoot, $otherWorkspaceUids);
 
         $moduleTemplate->assignMultiple([
             'pageUid' => $pageUid,
@@ -125,6 +126,14 @@ final class ContentFlowController extends ActionController
             'ContentFlow',
             'currentUserId',
             (int)($backendUser->user['uid'] ?? 0),
+        );
+        // filters.js needs this to always show the active workspace's own cards
+        // regardless of the workspace checkbox filter - that filter only ever
+        // narrows which *other* workspaces' merged-in cards are visible.
+        $this->pageRenderer->addInlineSetting(
+            'ContentFlow',
+            'currentWorkspaceId',
+            $workspaceUid,
         );
         $this->pageRenderer->addInlineSetting(
             'ContentFlow',
@@ -177,6 +186,7 @@ final class ContentFlowController extends ActionController
     }
 
     /**
+     * @param list<int> $otherWorkspaceUids
      * @return list<array<string, mixed>>
      */
     private function buildBoard(
@@ -185,8 +195,9 @@ final class ContentFlowController extends ActionController
         int $pageUid,
         int $depth,
         bool $fromWorkspaceRoot,
+        array $otherWorkspaceUids,
     ): array {
-        $columns = $this->boardColumnRegistry->getColumns($backendUser, $workspaceUid);
+        $columns = $this->boardColumnRegistry->getColumns($backendUser, $workspaceUid, $otherWorkspaceUids);
         if ($pageUid < 1) {
             return $columns;
         }
@@ -321,28 +332,28 @@ final class ContentFlowController extends ActionController
     }
 
     /**
-     * A versioned task belongs to the column of its concrete stage; an unversioned
-     * task belongs to the column of its state. A task from a foreign workspace
-     * belongs to neither - it is routed to the dedicated sentinel column instead
-     * (matched by key, since stageUid/state are already spoken for above).
+     * A versioned task (workspace_uid > 0, whether the active workspace or one of
+     * the other ones merged into the board - see BoardColumnRegistry) belongs to
+     * the merged column whose stageUidByWorkspace entry for its own workspace
+     * matches its own stage_uid. An unversioned task belongs to the column of its
+     * Content Flow state instead, and only ever to one from the active workspace
+     * (or none) - a foreign workspace never owns a Backlog/Planned/Done task,
+     * since those states only exist before/after a workspace version does.
      *
      * @param array<string, mixed> $task
      * @param array<string, mixed> $column
      */
     private function belongsInColumn(array $task, array $column): bool
     {
-        $foreignWorkspace = (bool)($task['foreignWorkspace'] ?? false);
-        if ($column['key'] === 'other-workspaces') {
-            return $foreignWorkspace;
-        }
-        if ($foreignWorkspace) {
-            return false;
+        $stageUidByWorkspace = $column['stageUidByWorkspace'] ?? null;
+        if ($stageUidByWorkspace !== null) {
+            $taskWorkspaceUid = (int)($task['workspace_uid'] ?? 0);
+            if ($taskWorkspaceUid < 1) {
+                return false;
+            }
+            return ($stageUidByWorkspace[$taskWorkspaceUid] ?? null) === (int)($task['stage_uid'] ?? 0);
         }
 
-        if ($column['stageUid'] !== null) {
-            return (int)($task['workspace_uid'] ?? 0) > 0
-                && (int)($task['stage_uid'] ?? 0) === $column['stageUid'];
-        }
         return (int)($task['workspace_uid'] ?? 0) === 0
             && (string)($task['state'] ?? '') === $column['state'];
     }

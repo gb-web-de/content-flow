@@ -1,0 +1,183 @@
+<?php
+
+declare(strict_types=1);
+
+namespace GbWeb\ContentFlow\Tests\Functional\Service;
+
+use GbWeb\ContentFlow\Service\BoardColumnRegistry;
+use PHPUnit\Framework\Attributes\Test;
+use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
+
+/**
+ * Every workspace's own stage chain always starts with the built-in "Editing"
+ * stage (uid 0) and always ends with "Ready to publish" (uid -10) - core
+ * prepends/appends them unconditionally in WorkspaceStageRepository::
+ * findAllStagesByWorkspace(), regardless of what an integrator configures. That
+ * makes those two stages a reliable, title-independent way to prove the
+ * "shared when 2+ workspaces contribute" rule: they are shared by construction
+ * the instant a second workspace is merged in at all, with no fixture stage
+ * needed. Only genuinely custom `sys_workspace_stage` rows can produce an
+ * 'own'-colored or an uncoloured column, so those are what the fixtures below
+ * add.
+ */
+final class BoardColumnRegistryTest extends FunctionalTestCase
+{
+    /**
+     * @var string[]
+     */
+    protected array $coreExtensionsToLoad = [
+        'typo3/cms-workspaces',
+        'typo3/cms-dashboard',
+    ];
+
+    /**
+     * @var string[]
+     */
+    protected array $testExtensionsToLoad = [
+        'gb-web/content-flow',
+    ];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->importCSVDataSet(__DIR__ . '/../Fixtures/be_users.csv');
+        $this->setUpBackendUser(1);
+        $GLOBALS['LANG'] = $this->get(LanguageServiceFactory::class)
+            ->createFromUserPreferences($GLOBALS['BE_USER']);
+        $this->createWorkspace(1, 'Editorial');
+    }
+
+    private function subject(): BoardColumnRegistry
+    {
+        return $this->get(BoardColumnRegistry::class);
+    }
+
+    private function createWorkspace(int $uid, string $title, string $color = 'orange'): void
+    {
+        $this->getConnectionPool()->getConnectionForTable('sys_workspace')->insert('sys_workspace', [
+            'uid' => $uid,
+            'pid' => 0,
+            'title' => $title,
+            'color' => $color,
+            'deleted' => 0,
+        ]);
+    }
+
+    private function createCustomStage(int $uid, int $workspaceUid, string $title, int $sorting = 1): void
+    {
+        $this->getConnectionPool()->getConnectionForTable('sys_workspace_stage')->insert('sys_workspace_stage', [
+            'uid' => $uid,
+            'pid' => 0,
+            'parentid' => $workspaceUid,
+            'title' => $title,
+            'sorting' => $sorting,
+            'deleted' => 0,
+        ]);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $columns
+     */
+    private function findColumnByStageUid(array $columns, int $stageUid): ?array
+    {
+        foreach ($columns as $column) {
+            if ($column['stageUid'] === $stageUid) {
+                return $column;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $columns
+     */
+    private function findColumnByLabel(array $columns, string $label): ?array
+    {
+        foreach ($columns as $column) {
+            if ($column['label'] === $label) {
+                return $column;
+            }
+        }
+        return null;
+    }
+
+    #[Test]
+    public function withNoOtherWorkspacesNothingIsColored(): void
+    {
+        $columns = $this->subject()->getColumns($GLOBALS['BE_USER'], 1, []);
+
+        $editing = $this->findColumnByStageUid($columns, 0);
+        self::assertNotNull($editing);
+        self::assertFalse($editing['colorShared']);
+        self::assertFalse($editing['colorOwn']);
+        self::assertSame('', $editing['style']);
+    }
+
+    #[Test]
+    public function editingAndReadyAreSharedTheMomentAnotherWorkspaceIsMerged(): void
+    {
+        $this->createWorkspace(2, 'Legal');
+
+        $columns = $this->subject()->getColumns($GLOBALS['BE_USER'], 1, [2]);
+
+        $editing = $this->findColumnByStageUid($columns, 0);
+        $ready = $this->findColumnByStageUid($columns, -10);
+        self::assertNotNull($editing);
+        self::assertNotNull($ready);
+        self::assertTrue($editing['colorShared']);
+        self::assertTrue($ready['colorShared']);
+        self::assertFalse($editing['colorOwn']);
+        self::assertStringContainsString('Editorial', $editing['contributingWorkspaceTitles']);
+        self::assertStringContainsString('Legal', $editing['contributingWorkspaceTitles']);
+    }
+
+    #[Test]
+    public function aCustomStageUniqueToOneOtherWorkspaceGetsThatWorkspacesOwnColor(): void
+    {
+        $this->createWorkspace(2, 'Legal', 'magenta');
+        $this->createCustomStage(100, 2, 'Legal review');
+
+        $columns = $this->subject()->getColumns($GLOBALS['BE_USER'], 1, [2]);
+
+        $legalReview = $this->findColumnByLabel($columns, 'Legal review');
+        self::assertNotNull($legalReview);
+        self::assertFalse($legalReview['colorShared']);
+        self::assertTrue($legalReview['colorOwn']);
+        self::assertSame('Legal', $legalReview['contributingWorkspaceTitles']);
+        self::assertStringContainsString('magenta', $legalReview['style']);
+        // The active workspace (1) has no such stage - nothing to drop onto.
+        self::assertNull($legalReview['stageUid']);
+        self::assertFalse($legalReview['acceptsDrop']);
+    }
+
+    #[Test]
+    public function aStageSharedByTwoOtherWorkspacesIsSharedEvenWhenTheActiveWorkspaceDoesNotHaveIt(): void
+    {
+        $this->createWorkspace(2, 'Legal');
+        $this->createWorkspace(3, 'Marketing');
+        $this->createCustomStage(100, 2, 'Legal review');
+        $this->createCustomStage(101, 3, 'Legal review');
+
+        $columns = $this->subject()->getColumns($GLOBALS['BE_USER'], 1, [2, 3]);
+
+        $legalReview = $this->findColumnByLabel($columns, 'Legal review');
+        self::assertNotNull($legalReview);
+        self::assertTrue($legalReview['colorShared']);
+        self::assertFalse($legalReview['colorOwn']);
+        self::assertNull($legalReview['stageUid']);
+        self::assertFalse($legalReview['acceptsDrop']);
+    }
+
+    #[Test]
+    public function theOtherWorkspacesSentinelColumnNoLongerExists(): void
+    {
+        $this->createWorkspace(2, 'Legal');
+
+        $columns = $this->subject()->getColumns($GLOBALS['BE_USER'], 1, [2]);
+
+        foreach ($columns as $column) {
+            self::assertNotSame('other-workspaces', $column['key']);
+        }
+    }
+}

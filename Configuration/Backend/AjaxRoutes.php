@@ -121,6 +121,13 @@ return [
         'path' => '/contentflow/task/conflict-diff',
         'target' => TaskAjaxController::class . '::conflictDiffAction',
     ],
+    // Whether a task has anything pending to send to a review stage - checked
+    // before the "Send to stage" dialog opens, so a task with nothing pending
+    // is refused inline instead of opening a dialog that can only ever fail.
+    'contentflow_task_check_stage_transition' => [
+        'path' => '/contentflow/task/check-stage-transition',
+        'target' => TaskAjaxController::class . '::checkStageTransitionEligibilityAction',
+    ],
     // Workspace stage transition execution with comments and recipients.
     'contentflow_task_execute_stage' => [
         'path' => '/contentflow/task/execute-stage',

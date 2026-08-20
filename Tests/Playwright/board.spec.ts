@@ -5,7 +5,7 @@ test.describe('the Content Flow board module', () => {
   test('renders the backlog columns it owns', async ({ page }) => {
     const board = await openBoard(page)
 
-    for (const column of ['backlog', 'planned', 'done', 'other-workspaces']) {
+    for (const column of ['backlog', 'planned', 'done']) {
       await expect(board.locator(`[data-contentflow-column="${column}"]`)).toBeVisible()
     }
   })
