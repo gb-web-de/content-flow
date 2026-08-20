@@ -7,8 +7,8 @@
  */
 import AjaxRequest from '@typo3/core/ajax/ajax-request.js';
 import Notification from '@typo3/backend/notification.js';
-import Modal from '@typo3/backend/modal.js';
 import { SeverityEnum } from '@typo3/backend/enum/severity.js';
+import { confirmModal } from '@gb-web/content-flow/modal-confirm.js';
 
 export function registerPublishButtons(board) {
   const canPublish = TYPO3.settings.ContentFlow?.canPublish === true;
@@ -32,7 +32,7 @@ export function registerPublishButtons(board) {
         return;
       }
 
-      const confirmed = await Modal.confirm(
+      const confirmed = await confirmModal(
         'Publish "' + taskTitle + '"',
         'This makes every pending change in this task live immediately. This cannot be undone. Continue?',
         SeverityEnum.warning,

@@ -10,9 +10,9 @@
  */
 import AjaxRequest from '@typo3/core/ajax/ajax-request.js';
 import Notification from '@typo3/backend/notification.js';
-import Modal from '@typo3/backend/modal.js';
 import { SeverityEnum } from '@typo3/backend/enum/severity.js';
 import { topDocument } from '@gb-web/content-flow/dom-scope.js';
+import { confirmModal } from '@gb-web/content-flow/modal-confirm.js';
 
 export function registerMemberActions() {
   topDocument().addEventListener('click', async (event) => {
@@ -74,7 +74,7 @@ async function previewMember(table, uid) {
 }
 
 async function discardMember(table, uid, title) {
-  const confirmed = await Modal.confirm(
+  const confirmed = await confirmModal(
     'Discard version',
     'Throw away the pending changes to "' + title + '"? This cannot be undone.',
     SeverityEnum.warning,
