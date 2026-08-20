@@ -15,6 +15,10 @@
                 <source>Done</source>
                 <target>Terminé</target>
             </trans-unit>
+            <trans-unit id="column.workspaceCount" xml:space="preserve">
+                <source>{0} workspaces</source>
+                <target>{0} espaces de travail</target>
+            </trans-unit>
             <trans-unit id="task.untitled" xml:space="preserve">
                 <source>Untitled task</source>
                 <target>Tâche sans titre</target>

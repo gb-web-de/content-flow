@@ -221,6 +221,13 @@ final class BoardColumnRegistry
             'colorOwn' => $colorMode === 'own',
             'style' => $style,
             'contributingWorkspaceTitles' => implode(', ', $contributingWorkspaceTitles),
+            // A board this column belongs to can merge in every accessible
+            // *other* workspace's stage chain (see this class's own docblock),
+            // which for an installation with many workspaces means a column
+            // can list a couple dozen names. Index.html only renders them
+            // inline up to a threshold and folds the rest behind a <details>
+            // disclosure past it - this count is what decides which.
+            'contributingWorkspaceCount' => count($contributingWorkspaceTitles),
         ];
     }
 
@@ -296,6 +303,7 @@ final class BoardColumnRegistry
             'colorOwn' => false,
             'style' => '',
             'contributingWorkspaceTitles' => '',
+            'contributingWorkspaceCount' => 0,
         ];
     }
 

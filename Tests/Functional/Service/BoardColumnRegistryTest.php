@@ -180,4 +180,31 @@ final class BoardColumnRegistryTest extends FunctionalTestCase
             self::assertNotSame('other-workspaces', $column['key']);
         }
     }
+
+    /**
+     * Index.html only folds the contributing-workspace list behind a
+     * details/summary disclosure once contributingWorkspaceCount passes its
+     * threshold - a real installation with many workspaces (18, on the one
+     * that surfaced this) otherwise grew the "Editing" column to the width
+     * of the whole board. This locks in the count the template branches on;
+     * the full title string must still carry every name, since the
+     * disclosure's expanded content is what renders it.
+     */
+    #[Test]
+    public function contributingWorkspaceCountReflectsEveryContributorEvenPastTheInlineDisplayThreshold(): void
+    {
+        for ($workspaceUid = 2; $workspaceUid <= 6; $workspaceUid++) {
+            $this->createWorkspace($workspaceUid, 'Team ' . $workspaceUid);
+        }
+
+        $columns = $this->subject()->getColumns($GLOBALS['BE_USER'], 1, [2, 3, 4, 5, 6]);
+
+        $editing = $this->findColumnByStageUid($columns, 0);
+        self::assertNotNull($editing);
+        // The active workspace (1, "Editorial") plus the five just created.
+        self::assertSame(6, $editing['contributingWorkspaceCount']);
+        foreach (range(2, 6) as $workspaceUid) {
+            self::assertStringContainsString('Team ' . $workspaceUid, $editing['contributingWorkspaceTitles']);
+        }
+    }
 }

@@ -143,6 +143,14 @@
 
 .contentflow-column {
     flex: 0 0 var(--contentflow-col-width);
+    /* Flex items default to a content-based automatic minimum size, which
+       wins over flex-basis when a descendant can't wrap (e.g. a long
+       nowrap workspace list) - the column would grow to fit that text
+       instead of holding at --contentflow-col-width. min-width: 0 turns
+       that automatic minimum off, so the fixed width above is the actual
+       width, and .contentflow-column-subtitle's own overflow/ellipsis is
+       what clips the short-list case. */
+    min-width: 0;
     background: var(--contentflow-col-bg);
     border: 1px solid var(--contentflow-col-border);
     border-radius: 8px;
@@ -180,6 +188,41 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* More than three contributing workspaces (BoardColumnRegistry::
+   buildStageColumn()'s contributingWorkspaceCount): a plain nowrap line
+   stopped being a compact label and started being the whole board's width
+   on an installation with many workspaces. <summary> keeps the same compact
+   look as the plain-list case above; expanding it wraps normally instead of
+   forcing a single unbroken line, so the column's fixed width holds either
+   way - only its height grows. */
+.contentflow-column-subtitle--collapsible {
+    cursor: pointer;
+}
+
+.contentflow-column-subtitle--collapsible summary {
+    list-style: none;
+}
+
+.contentflow-column-subtitle--collapsible summary::-webkit-details-marker {
+    display: none;
+}
+
+.contentflow-column-subtitle--collapsible summary::before {
+    content: '▸ ';
+    font-size: 8px;
+}
+
+.contentflow-column-subtitle--collapsible[open] summary::before {
+    content: '▾ ';
+}
+
+.contentflow-column-subtitle-list {
+    display: block;
+    margin-top: 2px;
+    white-space: normal;
+    word-break: break-word;
 }
 
 /* A step shared by 2+ workspaces on the board - see BoardColumnRegistry's

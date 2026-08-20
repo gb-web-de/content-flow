@@ -115,7 +115,31 @@
                         style="{column.style}">
                         <span class="contentflow-column-title">{column.label}</span>
                         <f:if condition="{column.contributingWorkspaceTitles}">
-                            <span class="contentflow-column-subtitle" title="{column.contributingWorkspaceTitles}">{column.contributingWorkspaceTitles}</span>
+                            <f:then>
+                                <f:comment>
+                                    A handful of names still reads fine inline (and
+                                    stays keyboard/screen-reader simple); past that,
+                                    the header itself was growing to fit the whole
+                                    list (18 workspaces on a real installation made
+                                    one column swallow the entire board). A native
+                                    details/summary disclosure keeps this reachable
+                                    without JS and without a hover-only tooltip as
+                                    the only way in.
+                                </f:comment>
+                                <f:if condition="{column.contributingWorkspaceCount} > 3">
+                                    <f:then>
+                                        <details class="contentflow-column-subtitle contentflow-column-subtitle--collapsible">
+                                            <summary>
+                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:column.workspaceCount" default="{0} workspaces" arguments="{0: column.contributingWorkspaceCount}" />
+                                            </summary>
+                                            <span class="contentflow-column-subtitle-list">{column.contributingWorkspaceTitles}</span>
+                                        </details>
+                                    </f:then>
+                                    <f:else>
+                                        <span class="contentflow-column-subtitle" title="{column.contributingWorkspaceTitles}">{column.contributingWorkspaceTitles}</span>
+                                    </f:else>
+                                </f:if>
+                            </f:then>
                         </f:if>
                         <span class="badge badge-pill badge-secondary">{column.cards -> f:count()}</span>
                         <f:if condition="{column.canManageChecklist}">

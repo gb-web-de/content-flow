@@ -12,6 +12,14 @@
             <trans-unit id="column.done" xml:space="preserve">
                 <source>Done</source>
             </trans-unit>
+            <!-- BoardColumnRegistry merges every accessible other workspace's own
+                 stage chain into the board's middle columns; past a handful of
+                 contributing workspaces, Index.html folds their names behind a
+                 <details> disclosure instead of listing them all inline, and this
+                 is that disclosure's compact <summary> label. %0$s / {0} is the count. -->
+            <trans-unit id="column.workspaceCount" xml:space="preserve">
+                <source>{0} workspaces</source>
+            </trans-unit>
 
             <trans-unit id="task.untitled" xml:space="preserve">
                 <source>Untitled task</source>
