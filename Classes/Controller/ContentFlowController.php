@@ -10,6 +10,7 @@ use GbWeb\ContentFlow\Service\AssignableUserProvider;
 use GbWeb\ContentFlow\Service\BoardColumnRegistry;
 use GbWeb\ContentFlow\Service\BoardScopeResolver;
 use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
+use GbWeb\ContentFlow\Service\WorkspaceConflictDetector;
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Backend\Attribute\AsController;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
@@ -44,6 +45,7 @@ final class ContentFlowController extends ActionController
         protected readonly WorkspaceService $workspaceService,
         protected readonly AssignableUserProvider $assignableUserProvider,
         protected readonly ActiveTaskSession $activeTaskSession,
+        protected readonly WorkspaceConflictDetector $conflictDetector,
     ) {
     }
 
@@ -204,11 +206,13 @@ final class ContentFlowController extends ActionController
 
         $tasks = $this->taskRepository->findForBoard($pageUids);
         $activeTaskUid = $this->activeTaskSession->current($backendUser)['taskUid'] ?? 0;
-        $enrichedTasks = array_map(function (array $task) use ($backendUser, $workspaceUid, $activeTaskUid): array {
+        $conflictsByTask = $this->findConflictsByTask($tasks);
+        $enrichedTasks = array_map(function (array $task) use ($backendUser, $workspaceUid, $activeTaskUid, $conflictsByTask): array {
             $table = (string)($task['subject_table'] ?? 'pages');
             $uid = (int)($task['subject_uid'] ?? 0);
             $task['iconIdentifier'] = $table === 'pages' ? 'apps-pagetree-page-default' : 'mimetypes-x-content-text';
             $task['isActive'] = (int)$task['uid'] === $activeTaskUid;
+            $task += $conflictsByTask[(int)$task['uid']] ?? ['hasConflict' => false, 'conflictLabel' => '', 'conflictTable' => '', 'conflictUid' => 0];
 
             $assigneeUid = (int)($task['assignee'] ?? 0);
             if ($assigneeUid > 0) {
@@ -291,6 +295,29 @@ final class ContentFlowController extends ActionController
         }
 
         return $board;
+    }
+
+    /**
+     * One batch conflict check for the whole board: every card's members in
+     * one query (TaskRepository::findMembersForTasks()), then one
+     * WorkspaceConflictDetector query per distinct record table - never one
+     * query per card, matching this controller's existing "one query per
+     * board" doctrine (see the class docblock).
+     *
+     * @param list<array<string, mixed>> $tasks
+     * @return array<int, array{hasConflict: bool, conflictLabel: string, conflictTable: string, conflictUid: int}>
+     */
+    private function findConflictsByTask(array $tasks): array
+    {
+        $taskUids = array_map(static fn (array $task): int => (int)$task['uid'], $tasks);
+        $membersByTask = $this->taskRepository->findMembersForTasks($taskUids);
+
+        $taskWorkspaceUids = [];
+        foreach ($tasks as $task) {
+            $taskWorkspaceUids[(int)$task['uid']] = (int)($task['workspace_uid'] ?? 0);
+        }
+
+        return $this->conflictDetector->findConflictsForTasks($membersByTask, $taskWorkspaceUids);
     }
 
     /**

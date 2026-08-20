@@ -20,6 +20,7 @@ use GbWeb\ContentFlow\Service\StageTransitionService;
 use GbWeb\ContentFlow\Service\TaskColor;
 use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
 use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
+use GbWeb\ContentFlow\Service\WorkspaceConflictDetector;
 use GbWeb\ContentFlow\Service\WorkspaceIntegrationService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -65,6 +66,7 @@ final class TaskAjaxController
         private readonly UriBuilder $uriBuilder,
         private readonly ViewFactoryInterface $viewFactory,
         private readonly LoggerInterface $logger,
+        private readonly WorkspaceConflictDetector $conflictDetector,
     ) {
     }
 
@@ -2001,6 +2003,80 @@ final class TaskAjaxController
         ]);
 
         return new HtmlResponse($view->render('ContentFlow/Ticket'));
+    }
+
+    /**
+     * "Compare versions": the workspace-vs-workspace diff behind every
+     * conflict badge (Page module banner, content-element badge, board card,
+     * ticket). Keyed by the live record's table+uid, not by task - a
+     * conflicted record may have no task of its own at all on the side that
+     * hasn't been claimed (see WorkspaceConflictDetector's docblock).
+     *
+     * The workspace list is re-derived here, never trusted from the client -
+     * same rule as every other endpoint in this controller.
+     */
+    public function conflictDiffAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $table = (string)($request->getQueryParams()['table'] ?? '');
+        $liveUid = (int)($request->getQueryParams()['uid'] ?? 0);
+
+        if (!$this->subjectRegistry->isTrackable($table) || $liveUid < 1) {
+            return new HtmlResponse(
+                '<div class="callout callout-danger"><div class="callout-body">'
+                    . htmlspecialchars($this->label('conflict.diff.invalid') ?: 'Invalid record.', ENT_QUOTES | ENT_HTML5)
+                    . '</div></div>',
+                400,
+            );
+        }
+
+        $workspaceUids = $this->conflictDetector->findPendingWorkspaces($table, $liveUid);
+        if (count($workspaceUids) < 2) {
+            return new HtmlResponse(
+                '<div class="callout callout-info"><div class="callout-body">'
+                    . htmlspecialchars($this->label('conflict.diff.empty') ?: 'No conflict (any more) for this record.', ENT_QUOTES | ENT_HTML5)
+                    . '</div></div>',
+            );
+        }
+
+        // buildConflictDiff() iterates $workspaceUids in this exact order to
+        // build each row's `cells` list - workspaceColumns is built from the
+        // same array in the same order so the template can zip header and
+        // body via two independent f:for loops, with no dynamic array-key
+        // lookups in Fluid.
+        $rows = $this->workspaceService->buildConflictDiff($table, $liveUid, $workspaceUids);
+        $workspaceTitles = $this->conflictDetector->resolveWorkspaceTitles($workspaceUids);
+        $workspaceColumns = array_map(
+            static fn (int $workspaceUid): array => ['uid' => $workspaceUid, 'title' => $workspaceTitles[$workspaceUid] ?? ('#' . $workspaceUid)],
+            $workspaceUids,
+        );
+        $recordTitle = $this->recordTitleFor($table, $liveUid);
+
+        $view = $this->viewFactory->create(new ViewFactoryData(
+            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
+            partialRootPaths: ['EXT:content_flow/Resources/Private/Partials/'],
+            layoutRootPaths: ['EXT:content_flow/Resources/Private/Layouts/'],
+            request: $request,
+        ));
+        $view->assignMultiple([
+            'table' => $table,
+            'uid' => $liveUid,
+            'recordTitle' => $recordTitle,
+            'workspaceColumns' => $workspaceColumns,
+            'rows' => $rows,
+        ]);
+
+        return new HtmlResponse($view->render('ContentFlow/ConflictDiff'));
+    }
+
+    private function recordTitleFor(string $table, int $uid): string
+    {
+        $record = BackendUtility::getRecord($table, $uid);
+        if ($record === null) {
+            return sprintf('%s:%d', $table, $uid);
+        }
+        $title = BackendUtility::getRecordTitle($table, $record);
+
+        return $title !== '' ? $title : sprintf('%s:%d', $table, $uid);
     }
 
     /**

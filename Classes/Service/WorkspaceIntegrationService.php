@@ -8,10 +8,15 @@ use GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\DataHandling\TableColumnType;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Imaging\IconSize;
+use TYPO3\CMS\Core\Localization\LanguageService;
+use TYPO3\CMS\Core\Schema\TcaSchemaFactory;
+use TYPO3\CMS\Core\Utility\DiffGranularity;
+use TYPO3\CMS\Core\Utility\DiffUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceRepository;
 use TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceStageRepository;
@@ -31,6 +36,9 @@ final class WorkspaceIntegrationService
         private readonly WorkspaceStageRepository $workspaceStageRepository,
         private readonly WorkspaceRepository $workspaceRepository,
         private readonly StagesService $stagesService,
+        private readonly WorkspaceConflictDetector $conflictDetector,
+        private readonly TcaSchemaFactory $tcaSchemaFactory,
+        private readonly DiffUtility $diffUtility,
     ) {
     }
 
@@ -78,7 +86,15 @@ final class WorkspaceIntegrationService
         // aggregation above, they just never reach the view.
         $coveredMembers = array_values(array_filter(
             $decoratedMembers,
-            static fn (array $member): bool => ($member['hasPendingVersion'] ?? false) || ($member['hasDiffs'] ?? false),
+            // hasConflict is included on its own: a member claimed onto this
+            // task while its only real pending version sits in a different
+            // workspace (see WorkspaceConflictDetector's docblock) has no
+            // pending version or diff *in this task's own workspace* at all,
+            // and hiding it here would defeat "must be shown" for exactly the
+            // case this feature exists for.
+            static fn (array $member): bool => ($member['hasPendingVersion'] ?? false)
+                || ($member['hasDiffs'] ?? false)
+                || ($member['hasConflict'] ?? false),
         ));
         // Empty before the task has a version at all - a checklist reviews
         // work against a stage, and there is no stage to review against yet.
@@ -315,11 +331,27 @@ final class WorkspaceIntegrationService
         string $subjectTable = '',
         int $subjectUid = 0,
     ): array {
+        // One conflict check for the whole ticket, not one per member - same
+        // batching rule as PageModuleEventListener/ContentFlowController.
+        $liveUidsByTable = [];
+        foreach ($members as $member) {
+            $liveUidsByTable[(string)$member['record_table']][] = (int)$member['record_uid'];
+        }
+        $conflicts = $this->conflictDetector->findConflicts($liveUidsByTable);
+
         $decorated = [];
         foreach ($members as $member) {
             $table = (string)$member['record_table'];
             $uid = (int)$member['record_uid'];
             $record = BackendUtility::getRecord($table, $uid);
+
+            $workspaceUidsInConflict = $conflicts[$table][$uid] ?? null;
+            $member['hasConflict'] = $workspaceUidsInConflict !== null;
+            if ($workspaceUidsInConflict !== null) {
+                $otherWorkspaceUids = array_values(array_diff($workspaceUidsInConflict, [$workspaceUid]));
+                $titles = $this->conflictDetector->resolveWorkspaceTitles($otherWorkspaceUids ?: $workspaceUidsInConflict);
+                $member['conflictLabel'] = implode(', ', $titles);
+            }
 
             $homePid = (int)($member['home_pid'] ?? 0);
             $member['title'] = $record !== null
@@ -493,6 +525,119 @@ final class WorkspaceIntegrationService
         return trim((string)($user['realName'] ?? '')) !== ''
             ? (string)$user['realName']
             : (string)($user['username'] ?? 'unknown');
+    }
+
+    /**
+     * The workspace-vs-workspace comparison behind the "Compare versions"
+     * button - live value against each conflicting workspace's own pending
+     * version of the same record, field by field. Deliberately not built on
+     * sys_history (see getRecordDiffs() above): both workspaces' entries
+     * interleave there into one undifferentiated trail with no workspace
+     * attribution, unsuitable for an A-vs-B comparison. Reuses core's
+     * DiffUtility field-by-field exactly the way
+     * Workspaces\Service\GridDataService::getRowDetails() does for
+     * version-vs-live, just against each workspace's version instead.
+     *
+     * File, inline and FlexForm fields are left out for now - each needs its
+     * own comparison strategy (core's own getRowDetails() has ~80 lines just
+     * for file references), and a simple field list already answers "where
+     * do I need to look" for the common case. Revisit if usage shows it's
+     * not enough.
+     *
+     * @param list<int> $workspaceUids at least 2, from WorkspaceConflictDetector
+     * @return list<array{field: string, label: string, liveValue: string, cells: list<array{changed: bool, html: string}>, isTrueConflict: bool}>
+     */
+    public function buildConflictDiff(string $table, int $liveUid, array $workspaceUids): array
+    {
+        if (!$this->tcaSchemaFactory->has($table)) {
+            return [];
+        }
+        $schema = $this->tcaSchemaFactory->get($table);
+        $live = BackendUtility::getRecord($table, $liveUid) ?? [];
+        if ($live === []) {
+            return [];
+        }
+
+        $versions = [];
+        foreach ($workspaceUids as $workspaceUid) {
+            $versions[$workspaceUid] = BackendUtility::getWorkspaceVersionOfRecord($workspaceUid, $table, $liveUid) ?: [];
+        }
+
+        $skippedTypes = [
+            TableColumnType::PASSTHROUGH,
+            TableColumnType::NONE,
+            TableColumnType::USER,
+            TableColumnType::FILE,
+            TableColumnType::INLINE,
+            TableColumnType::FLEX,
+        ];
+
+        $rows = [];
+        foreach (array_keys($live) as $field) {
+            if (!$schema->hasField($field)) {
+                continue;
+            }
+            $fieldTypeInformation = $schema->getField($field);
+            $isSkippedType = false;
+            foreach ($skippedTypes as $skippedType) {
+                if ($fieldTypeInformation->isType($skippedType)) {
+                    $isSkippedType = true;
+                    break;
+                }
+            }
+            if ($isSkippedType) {
+                continue;
+            }
+
+            $liveValue = (string)(BackendUtility::getProcessedValue($table, $field, (string)($live[$field] ?? ''), 0, true) ?? ($live[$field] ?? ''));
+
+            // One cell per workspace, in the same order as $workspaceUids for
+            // every row - Fluid then zips this against the header via plain
+            // parallel f:for loops, no dynamic array-key lookups needed.
+            $cells = [];
+            $changedValues = [];
+            $touchedByAnyWorkspace = false;
+            foreach ($workspaceUids as $workspaceUid) {
+                $versionRawValue = (string)($versions[$workspaceUid][$field] ?? '');
+                $changed = $versionRawValue !== (string)($live[$field] ?? '');
+                if (!$changed) {
+                    // This workspace never touched the field - not part of the story.
+                    $cells[] = ['changed' => false, 'html' => ''];
+                    continue;
+                }
+                $touchedByAnyWorkspace = true;
+                $versionValue = (string)(BackendUtility::getProcessedValue($table, $field, $versionRawValue, 0, true) ?? $versionRawValue);
+                $cells[] = [
+                    'changed' => true,
+                    'html' => $this->diffUtility->diff(strip_tags($liveValue), strip_tags($versionValue), DiffGranularity::WORD),
+                ];
+                $changedValues[$workspaceUid] = $versionValue;
+            }
+            if (!$touchedByAnyWorkspace) {
+                continue;
+            }
+
+            $rows[] = [
+                'field' => $field,
+                'label' => $this->getLanguageService()->sL($fieldTypeInformation->getLabel()) ?: $field,
+                'liveValue' => $liveValue,
+                'cells' => $cells,
+                // The genuinely dangerous case: two workspaces changed the SAME
+                // field to DIFFERENT values, both away from live - a field only
+                // one side touched isn't a conflict in the merge sense, it just
+                // needs one human to notice both sides exist (the badges
+                // upstream already do that); this flags where a decision is
+                // actually needed.
+                'isTrueConflict' => count(array_unique($changedValues)) > 1,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function getLanguageService(): LanguageService
+    {
+        return $GLOBALS['LANG'];
     }
 
     private function getBackendUser(): BackendUserAuthentication

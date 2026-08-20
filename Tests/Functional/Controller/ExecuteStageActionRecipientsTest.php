@@ -164,6 +164,9 @@ final class ExecuteStageActionRecipientsTest extends FunctionalTestCase
                 $this->get(\TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceStageRepository::class),
                 $this->get(\TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceRepository::class),
                 $this->get(\TYPO3\CMS\Workspaces\Service\StagesService::class),
+                $this->get(\GbWeb\ContentFlow\Service\WorkspaceConflictDetector::class),
+                $this->get(\TYPO3\CMS\Core\Schema\TcaSchemaFactory::class),
+                $this->get(\TYPO3\CMS\Core\Utility\DiffUtility::class),
             ),
             $this->get(\TYPO3\CMS\Workspaces\Authorization\WorkspacePublishGate::class),
             $this->get(\GbWeb\ContentFlow\Service\StageTransitionService::class),
@@ -171,6 +174,7 @@ final class ExecuteStageActionRecipientsTest extends FunctionalTestCase
             $this->get(UriBuilder::class),
             $this->get(ViewFactoryInterface::class),
             new NullLogger(),
+            $this->get(\GbWeb\ContentFlow\Service\WorkspaceConflictDetector::class),
         );
     }
 

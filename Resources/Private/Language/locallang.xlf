@@ -550,6 +550,44 @@
             <trans-unit id="autoCreation.comment.reopened" xml:space="preserve">
                 <source>Automatically reopened for editing - %1$s:%2$d was modified.</source>
             </trans-unit>
+
+            <!--
+                Cross-workspace conflict badge, shown on the Page module banner,
+                the content-element badge, the board card and the ticket when
+                the same live record has a pending version in more than one
+                workspace at once. WorkspaceConflictDetector detects it,
+                nothing publishes without a human choosing to.
+            -->
+            <trans-unit id="conflict.badge" xml:space="preserve">
+                <source>conflict</source>
+            </trans-unit>
+            <trans-unit id="conflict.banner" xml:space="preserve">
+                <source>Also edited in {0}</source>
+            </trans-unit>
+            <trans-unit id="conflict.title" xml:space="preserve">
+                <source>This record was also edited in another workspace - compare before publishing either side.</source>
+            </trans-unit>
+            <trans-unit id="conflict.view" xml:space="preserve">
+                <source>Compare versions</source>
+            </trans-unit>
+            <trans-unit id="conflict.diff.heading" xml:space="preserve">
+                <source>Workspace comparison</source>
+            </trans-unit>
+            <trans-unit id="conflict.diff.field" xml:space="preserve">
+                <source>Field</source>
+            </trans-unit>
+            <trans-unit id="conflict.diff.live" xml:space="preserve">
+                <source>Live</source>
+            </trans-unit>
+            <trans-unit id="conflict.diff.trueConflict" xml:space="preserve">
+                <source>conflicting</source>
+            </trans-unit>
+            <trans-unit id="conflict.diff.empty" xml:space="preserve">
+                <source>No conflict (any more) for this record.</source>
+            </trans-unit>
+            <trans-unit id="conflict.diff.invalid" xml:space="preserve">
+                <source>Invalid record.</source>
+            </trans-unit>
         </body>
     </file>
 </xliff>

@@ -105,6 +105,13 @@
                                     <f:if condition="{member.isShared}">
                                         <span class="badge badge-warning" title="Other pages reference this record">reused elsewhere</span>
                                     </f:if>
+                                    <f:if condition="{member.hasConflict}">
+                                        <span class="badge badge-warning contentflow-badge-conflict"
+                                              title="{f:translate(key: 'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.title', default: 'This record was also edited in another workspace - compare before publishing either side.')}">
+                                            <core:icon identifier="actions-exclamation-triangle" size="small" />
+                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.banner" default="Also edited in {0}" arguments="{0: member.conflictLabel}" />
+                                        </span>
+                                    </f:if>
                                 </div>
                                 <f:comment>
                                     Read-only, so shown regardless of workspace context or
@@ -116,6 +123,22 @@
                                         <button type="button" class="btn btn-xs btn-default contentflow-member-diff"
                                                 data-table="{member.record_table}" data-uid="{member.record_uid}">
                                             <core:icon identifier="actions-code-compare" size="small" /> Diff
+                                        </button>
+                                    </f:if>
+                                    <f:comment>
+                                        Deliberately a separate button from "Diff" above: that one
+                                        jumps to this member's own sequential sys_history diff
+                                        (old value -&gt; new value, one workspace). This one opens the
+                                        cross-workspace comparison - workspace A's draft vs.
+                                        workspace B's draft of the same live record - a different
+                                        question that must never visually merge with the other.
+                                    </f:comment>
+                                    <f:if condition="{member.hasConflict}">
+                                        <button type="button" class="btn btn-xs btn-warning"
+                                                data-contentflow-open-conflict-diff="{member.record_table}:{member.record_uid}"
+                                                data-contentflow-conflict-title="{member.title}">
+                                            <core:icon identifier="actions-exclamation-triangle" size="small" />
+                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.view" default="Compare versions" />
                                         </button>
                                     </f:if>
                                     <f:comment>

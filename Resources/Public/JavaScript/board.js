@@ -34,6 +34,7 @@ import { registerCommentForm } from '@gb-web/content-flow/task/comment.js';
 import { registerPublishButtons } from '@gb-web/content-flow/task/publish.js';
 import { registerMemberActions } from '@gb-web/content-flow/task/member-actions.js';
 import { registerMembershipActions } from '@gb-web/content-flow/task/membership.js';
+import { registerConflictDiffButtons } from '@gb-web/content-flow/task/conflict-diff.js';
 import { registerChecklistManagement, registerChecklistManageActions, registerChecklistToggle } from '@gb-web/content-flow/board/checklist.js';
 
 /*
@@ -69,6 +70,10 @@ class ContentFlowBoard {
     // Same reasoning, and the same delegation: the split/move buttons appear in
     // the ticket's member list and on the page module's element badge.
     registerMembershipActions();
+    // Same delegation again: "Compare versions" appears on the page module
+    // banner, the content-element badge, the board card and inside the
+    // ticket modal's member list.
+    registerConflictDiffButtons();
     registerChecklistToggle();
     registerChecklistManageActions();
 

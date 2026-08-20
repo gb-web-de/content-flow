@@ -1,0 +1,83 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+      xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+      data-namespace-typo3-fluid="true">
+
+<f:comment>
+    The workspace-vs-workspace comparison behind every conflict badge's
+    "Compare versions" button. Keyed by the live record (table+uid), not by
+    task - see WorkspaceConflictDetector's docblock for why a conflicted
+    record may not have a task on every side.
+
+    Rendered server-side, same reason as Ticket.html: the diff markup comes
+    from core's DiffUtility already rendered.
+</f:comment>
+
+<div class="contentflow-conflict-diff">
+    <header class="contentflow-conflict-diff-header">
+        <h2 class="contentflow-conflict-diff-title">
+            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.diff.heading" default="Workspace comparison" />
+        </h2>
+        <p class="contentflow-conflict-diff-subtitle">
+            <span class="contentflow-record-ref">{table}:{uid}</span> {recordTitle}
+        </p>
+    </header>
+
+    <f:if condition="{rows}">
+        <f:then>
+            <div class="contentflow-conflict-diff-table-wrap">
+                <table class="contentflow-conflict-diff-table">
+                    <thead>
+                        <tr>
+                            <th><f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.diff.field" default="Field" /></th>
+                            <th><f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.diff.live" default="Live" /></th>
+                            <f:for each="{workspaceColumns}" as="column">
+                                <th>{column.title}</th>
+                            </f:for>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <f:for each="{rows}" as="row">
+                            <tr class="{f:if(condition: row.isTrueConflict, then: 'contentflow-conflict-diff-row--conflict')}">
+                                <th scope="row">
+                                    {row.label}
+                                    <f:if condition="{row.isTrueConflict}">
+                                        <span class="badge badge-danger contentflow-badge-conflict">
+                                            <core:icon identifier="actions-exclamation-triangle" size="small" />
+                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.diff.trueConflict" default="conflicting" />
+                                        </span>
+                                    </f:if>
+                                </th>
+                                <td class="contentflow-conflict-diff-live">{row.liveValue}</td>
+                                <f:comment>
+                                    row.cells is built server-side in the same
+                                    order as workspaceColumns (see
+                                    WorkspaceIntegrationService::buildConflictDiff()),
+                                    so two parallel f:for loops line up without
+                                    any dynamic array-key lookup in Fluid.
+                                </f:comment>
+                                <f:for each="{row.cells}" as="cell">
+                                    <td>
+                                        <f:if condition="{cell.changed}">
+                                            <f:then>
+                                                <f:format.raw>{cell.html}</f:format.raw>
+                                            </f:then>
+                                            <f:else>
+                                                <span class="contentflow-conflict-diff-unchanged">—</span>
+                                            </f:else>
+                                        </f:if>
+                                    </td>
+                                </f:for>
+                            </tr>
+                        </f:for>
+                    </tbody>
+                </table>
+            </div>
+        </f:then>
+        <f:else>
+            <p class="contentflow-empty">
+                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.diff.empty" default="No conflict (any more) for this record." />
+            </p>
+        </f:else>
+    </f:if>
+</div>
+</html>

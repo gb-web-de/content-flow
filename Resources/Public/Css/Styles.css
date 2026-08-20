@@ -297,6 +297,18 @@
     border: 1px solid var(--contentflow-foreign-accent);
 }
 
+/* WorkspaceConflictDetector: the same live record has a pending version in
+   more than one workspace at once. Distinct icon from the foreign-workspace
+   badge above (actions-exclamation-triangle vs. actions-workspace) so the two
+   are never mistaken for each other even before reading the text - never
+   color alone. Uses core's own badge-warning background/text color; only the
+   icon gap needs styling here. */
+.contentflow-badge-conflict {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .contentflow-foreign-notice {
     font-size: 11px;
     font-style: italic;
@@ -588,6 +600,24 @@
     background: hsl(var(--contentflow-task-hue, 0), 70%, 45%, .2);
 }
 
+/* A second, independent badge next to the task-colour one above (see
+   ContentElementTaskBadgeListener::renderConflictBadge()) - not tied to any
+   task's hue, because the record it warns about may belong to no task at
+   all on the side that has not been claimed. */
+.contentflow-element-conflict {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 6px;
+    padding: 1px 8px 1px 5px;
+    border: 1px solid var(--typo3-state-warning-color, #92620a);
+    border-radius: 10px;
+    background: var(--typo3-state-warning-bg, #fdf6ec);
+    color: var(--typo3-state-warning-color, #92620a);
+    font-size: 11px;
+    line-height: 1.7;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .contentflow-card,
     .contentflow-column {
@@ -653,6 +683,64 @@
     font-weight: 600;
     padding: 2px 4px;
     border-radius: 3px;
+}
+
+/* ---- Workspace-vs-workspace comparison (ConflictDiff.html) ------------- */
+
+.contentflow-conflict-diff-header {
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--typo3-component-border-color, #ddd);
+}
+
+.contentflow-conflict-diff-title {
+    margin: 0 0 4px;
+}
+
+.contentflow-conflict-diff-subtitle {
+    margin: 0;
+    color: var(--typo3-text-color-variant, #555);
+    font-size: 12px;
+}
+
+.contentflow-conflict-diff-table-wrap {
+    overflow-x: auto;
+}
+
+.contentflow-conflict-diff-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.contentflow-conflict-diff-table th,
+.contentflow-conflict-diff-table td {
+    padding: 8px 10px;
+    border: 1px solid var(--typo3-component-border-color, #e0e0e0);
+    text-align: left;
+    vertical-align: top;
+}
+
+.contentflow-conflict-diff-table thead th {
+    background: var(--typo3-surface-container-low, #f3f4f6);
+    font-weight: 600;
+}
+
+.contentflow-conflict-diff-live {
+    color: var(--typo3-text-color-variant, #555);
+}
+
+.contentflow-conflict-diff-unchanged {
+    color: var(--typo3-text-color-variant, #999);
+}
+
+/* Both workspaces changed the same field to different values - the one
+   situation in this table that needs a human decision before either side
+   publishes. Never color-only: the row's th also carries the "conflicting"
+   badge in words (see ConflictDiff.html). */
+.contentflow-conflict-diff-row--conflict th,
+.contentflow-conflict-diff-row--conflict td {
+    background: var(--typo3-state-danger-bg, #fde8e8);
 }
 
 .contentflow-timeline {

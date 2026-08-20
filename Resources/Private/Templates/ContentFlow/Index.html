@@ -178,6 +178,18 @@
                                                 <core:icon identifier="actions-workspace" size="small" /> {card.foreignWorkspaceTitle}
                                             </span>
                                         </f:if>
+                                        <f:if condition="{card.hasConflict}">
+                                            <span class="badge badge-warning contentflow-badge-conflict"
+                                                  title="{f:translate(key: 'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.title', default: 'This record was also edited in another workspace - compare before publishing either side.')}">
+                                                <core:icon identifier="actions-exclamation-triangle" size="small" />
+                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.banner" default="Also edited in {0}" arguments="{0: card.conflictLabel}" />
+                                            </span>
+                                            <button type="button" class="btn btn-xs btn-warning"
+                                                    data-contentflow-open-conflict-diff="{card.conflictTable}:{card.conflictUid}"
+                                                    data-contentflow-conflict-title="{card.title}">
+                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.view" default="Compare versions" />
+                                            </button>
+                                        </f:if>
                                         <f:comment>
                                             Never color-only: the card's left-border accent
                                             (contentflow-card--due-soon/-overdue, see

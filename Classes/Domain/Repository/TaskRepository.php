@@ -378,6 +378,44 @@ final class TaskRepository
     }
 
     /**
+     * The board-wide equivalent of findMembers(): every open member row for a
+     * batch of tasks in one query, grouped by task uid in PHP. Exists so a
+     * whole board's conflict check costs one query for its members plus one
+     * per distinct record table, not one findMembers() call per card.
+     *
+     * @param list<int> $taskUids
+     * @return array<int, list<array<string, mixed>>> task uid => its members
+     */
+    public function findMembersForTasks(array $taskUids): array
+    {
+        $taskUids = array_values(array_unique(array_filter($taskUids, static fn (int $uid): bool => $uid > 0)));
+        if ($taskUids === []) {
+            return [];
+        }
+
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE_ITEM);
+        $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
+
+        $rows = $queryBuilder
+            ->select('*')
+            ->from(self::TABLE_ITEM)
+            ->where(
+                $queryBuilder->expr()->in('task', $queryBuilder->createNamedParameter($taskUids, Connection::PARAM_INT_ARRAY)),
+                $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
+            )
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        $membersByTask = [];
+        foreach ($rows as $row) {
+            $membersByTask[(int)$row['task']][] = $row;
+        }
+
+        return $membersByTask;
+    }
+
+    /**
      * Every open task touching a page - its own subject task (or a subject
      * task for a page-like record that lives on it) plus any task whose
      * membership reaches onto it, e.g. a detached content element's own task.

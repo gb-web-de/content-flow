@@ -65,6 +65,18 @@
                                 <f:if condition="{task.auto_created}">
                                     <span class="badge badge-secondary" title="Created automatically when editing started">auto</span>
                                 </f:if>
+                                <f:if condition="{task.hasConflict}">
+                                    <span class="badge badge-warning contentflow-badge-conflict"
+                                          title="{f:translate(key: 'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.title', default: 'This record was also edited in another workspace - compare before publishing either side.')}">
+                                        <core:icon identifier="actions-exclamation-triangle" size="small" />
+                                        <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.banner" default="Also edited in {0}" arguments="{0: task.conflictLabel}" />
+                                    </span>
+                                    <button type="button" class="btn btn-xs btn-warning"
+                                            data-contentflow-open-conflict-diff="{task.conflictTable}:{task.conflictUid}"
+                                            data-contentflow-conflict-title="{task.title}">
+                                        <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.view" default="Compare versions" />
+                                    </button>
+                                </f:if>
                                 <f:if condition="{task.assigneeName} == ''">
                                     <button type="button" class="btn btn-xs btn-default contentflow-action-assign" data-task-uid="{task.uid}">
                                         <core:icon identifier="actions-user" size="small" /> Assign to me

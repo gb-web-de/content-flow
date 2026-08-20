@@ -8,6 +8,7 @@ use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use GbWeb\ContentFlow\Service\ActiveTaskSession;
 use GbWeb\ContentFlow\Service\TaskColor;
 use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
+use GbWeb\ContentFlow\Service\WorkspaceConflictDetector;
 use TYPO3\CMS\Backend\Controller\Event\ModifyPageLayoutContentEvent;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
@@ -38,6 +39,7 @@ final class PageModuleEventListener
         private readonly PageRenderer $pageRenderer,
         private readonly TaskSubjectRegistry $subjectRegistry,
         private readonly ActiveTaskSession $activeTaskSession,
+        private readonly WorkspaceConflictDetector $conflictDetector,
     ) {
     }
 
@@ -65,12 +67,13 @@ final class PageModuleEventListener
         if (!in_array($activeTaskUid, array_map(static fn (array $task): int => (int)$task['uid'], $tasks), true)) {
             $activeTaskUid = 0;
         }
+        $conflictsByTask = $this->findConflictsByTask($tasks);
         $tasks = array_map(
             fn (array $task): array => $task + [
                 'hue' => TaskColor::hueFor((int)$task['uid']),
                 'isActive' => (int)$task['uid'] === $activeTaskUid,
                 'assigneeName' => $this->resolveAssigneeName($task),
-            ],
+            ] + ($conflictsByTask[(int)$task['uid']] ?? ['hasConflict' => false, 'conflictLabel' => '']),
             $tasks,
         );
 
@@ -121,6 +124,30 @@ final class PageModuleEventListener
             $this->subjectRegistry->getSubjectTables(),
             $this->subjectRegistry->getAggregatableTables(),
         )));
+    }
+
+    /**
+     * One batch conflict check for every task on this page: collect every
+     * member's live record across every task in one pass, ask
+     * WorkspaceConflictDetector once per record table, then attribute the
+     * result back to whichever task the record belongs to. A page with
+     * several tasks and a dozen members still costs one members query plus
+     * one conflict query per distinct table - never one query per task.
+     *
+     * @param list<array<string, mixed>> $tasks
+     * @return array<int, array{hasConflict: bool, conflictLabel: string, conflictTable: string, conflictUid: int}>
+     */
+    private function findConflictsByTask(array $tasks): array
+    {
+        $taskUids = array_map(static fn (array $task): int => (int)$task['uid'], $tasks);
+        $membersByTask = $this->taskRepository->findMembersForTasks($taskUids);
+
+        $taskWorkspaceUids = [];
+        foreach ($tasks as $task) {
+            $taskWorkspaceUids[(int)$task['uid']] = (int)($task['workspace_uid'] ?? 0);
+        }
+
+        return $this->conflictDetector->findConflictsForTasks($membersByTask, $taskWorkspaceUids);
     }
 
     /**

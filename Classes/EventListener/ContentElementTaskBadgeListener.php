@@ -7,11 +7,14 @@ namespace GbWeb\ContentFlow\EventListener;
 use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
 use GbWeb\ContentFlow\Service\ActiveTaskSession;
 use GbWeb\ContentFlow\Service\TaskColor;
+use GbWeb\ContentFlow\Service\WorkspaceConflictDetector;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Backend\View\Event\AfterPageContentPreviewRenderedEvent;
 use TYPO3\CMS\Core\Attribute\AsEventListener;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Domain\RecordInterface;
+use TYPO3\CMS\Core\Imaging\IconFactory;
+use TYPO3\CMS\Core\Imaging\IconSize;
 
 /**
  * Marks a content element in the Page module when a task already claims it.
@@ -34,13 +37,15 @@ final class ContentElementTaskBadgeListener
      * module render walks every element on the page, and asking the database
      * for each one would turn one query into dozens.
      *
-     * @var array<int, array<string, array{title: string, hue: float, isActive: bool, isSubject: bool}>>
+     * @var array<int, array<string, array{title: string, hue: float, isActive: bool, isSubject: bool, hasConflict: bool, conflictLabel: string}>>
      */
     private array $claimsByPage = [];
 
     public function __construct(
         private readonly TaskRepository $taskRepository,
         private readonly ActiveTaskSession $activeTaskSession,
+        private readonly WorkspaceConflictDetector $conflictDetector,
+        private readonly IconFactory $iconFactory,
     ) {
     }
 
@@ -71,7 +76,7 @@ final class ContentElementTaskBadgeListener
     }
 
     /**
-     * @param array{title: string, hue: float, isActive: bool, isSubject: bool} $claim
+     * @param array{title: string, hue: float, isActive: bool, isSubject: bool, hasConflict: bool, conflictLabel: string} $claim
      */
     private function renderBadge(array $claim, string $table, int $recordUid, string $recordTitle): string
     {
@@ -84,12 +89,39 @@ final class ContentElementTaskBadgeListener
 
         return sprintf(
             '<div class="contentflow-element-badge%s" style="--contentflow-task-hue: %s" title="%s">'
-                . '<span class="contentflow-task-dot"></span>%s%s</div>',
+                . '<span class="contentflow-task-dot"></span>%s%s</div>%s',
             $claim['isActive'] ? ' contentflow-element-badge--active' : '',
             (string)$claim['hue'],
             htmlspecialchars($title, ENT_QUOTES | ENT_HTML5),
             $label,
             $this->renderActions($claim, $table, $recordUid, $recordTitle),
+            $claim['hasConflict'] ? $this->renderConflictBadge($claim, $table, $recordUid) : '',
+        );
+    }
+
+    /**
+     * A second, independent badge - not folded into the task-colour dot -
+     * because the record whose live uid is versioned in a second workspace
+     * may belong to a task that knows nothing about that second workspace at
+     * all (see WorkspaceConflictDetector's docblock). It must survive
+     * regardless of which task, if any, the element above claims it for.
+     *
+     * @param array{conflictLabel: string} $claim
+     */
+    private function renderConflictBadge(array $claim, string $table, int $recordUid): string
+    {
+        return sprintf(
+            '<span class="contentflow-element-conflict" title="%s">%s %s</span>'
+                . '<button type="button" class="contentflow-element-action" data-contentflow-open-conflict-diff="%s:%d">%s</button>',
+            htmlspecialchars(
+                sprintf('Also edited in %s - compare before publishing either side.', $claim['conflictLabel']),
+                ENT_QUOTES | ENT_HTML5,
+            ),
+            $this->iconFactory->getIcon('actions-exclamation-triangle', IconSize::SMALL)->render(),
+            htmlspecialchars($this->label('conflict.badge', 'conflict'), ENT_QUOTES | ENT_HTML5),
+            htmlspecialchars($table, ENT_QUOTES | ENT_HTML5),
+            $recordUid,
+            htmlspecialchars($this->label('conflict.view', 'Compare versions'), ENT_QUOTES | ENT_HTML5),
         );
     }
 
@@ -152,7 +184,7 @@ final class ContentElementTaskBadgeListener
     }
 
     /**
-     * @return array<string, array{title: string, hue: float, isActive: bool, isSubject: bool}>
+     * @return array<string, array{title: string, hue: float, isActive: bool, isSubject: bool, hasConflict: bool, conflictLabel: string}>
      */
     private function claimsFor(int $pageUid): array
     {
@@ -162,21 +194,46 @@ final class ContentElementTaskBadgeListener
 
         $activeTaskUid = ($this->activeTaskSession->current($this->getBackendUser()) ?? [])['taskUid'] ?? 0;
 
+        $tasks = $this->taskRepository->findAllOpenForPage($pageUid);
+        $membersByTask = $this->taskRepository->findMembersForTasks(
+            array_map(static fn (array $task): int => (int)$task['uid'], $tasks),
+        );
+
+        // One conflict check for the whole page, not one per member - the
+        // same batching PageModuleEventListener::findConflictsByTask() uses.
+        $liveUidsByTable = [];
+        foreach ($membersByTask as $members) {
+            foreach ($members as $member) {
+                $liveUidsByTable[(string)$member['record_table']][] = (int)$member['record_uid'];
+            }
+        }
+        $conflicts = $this->conflictDetector->findConflicts($liveUidsByTable);
+
         $claims = [];
-        foreach ($this->taskRepository->findAllOpenForPage($pageUid) as $task) {
+        foreach ($tasks as $task) {
             $taskUid = (int)$task['uid'];
+            $taskWorkspaceUid = (int)($task['workspace_uid'] ?? 0);
             $entry = [
                 'title' => (string)$task['title'],
                 'hue' => TaskColor::hueFor($taskUid),
                 'isActive' => $taskUid === $activeTaskUid,
                 'isSubject' => false,
             ];
-            foreach ($this->taskRepository->findMembers($taskUid) as $member) {
+            foreach ($membersByTask[$taskUid] ?? [] as $member) {
                 $memberTable = (string)$member['record_table'];
                 $memberUid = (int)$member['record_uid'];
+                $workspaceUids = $conflicts[$memberTable][$memberUid] ?? null;
+                $conflictLabel = '';
+                if ($workspaceUids !== null) {
+                    $otherWorkspaceUids = array_values(array_diff($workspaceUids, [$taskWorkspaceUid]));
+                    $titles = $this->conflictDetector->resolveWorkspaceTitles($otherWorkspaceUids ?: $workspaceUids);
+                    $conflictLabel = implode(', ', $titles);
+                }
                 $claims[$memberTable . ':' . $memberUid] = [
                     'isSubject' => $memberTable === (string)$task['subject_table']
                         && $memberUid === (int)$task['subject_uid'],
+                    'hasConflict' => $workspaceUids !== null,
+                    'conflictLabel' => $conflictLabel,
                 ] + $entry;
             }
         }

@@ -666,6 +666,47 @@
                 <source>Automatically reopened for editing - %1$s:%2$d was modified.</source>
                 <target>Rouverte automatiquement pour modification - %1$s:%2$d a été modifié.</target>
             </trans-unit>
+
+            <trans-unit id="conflict.badge" xml:space="preserve">
+                <source>conflict</source>
+                <target>conflit</target>
+            </trans-unit>
+            <trans-unit id="conflict.banner" xml:space="preserve">
+                <source>Also edited in {0}</source>
+                <target>Également modifié dans {0}</target>
+            </trans-unit>
+            <trans-unit id="conflict.title" xml:space="preserve">
+                <source>This record was also edited in another workspace - compare before publishing either side.</source>
+                <target>Cet enregistrement a aussi été modifié dans un autre espace de travail - comparez avant de publier l'un ou l'autre côté.</target>
+            </trans-unit>
+            <trans-unit id="conflict.view" xml:space="preserve">
+                <source>Compare versions</source>
+                <target>Comparer les versions</target>
+            </trans-unit>
+            <trans-unit id="conflict.diff.heading" xml:space="preserve">
+                <source>Workspace comparison</source>
+                <target>Comparaison des espaces de travail</target>
+            </trans-unit>
+            <trans-unit id="conflict.diff.field" xml:space="preserve">
+                <source>Field</source>
+                <target>Champ</target>
+            </trans-unit>
+            <trans-unit id="conflict.diff.live" xml:space="preserve">
+                <source>Live</source>
+                <target>Live</target>
+            </trans-unit>
+            <trans-unit id="conflict.diff.trueConflict" xml:space="preserve">
+                <source>conflicting</source>
+                <target>en conflit</target>
+            </trans-unit>
+            <trans-unit id="conflict.diff.empty" xml:space="preserve">
+                <source>No conflict (any more) for this record.</source>
+                <target>Il n'y a pas ou plus de conflit pour cet enregistrement.</target>
+            </trans-unit>
+            <trans-unit id="conflict.diff.invalid" xml:space="preserve">
+                <source>Invalid record.</source>
+                <target>Enregistrement invalide.</target>
+            </trans-unit>
         </body>
     </file>
 </xliff>

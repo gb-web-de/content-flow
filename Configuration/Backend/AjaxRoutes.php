@@ -114,6 +114,13 @@ return [
         'path' => '/contentflow/task/ticket',
         'target' => TaskAjaxController::class . '::ticketAction',
     ],
+    // "Compare versions": workspace-vs-workspace diff for a record with a
+    // pending version in more than one workspace at once, rendered as HTML
+    // for a modal - see WorkspaceConflictDetector.
+    'contentflow_task_conflict_diff' => [
+        'path' => '/contentflow/task/conflict-diff',
+        'target' => TaskAjaxController::class . '::conflictDiffAction',
+    ],
     // Workspace stage transition execution with comments and recipients.
     'contentflow_task_execute_stage' => [
         'path' => '/contentflow/task/execute-stage',
