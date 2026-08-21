@@ -130,7 +130,7 @@
                                     <f:then>
                                         <details class="contentflow-column-subtitle contentflow-column-subtitle--collapsible">
                                             <summary>
-                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:column.workspaceCount" default="{0} workspaces" arguments="{0: column.contributingWorkspaceCount}" />
+                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:column.workspaceCount" default="%1$d workspaces" arguments="{0: column.contributingWorkspaceCount}" />
                                             </summary>
                                             <span class="contentflow-column-subtitle-list">{column.contributingWorkspaceTitles}</span>
                                         </details>
@@ -232,7 +232,7 @@
                                             <span class="badge badge-warning contentflow-badge-conflict"
                                                   title="{f:translate(key: 'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.title', default: 'This record was also edited in another workspace - compare before publishing either side.')}">
                                                 <core:icon identifier="actions-exclamation-triangle" size="small" />
-                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.banner" default="Also edited in {0}" arguments="{0: card.conflictLabel}" />
+                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.banner" default="Also edited in %1$s" arguments="{0: card.conflictLabel}" />
                                             </span>
                                             <button type="button" class="btn btn-xs btn-warning"
                                                     data-contentflow-open-conflict-diff="{card.conflictTable}:{card.conflictUid}"

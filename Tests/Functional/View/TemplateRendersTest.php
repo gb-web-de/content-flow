@@ -99,6 +99,70 @@ final class TemplateRendersTest extends FunctionalTestCase
         self::assertStringContainsString('aria-live="polite"', $output);
     }
 
+    /**
+     * BoardColumnRegistry::buildStageColumn() merges every accessible other
+     * workspace's own stage chain into one column - on an installation with
+     * many workspaces, that inline name list once grew the whole column to
+     * the width of the entire board. Past contributingWorkspaceCount > 3,
+     * Index.html folds the names behind a details/summary disclosure instead;
+     * this proves that branch actually parses and renders (see this class's
+     * own docblock for why "always render" is the point of this file), and
+     * that the %1$d placeholder in column.workspaceCount is real vsprintf
+     * syntax rather than a Fluid-style {0} that silently never substitutes.
+     */
+    #[Test]
+    public function aColumnWithManyContributingWorkspacesCollapsesTheirNamesBehindADisclosure(): void
+    {
+        $output = $this->render([
+            'pageSelected' => true,
+            'columns' => [
+                [
+                    'key' => 'stage-0',
+                    'label' => 'Editing',
+                    'state' => 'in_progress',
+                    'stageUid' => 0,
+                    'acceptsDrop' => true,
+                    'colorShared' => true,
+                    'colorOwn' => false,
+                    'style' => '',
+                    'contributingWorkspaceTitles' => 'Editorial, Legal, Marketing, Sales, Support',
+                    'contributingWorkspaceCount' => 5,
+                    'cards' => [],
+                ],
+            ],
+        ]);
+
+        self::assertStringContainsString('contentflow-column-subtitle--collapsible', $output);
+        self::assertStringContainsString('5 workspaces', $output);
+        self::assertStringContainsString('Editorial, Legal, Marketing, Sales, Support', $output);
+    }
+
+    #[Test]
+    public function aColumnWithFewContributingWorkspacesListsThemInline(): void
+    {
+        $output = $this->render([
+            'pageSelected' => true,
+            'columns' => [
+                [
+                    'key' => 'stage-0',
+                    'label' => 'Editing',
+                    'state' => 'in_progress',
+                    'stageUid' => 0,
+                    'acceptsDrop' => true,
+                    'colorShared' => true,
+                    'colorOwn' => false,
+                    'style' => '',
+                    'contributingWorkspaceTitles' => 'Editorial, Legal',
+                    'contributingWorkspaceCount' => 2,
+                    'cards' => [],
+                ],
+            ],
+        ]);
+
+        self::assertStringNotContainsString('contentflow-column-subtitle--collapsible', $output);
+        self::assertStringContainsString('Editorial, Legal', $output);
+    }
+
     #[Test]
     public function aPlannedTaskShowsNoAutoBadge(): void
     {

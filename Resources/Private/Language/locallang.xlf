@@ -16,9 +16,9 @@
                  stage chain into the board's middle columns; past a handful of
                  contributing workspaces, Index.html folds their names behind a
                  <details> disclosure instead of listing them all inline, and this
-                 is that disclosure's compact <summary> label. %0$s / {0} is the count. -->
+                 is that disclosure's compact <summary> label. %1$d is the count. -->
             <trans-unit id="column.workspaceCount" xml:space="preserve">
-                <source>{0} workspaces</source>
+                <source>%1$d workspaces</source>
             </trans-unit>
 
             <trans-unit id="task.untitled" xml:space="preserve">
@@ -567,7 +567,7 @@
                 <source>conflict</source>
             </trans-unit>
             <trans-unit id="conflict.banner" xml:space="preserve">
-                <source>Also edited in {0}</source>
+                <source>Also edited in %1$s</source>
             </trans-unit>
             <trans-unit id="conflict.title" xml:space="preserve">
                 <source>This record was also edited in another workspace - compare before publishing either side.</source>

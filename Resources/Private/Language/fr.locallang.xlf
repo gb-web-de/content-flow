@@ -16,8 +16,8 @@
                 <target>Terminé</target>
             </trans-unit>
             <trans-unit id="column.workspaceCount" xml:space="preserve">
-                <source>{0} workspaces</source>
-                <target>{0} espaces de travail</target>
+                <source>%1$d workspaces</source>
+                <target>%1$d espaces de travail</target>
             </trans-unit>
             <trans-unit id="task.untitled" xml:space="preserve">
                 <source>Untitled task</source>
@@ -672,8 +672,8 @@
                 <target>conflit</target>
             </trans-unit>
             <trans-unit id="conflict.banner" xml:space="preserve">
-                <source>Also edited in {0}</source>
-                <target>Également modifié dans {0}</target>
+                <source>Also edited in %1$s</source>
+                <target>Également modifié dans %1$s</target>
             </trans-unit>
             <trans-unit id="conflict.title" xml:space="preserve">
                 <source>This record was also edited in another workspace - compare before publishing either side.</source>
