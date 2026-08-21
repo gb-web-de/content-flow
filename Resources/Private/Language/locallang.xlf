@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <xliff version="1.0">
-    <file source-language="en" datatype="plaintext" original="messages" date="2026-08-07" product-name="content_flow">
+    <file source-language="en" datatype="plaintext" original="messages" date="2026-08-07" product-name="editorial_flow">
         <header/>
         <body>
             <trans-unit id="column.backlog" xml:space="preserve">
@@ -76,8 +76,8 @@
                 Everything from here to the error block is read by the wizard's
                 own JavaScript rather than by PHP: the step modules and the
                 modals that host them import this file as the
-                `content_flow.messages` translation domain
-                (`~labels/content_flow.messages`, resolved by core's
+                `editorial_flow.messages` translation domain
+                (`~labels/editorial_flow.messages`, resolved by core's
                 TranslationDomainMapper from the file's own path). Note that
                 LabelProvider.get() throws on a key it does not know, so a typo
                 here empties the wizard rather than printing a blank - the
@@ -398,12 +398,12 @@
             <!--
                 The Visual Editor's task select and its markers
                 (Resources/Public/JavaScript/task/visual-editor-task-select.js).
-                Read through the same `content_flow.messages` domain as the
+                Read through the same `editorial_flow.messages` domain as the
                 wizard above; the two server-side messages at the end are the
                 ones TaskAjaxController's own Visual Editor actions can return.
             -->
             <trans-unit id="ve.select.label" xml:space="preserve">
-                <source>Content Flow task</source>
+                <source>Editorial Flow task</source>
             </trans-unit>
             <trans-unit id="ve.select.placeholder" xml:space="preserve">
                 <source>Task</source>
@@ -433,7 +433,7 @@
                 <source>Tasks on this page</source>
             </trans-unit>
             <trans-unit id="ve.notification.title" xml:space="preserve">
-                <source>Content Flow</source>
+                <source>Editorial Flow</source>
             </trans-unit>
             <trans-unit id="ve.notification.taskActive" xml:space="preserve">
                 <source>This task is now active for this page.</source>

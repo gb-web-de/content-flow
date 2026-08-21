@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Domain\Repository;
+namespace GbWeb\EditorialFlow\Tests\Functional\Domain\Repository;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
 /**
- * tx_contentflow_task and tx_contentflow_task_item have no TCA, so
+ * tx_editorialflow_task and tx_editorialflow_task_item have no TCA, so
  * DeletedRestriction is a silent no-op for both - every read here must filter
  * `deleted` explicitly or a soft-deleted task/member keeps showing up.
  */
@@ -28,7 +28,7 @@ final class TaskRepositoryTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     private function subject(): TaskRepository
@@ -38,8 +38,8 @@ final class TaskRepositoryTest extends FunctionalTestCase
 
     private function createTask(array $overrides = []): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
-        $connection->insert('tx_contentflow_task', array_merge([
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task');
+        $connection->insert('tx_editorialflow_task', array_merge([
             'title' => 'About us',
             'subject_table' => 'pages',
             'subject_uid' => 2,
@@ -52,8 +52,8 @@ final class TaskRepositoryTest extends FunctionalTestCase
 
     private function softDeleteTask(int $taskUid): void
     {
-        $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task')->update(
-            'tx_contentflow_task',
+        $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task')->update(
+            'tx_editorialflow_task',
             ['deleted' => 1],
             ['uid' => $taskUid],
         );
@@ -61,8 +61,8 @@ final class TaskRepositoryTest extends FunctionalTestCase
 
     private function softDeleteMember(int $recordUid, string $recordTable = 'tt_content'): void
     {
-        $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task_item')->update(
-            'tx_contentflow_task_item',
+        $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task_item')->update(
+            'tx_editorialflow_task_item',
             ['deleted' => 1],
             ['record_table' => $recordTable, 'record_uid' => $recordUid],
         );
@@ -73,8 +73,8 @@ final class TaskRepositoryTest extends FunctionalTestCase
      */
     private function addRawMember(int $taskUid, int $recordUid, array $overrides = []): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task_item');
-        $connection->insert('tx_contentflow_task_item', array_merge([
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task_item');
+        $connection->insert('tx_editorialflow_task_item', array_merge([
             'task' => $taskUid,
             'record_table' => 'tt_content',
             'record_uid' => $recordUid,
@@ -93,8 +93,8 @@ final class TaskRepositoryTest extends FunctionalTestCase
     private function findItem(int $itemUid): array|false
     {
         return $this->getConnectionPool()
-            ->getConnectionForTable('tx_contentflow_task_item')
-            ->select(['closed', 'deleted'], 'tx_contentflow_task_item', ['uid' => $itemUid])
+            ->getConnectionForTable('tx_editorialflow_task_item')
+            ->select(['closed', 'deleted'], 'tx_editorialflow_task_item', ['uid' => $itemUid])
             ->fetchAssociative();
     }
 
@@ -155,7 +155,7 @@ final class TaskRepositoryTest extends FunctionalTestCase
     {
         // findOpenForBoard() used to filter these out entirely, which was the
         // reason a published task vanished from the board instead of showing
-        // up in the Done column - see ContentFlowController::belongsInColumn().
+        // up in the Done column - see EditorialFlowController::belongsInColumn().
         $taskUid = $this->createTask(['subject_pid' => 2, 'closed' => 1, 'state' => 'done']);
 
         $foundUids = array_map(
@@ -169,7 +169,7 @@ final class TaskRepositoryTest extends FunctionalTestCase
     #[Test]
     public function closeResetsWorkspaceAndStageUidSoTheTaskMatchesTheDoneColumn(): void
     {
-        // BoardColumnRegistry's Done column, and ContentFlowController::
+        // BoardColumnRegistry's Done column, and EditorialFlowController::
         // belongsInColumn(), both require workspace_uid === 0 for a
         // Content-Flow-owned state like 'done' to match - a closed task that
         // kept its old workspace/stage uid matched no column at all (or, worse,

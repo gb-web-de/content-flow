@@ -1,10 +1,10 @@
 #
-# Content Flow owns six tables.
+# Editorial Flow owns six tables.
 # Because these tables do not have full TCA definitions, all base columns
 # (uid, pid, tstamp, crdate, deleted) are explicitly declared in this SQL schema.
 # The same absence means DeletedRestriction is a silent no-op for all of them -
 # every repository query filters `deleted` explicitly instead, see
-# GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository::findItemsForStage()
+# GbWeb\EditorialFlow\Domain\Repository\TaskChecklistRepository::findItemsForStage()
 # for the reasoning.
 #
 
@@ -15,13 +15,13 @@
 # but not only: any versionable record that behaves like a page gets its own task.
 # The motivating case is a news record, which is technically a record but has its
 # own detail page and reads as a page to an editor. Which tables count as subjects
-# is configurable, see GbWeb\ContentFlow\Service\TaskSubjectRegistry.
+# is configurable, see GbWeb\EditorialFlow\Service\TaskSubjectRegistry.
 #
 # Everything else attaches to the subject's task as a member (see task_item):
 # editing a content element on a page belongs to that page's task, it does not
 # open a card of its own.
 #
-CREATE TABLE tx_contentflow_task (
+CREATE TABLE tx_editorialflow_task (
     uid int(11) unsigned NOT NULL auto_increment,
     pid int(11) unsigned DEFAULT '0' NOT NULL,
 
@@ -35,7 +35,7 @@ CREATE TABLE tx_contentflow_task (
     # table, and so the trail survives the subject record being deleted.
     subject_pid int(11) unsigned DEFAULT '0' NOT NULL,
 
-    # Lifecycle. `state` is the GbWeb\ContentFlow\Domain\Model\TaskState value.
+    # Lifecycle. `state` is the GbWeb\EditorialFlow\Domain\Model\TaskState value.
     # `stage_uid` is only meaningful while state->hasVersion() is true and then
     # mirrors the version's t3ver_stage - core stays the source of truth, this is
     # a read cache so the board can sort columns without touching every version.
@@ -95,7 +95,7 @@ CREATE TABLE tx_contentflow_task (
 # `closed` is denormalised from the task so the unique key only constrains open
 # tasks - a record may of course appear in many closed ones over its lifetime.
 #
-CREATE TABLE tx_contentflow_task_item (
+CREATE TABLE tx_editorialflow_task_item (
     uid int(11) unsigned NOT NULL auto_increment,
     pid int(11) unsigned DEFAULT '0' NOT NULL,
 
@@ -133,7 +133,7 @@ CREATE TABLE tx_contentflow_task_item (
 # comments must be queryable (@mentions, dashboards, "unresolved" filters) and
 # concurrently writable without read-modify-write races.
 #
-CREATE TABLE tx_contentflow_comment (
+CREATE TABLE tx_editorialflow_comment (
     uid int(11) unsigned NOT NULL auto_increment,
     pid int(11) unsigned DEFAULT '0' NOT NULL,
 
@@ -174,7 +174,7 @@ CREATE TABLE tx_contentflow_comment (
 # pointer means "detail expired", not an error.
 # See ARCHITECTURE.md, "Where the history lives".
 #
-CREATE TABLE tx_contentflow_activity (
+CREATE TABLE tx_editorialflow_activity (
     uid int(11) unsigned NOT NULL auto_increment,
     pid int(11) unsigned DEFAULT '0' NOT NULL,
 
@@ -198,10 +198,10 @@ CREATE TABLE tx_contentflow_activity (
 # that passes through this stage in this workspace. Not per-task: "did we check
 # links" is a property of the Review stage itself, not of any one task.
 #
-# stage_uid follows the same convention tx_contentflow_task.stage_uid does:
+# stage_uid follows the same convention tx_editorialflow_task.stage_uid does:
 # a real sys_workspace_stage uid, or one of core's fixed stage ids (0, -10, -20).
 #
-CREATE TABLE tx_contentflow_stage_checklist_item (
+CREATE TABLE tx_editorialflow_stage_checklist_item (
     uid int(11) unsigned NOT NULL auto_increment,
     pid int(11) unsigned DEFAULT '0' NOT NULL,
 
@@ -229,7 +229,7 @@ CREATE TABLE tx_contentflow_stage_checklist_item (
 # removed (stage_checklist_item.deleted = 1), its state rows simply stop being
 # reachable through findItemsForStage()'s join and are never read again.
 #
-CREATE TABLE tx_contentflow_task_checklist_state (
+CREATE TABLE tx_editorialflow_task_checklist_state (
     uid int(11) unsigned NOT NULL auto_increment,
     pid int(11) unsigned DEFAULT '0' NOT NULL,
 

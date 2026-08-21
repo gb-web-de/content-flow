@@ -12,12 +12,12 @@
 import Modal from '@typo3/backend/modal.js';
 import Notification from '@typo3/backend/notification.js';
 import { SeverityEnum } from '@typo3/backend/enum/severity.js';
-import { topDocument } from '@gb-web/content-flow/dom-scope.js';
+import { topDocument } from '@gb-web/editorial-flow/dom-scope.js';
 
 function openConflictDiff(table, uid, title) {
-  const url = TYPO3.settings.ajaxUrls.contentflow_task_conflict_diff;
+  const url = TYPO3.settings.ajaxUrls.editorialflow_task_conflict_diff;
   if (!url) {
-    Notification.error('Content Flow', 'Workspace comparison is not available.');
+    Notification.error('Editorial Flow', 'Workspace comparison is not available.');
     return;
   }
 
@@ -37,7 +37,7 @@ export function registerConflictDiffButtons() {
       return;
     }
 
-    const button = target.closest('[data-contentflow-open-conflict-diff]');
+    const button = target.closest('[data-editorialflow-open-conflict-diff]');
     if (button === null) {
       return;
     }
@@ -47,8 +47,8 @@ export function registerConflictDiffButtons() {
     // element preview - opening the diff must not also select or open those.
     event.stopPropagation();
 
-    const [table, uid] = button.dataset.contentflowOpenConflictDiff.split(':');
-    openConflictDiff(table, parseInt(uid, 10), button.dataset.contentflowConflictTitle || '');
+    const [table, uid] = button.dataset.editorialflowOpenConflictDiff.split(':');
+    openConflictDiff(table, parseInt(uid, 10), button.dataset.editorialflowConflictTitle || '');
   };
 
   document.addEventListener('click', handler);

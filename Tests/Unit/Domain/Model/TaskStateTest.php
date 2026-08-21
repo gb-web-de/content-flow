@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Unit\Domain\Model;
+namespace GbWeb\EditorialFlow\Tests\Unit\Domain\Model;
 
-use GbWeb\ContentFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Workspaces\Service\StagesService;
@@ -28,23 +28,23 @@ final class TaskStateTest extends UnitTestCase
     }
 
     #[Test]
-    public function onlyUnversionedStatesAreOwnedByContentFlow(): void
+    public function onlyUnversionedStatesAreOwnedByEditorialFlow(): void
     {
-        self::assertTrue(TaskState::BACKLOG->isOwnedByContentFlow());
-        self::assertTrue(TaskState::PLANNED->isOwnedByContentFlow());
-        self::assertTrue(TaskState::DONE->isOwnedByContentFlow());
+        self::assertTrue(TaskState::BACKLOG->isOwnedByEditorialFlow());
+        self::assertTrue(TaskState::PLANNED->isOwnedByEditorialFlow());
+        self::assertTrue(TaskState::DONE->isOwnedByEditorialFlow());
 
-        // These are core's to control - Content Flow must not write them directly.
-        self::assertFalse(TaskState::IN_PROGRESS->isOwnedByContentFlow());
-        self::assertFalse(TaskState::REVIEW->isOwnedByContentFlow());
-        self::assertFalse(TaskState::READY->isOwnedByContentFlow());
+        // These are core's to control - Editorial Flow must not write them directly.
+        self::assertFalse(TaskState::IN_PROGRESS->isOwnedByEditorialFlow());
+        self::assertFalse(TaskState::REVIEW->isOwnedByEditorialFlow());
+        self::assertFalse(TaskState::READY->isOwnedByEditorialFlow());
     }
 
     #[Test]
     public function hasVersionIsTheInverseOfOwnership(): void
     {
         foreach (TaskState::cases() as $state) {
-            self::assertSame(!$state->isOwnedByContentFlow(), $state->hasVersion(), $state->value);
+            self::assertSame(!$state->isOwnedByEditorialFlow(), $state->hasVersion(), $state->value);
         }
     }
 }

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Wizard;
+namespace GbWeb\EditorialFlow\Tests\Functional\Wizard;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
-use GbWeb\ContentFlow\Service\ActivityLogger;
-use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
-use GbWeb\ContentFlow\Wizard\TaskWizardProvider;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Service\ActivityLogger;
+use GbWeb\EditorialFlow\Service\TaskSubjectRegistry;
+use GbWeb\EditorialFlow\Wizard\TaskWizardProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\NullLogger;
@@ -39,7 +39,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void
@@ -57,9 +57,9 @@ final class TaskWizardProviderTest extends FunctionalTestCase
             $this->get(TaskRepository::class),
             $this->get(TaskSubjectRegistry::class),
             $this->get(ActivityLogger::class),
-            $this->get(\GbWeb\ContentFlow\Notification\AssignmentNotificationService::class),
-            $this->get(\GbWeb\ContentFlow\Domain\Repository\CommentRepository::class),
-            $this->get(\GbWeb\ContentFlow\Service\RecordCreationTargetProvider::class),
+            $this->get(\GbWeb\EditorialFlow\Notification\AssignmentNotificationService::class),
+            $this->get(\GbWeb\EditorialFlow\Domain\Repository\CommentRepository::class),
+            $this->get(\GbWeb\EditorialFlow\Service\RecordCreationTargetProvider::class),
             $this->get(UriBuilder::class),
             new NullLogger(),
         );
@@ -72,7 +72,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
 
     private function configRequest(array $data): ServerRequestInterface
     {
-        return (new ServerRequest())->withQueryParams(['mode' => 'contentflow_task_wizard', 'data' => $data]);
+        return (new ServerRequest())->withQueryParams(['mode' => 'editorialflow_task_wizard', 'data' => $data]);
     }
 
     /**
@@ -80,8 +80,8 @@ final class TaskWizardProviderTest extends FunctionalTestCase
      */
     private function createTask(array $overrides = []): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
-        $connection->insert('tx_contentflow_task', array_merge([
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task');
+        $connection->insert('tx_editorialflow_task', array_merge([
             'title' => 'About us',
             'description' => '',
             'subject_table' => 'pages',
@@ -99,7 +99,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
 
     private function addOpenMembership(int $taskUid, string $table, int $uid, int $homePid): void
     {
-        $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task_item')->insert('tx_contentflow_task_item', [
+        $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task_item')->insert('tx_editorialflow_task_item', [
             'task' => $taskUid,
             'record_table' => $table,
             'record_uid' => $uid,
@@ -151,7 +151,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
         self::assertSame('reload', $result['finisher']['identifier']);
         self::assertSame($taskUid, $result['finisher']['data']['task']);
 
-        $task = $this->fetchRow('tx_contentflow_task', $taskUid);
+        $task = $this->fetchRow('tx_editorialflow_task', $taskUid);
         self::assertSame('Landing page refresh', $task['title']);
         self::assertSame('Rework the intro section.', $task['description']);
         self::assertSame(0, (int)$task['assignee']);
@@ -186,7 +186,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
         self::assertTrue($result['success']);
         $taskUid = (int)$result['finisher']['data']['task'];
 
-        $task = $this->fetchRow('tx_contentflow_task', $taskUid);
+        $task = $this->fetchRow('tx_editorialflow_task', $taskUid);
         self::assertSame('tt_content', $task['subject_table']);
         self::assertSame(10, (int)$task['subject_uid']);
         self::assertSame('Intro hero follow-up', $task['title']);
@@ -235,7 +235,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
         self::assertTrue($result['success']);
         $taskUid = (int)$result['finisher']['data']['task'];
 
-        $task = $this->fetchRow('tx_contentflow_task', $taskUid);
+        $task = $this->fetchRow('tx_editorialflow_task', $taskUid);
         self::assertSame('New landing page', $task['title']);
         self::assertSame(1, (int)$task['priority']);
         self::assertSame('planned', $task['state']);
@@ -257,7 +257,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
         self::assertFalse($result['success']);
         self::assertNotEmpty($result['errors']);
 
-        $task = $this->fetchRow('tx_contentflow_task', $taskUid);
+        $task = $this->fetchRow('tx_editorialflow_task', $taskUid);
         self::assertSame('About us', $task['title']);
     }
 
@@ -269,7 +269,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
         ]))->jsonSerialize();
 
         self::assertCount(1, $configuration['steps']);
-        self::assertSame('@gb-web/content-flow/wizard/steps/route-choice-step.js', $configuration['steps'][0]['module']);
+        self::assertSame('@gb-web/editorial-flow/wizard/steps/route-choice-step.js', $configuration['steps'][0]['module']);
     }
 
     #[Test]
@@ -282,8 +282,8 @@ final class TaskWizardProviderTest extends FunctionalTestCase
 
         $modules = array_column($configuration['steps'], 'module');
         self::assertSame([
-            '@gb-web/content-flow/wizard/steps/task-details-step.js',
-            '@gb-web/content-flow/wizard/steps/stage-choice-step.js',
+            '@gb-web/editorial-flow/wizard/steps/task-details-step.js',
+            '@gb-web/editorial-flow/wizard/steps/stage-choice-step.js',
         ], $modules);
     }
 
@@ -311,7 +311,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
         self::assertTrue($result['success']);
         $taskUid = (int)$result['finisher']['data']['task'];
 
-        $task = $this->fetchRow('tx_contentflow_task', $taskUid);
+        $task = $this->fetchRow('tx_editorialflow_task', $taskUid);
         self::assertSame('New landing page', $task['title']);
         self::assertSame('pages', $task['subject_table']);
         self::assertSame(0, (int)$task['subject_uid']);
@@ -341,7 +341,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
         ]))->jsonSerialize();
 
         self::assertSame([
-            '@gb-web/content-flow/wizard/steps/task-details-step.js',
+            '@gb-web/editorial-flow/wizard/steps/task-details-step.js',
         ], array_column($configuration['steps'], 'module'));
     }
 
@@ -360,7 +360,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
 
         self::assertTrue($result['success']);
         $taskUid = (int)$result['finisher']['data']['task'];
-        $task = $this->fetchRow('tx_contentflow_task', $taskUid);
+        $task = $this->fetchRow('tx_editorialflow_task', $taskUid);
         self::assertSame('sys_category', $task['subject_table']);
         self::assertSame(0, (int)$task['subject_uid']);
         self::assertSame(1, (int)$task['subject_pid']);
@@ -386,7 +386,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
     public function updatingTheAutoGeneratedRegressionCommentReplacesItsContent(): void
     {
         $taskUid = $this->createTask();
-        $commentUid = $this->get(\GbWeb\ContentFlow\Domain\Repository\CommentRepository::class)
+        $commentUid = $this->get(\GbWeb\EditorialFlow\Domain\Repository\CommentRepository::class)
             ->add($taskUid, 'Automatically reopened for editing - pages:2 was modified.', 1);
 
         $result = $this->subject()->handleSubmit($this->submitRequest([
@@ -398,7 +398,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
 
         self::assertTrue($result['success']);
 
-        $comment = $this->fetchRow('tx_contentflow_comment', $commentUid);
+        $comment = $this->fetchRow('tx_editorialflow_comment', $commentUid);
         self::assertSame('Reopened because the intro needed another pass.', $comment['content']);
     }
 
@@ -406,7 +406,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
     public function updatingTheRegressionCommentWithEmptyContentIsRejected(): void
     {
         $taskUid = $this->createTask();
-        $commentUid = $this->get(\GbWeb\ContentFlow\Domain\Repository\CommentRepository::class)
+        $commentUid = $this->get(\GbWeb\EditorialFlow\Domain\Repository\CommentRepository::class)
             ->add($taskUid, 'Automatically reopened for editing.', 1);
 
         $result = $this->subject()->handleSubmit($this->submitRequest([
@@ -418,7 +418,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
 
         self::assertFalse($result['success']);
 
-        $comment = $this->fetchRow('tx_contentflow_comment', $commentUid);
+        $comment = $this->fetchRow('tx_editorialflow_comment', $commentUid);
         self::assertSame('Automatically reopened for editing.', $comment['content']);
     }
 
@@ -430,7 +430,7 @@ final class TaskWizardProviderTest extends FunctionalTestCase
         ]))->jsonSerialize();
 
         self::assertCount(1, $configuration['steps']);
-        self::assertSame('@gb-web/content-flow/wizard/steps/comment-step.js', $configuration['steps'][0]['module']);
+        self::assertSame('@gb-web/editorial-flow/wizard/steps/comment-step.js', $configuration['steps'][0]['module']);
         self::assertSame('Automatically reopened.', $configuration['steps'][0]['configurationData']['defaultComment']);
     }
 }

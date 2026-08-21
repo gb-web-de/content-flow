@@ -1,5 +1,5 @@
 {
-  "name": "content-flow-e2e",
+  "name": "editorial-flow-e2e",
   "private": true,
   "type": "module",
   "description": "Dev-only JavaScript test tooling: vitest for the extension's own ES modules, Playwright for the backend journeys. Neither builds or bundles the runtime JavaScript, which stays plain ES modules loaded via TYPO3's importmap.",

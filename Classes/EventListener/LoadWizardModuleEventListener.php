@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\EventListener;
+namespace GbWeb\EditorialFlow\EventListener;
 
-use GbWeb\ContentFlow\Service\AssignableUserProvider;
+use GbWeb\EditorialFlow\Service\AssignableUserProvider;
 use TYPO3\CMS\Backend\Controller\Event\AfterBackendPageRenderEvent;
 use TYPO3\CMS\Core\Attribute\AsEventListener;
 use TYPO3\CMS\Core\Page\PageRenderer;
@@ -32,7 +32,7 @@ use TYPO3\CMS\Core\Page\PageRenderer;
  * The CSS file belongs here for a related but distinct reason: TYPO3.Modal
  * always renders into this same outer chrome document, even when the button
  * that opened it lives inside a module's content iframe (the board does -
- * see board.js's openTicket()). ContentFlowController::indexAction() only
+ * see board.js's openTicket()). EditorialFlowController::indexAction() only
  * calls addCssFile() on the IFRAME's own PageRenderer, so every board card is
  * styled correctly, but the ticket/comment/checklist modal content - injected
  * into THIS outer document - had no stylesheet of its own and silently
@@ -51,12 +51,12 @@ final readonly class LoadWizardModuleEventListener
     #[AsEventListener(event: AfterBackendPageRenderEvent::class)]
     public function __invoke(): void
     {
-        $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/wizard.js');
-        $this->pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css');
-        // Populated here, not only in ContentFlowController, for the same reason
+        $this->pageRenderer->loadJavaScriptModule('@gb-web/editorial-flow/wizard.js');
+        $this->pageRenderer->addCssFile('EXT:editorial_flow/Resources/Public/Css/Styles.css');
+        // Populated here, not only in EditorialFlowController, for the same reason
         // the module itself is loaded here: the wizard's "assign to" field must
         // work from the Page module, the List module, or a direct record_edit
         // link, not only from the board.
-        $this->pageRenderer->addInlineSetting('ContentFlow', 'assignableUsers', $this->assignableUserProvider->getAssignableUsers());
+        $this->pageRenderer->addInlineSetting('EditorialFlow', 'assignableUsers', $this->assignableUserProvider->getAssignableUsers());
     }
 }

@@ -20,11 +20,11 @@ import { openVisualEditor, visualEditorContentFrame } from './fixtures/board'
 test.describe('the Visual Editor task select', () => {
   test('mounts into the Visual Editor toolbar with its fixed choices', async ({ page }) => {
     const moduleFrame = await openVisualEditor(page).goto()
-    const select = moduleFrame.locator('.contentflow-ve-task-select select')
+    const select = moduleFrame.locator('.editorialflow-ve-task-select select')
 
     // In the toolbar rather than somewhere in the page body - the difference
     // between "the element exists" and "an editor can find it".
-    await expect(moduleFrame.locator('.contentflow-ve-task-select')).toBeVisible()
+    await expect(moduleFrame.locator('.editorialflow-ve-task-select')).toBeVisible()
     await expect(select.locator('option', { hasText: /no task/i })).toHaveCount(1)
     await expect(select.locator('option', { hasText: /create new task/i })).toHaveCount(1)
 
@@ -34,7 +34,7 @@ test.describe('the Visual Editor task select', () => {
     // that is the property an editor actually sees; a class name would still
     // pass with the slot back on the left or wrapped onto a second row.
     const placement = await moduleFrame
-      .locator('.contentflow-ve-toolbar-slot')
+      .locator('.editorialflow-ve-toolbar-slot')
       .evaluate((slot) => {
         const toolbar = slot.closest('.btn-toolbar')
         if (toolbar === null) {
@@ -56,8 +56,8 @@ test.describe('the Visual Editor task select', () => {
 
   test('renders one legend swatch per task on the page', async ({ page }) => {
     const moduleFrame = await openVisualEditor(page).goto()
-    const legend = moduleFrame.locator('.contentflow-ve-legend')
-    const swatches = legend.locator('.contentflow-ve-legend-swatch')
+    const legend = moduleFrame.locator('.editorialflow-ve-legend')
+    const swatches = legend.locator('.editorialflow-ve-legend-swatch')
 
     // The legend mirrors the select: every task offered there is a colour here,
     // which is the property that makes a coloured dot in the page mean
@@ -67,7 +67,7 @@ test.describe('the Visual Editor task select', () => {
     // fixed values rather than by counting them off, which quietly went wrong
     // the moment "No task" was added.
     const taskOptions = moduleFrame.locator(
-      '.contentflow-ve-task-select select option[data-task]:not([value="__none__"]):not([value="__create__"])',
+      '.editorialflow-ve-task-select select option[data-task]:not([value="__none__"]):not([value="__create__"])',
     )
     const expected = await taskOptions.count()
 
@@ -81,7 +81,7 @@ test.describe('the Visual Editor task select', () => {
       // The option reads "Title (Stage)"; the legend shows the title alone.
       const firstTitle = firstOption.replace(/\s+\([^()]*\)\s*$/, '').trim()
 
-      await expect(swatches.first().locator('.contentflow-ve-legend-title')).toHaveText(firstTitle)
+      await expect(swatches.first().locator('.editorialflow-ve-legend-title')).toHaveText(firstTitle)
     }
   })
 
@@ -102,9 +102,9 @@ test.describe('the Visual Editor task select', () => {
      */
     const inconsistent = await contentFrame.locator('ve-content-element').evaluateAll((elements) => elements
       .filter((element) => {
-        const hasBubble = element.querySelector(':scope > .contentflow-task-bubble') !== null
-        const hasOutline = element.classList.contains('contentflow-task-claimed')
-        const hasHue = element.style.getPropertyValue('--contentflow-task-hue') !== ''
+        const hasBubble = element.querySelector(':scope > .editorialflow-task-bubble') !== null
+        const hasOutline = element.classList.contains('editorialflow-task-claimed')
+        const hasHue = element.style.getPropertyValue('--editorialflow-task-hue') !== ''
 
         return hasBubble !== hasOutline || hasBubble !== hasHue
       })
@@ -118,20 +118,20 @@ test.describe('the Visual Editor task select', () => {
     const contentFrame = visualEditorContentFrame(page)
     await expect(contentFrame.locator('ve-content-element').first()).toBeAttached({ timeout: 20000 })
 
-    const bubble = contentFrame.locator('.contentflow-task-bubble').first()
+    const bubble = contentFrame.locator('.editorialflow-task-bubble').first()
     if (await bubble.count() === 0) {
       test.skip(true, 'no task claims anything on this page - nothing to name')
     }
 
     // The tooltip is the whole point of the bubble: hovering has to answer
     // "whose is this?" rather than just confirming something is there.
-    await expect(bubble).toHaveAttribute('data-contentflow-label', /\S/)
+    await expect(bubble).toHaveAttribute('data-editorialflow-label', /\S/)
     await expect(bubble).toHaveAttribute('aria-label', /\S/)
   })
 
   test('lets a declaration be taken back', async ({ page }) => {
     const moduleFrame = await openVisualEditor(page).goto()
-    const select = moduleFrame.locator('.contentflow-ve-task-select select')
+    const select = moduleFrame.locator('.editorialflow-ve-task-select select')
 
     // The server treats this as "drop the choice" and moves nothing, so it is
     // the one write safe to make against a real installation. It is also the

@@ -5,7 +5,7 @@
  * custom element.
  */
 import { html } from 'lit'
-import labels from '~labels/content_flow.messages'
+import labels from '~labels/editorial_flow.messages'
 
 export class RouteChoiceStep {
   constructor(context, configurationData = {}) {
@@ -54,7 +54,7 @@ export class RouteChoiceStep {
               <label>
                 <input
                   type="radio"
-                  name="contentflow-destination-choice"
+                  name="editorialflow-destination-choice"
                   .value=${value}
                   .checked=${this.value === value}
                   @change=${() => this._select(value)}

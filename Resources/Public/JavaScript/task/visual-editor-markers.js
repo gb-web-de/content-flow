@@ -22,24 +22,24 @@
  */
 import Modal from '@typo3/backend/modal.js'
 import { SeverityEnum } from '@typo3/backend/enum/severity.js'
-import labels from '~labels/content_flow.messages'
-import { claimFor, hueForTaskUid, legendEntries } from '@gb-web/content-flow/task/task-markers.js'
-import { openMoveDialog, openSplitDialog, moveToTask } from '@gb-web/content-flow/task/membership.js'
+import labels from '~labels/editorial_flow.messages'
+import { claimFor, hueForTaskUid, legendEntries } from '@gb-web/editorial-flow/task/task-markers.js'
+import { openMoveDialog, openSplitDialog, moveToTask } from '@gb-web/editorial-flow/task/membership.js'
 
 const CONTENT_ELEMENT_SELECTOR = 've-content-element'
 const CONTENT_FRAME_SELECTOR = 'iframe.visual-editor-iframe'
 
-const BUBBLE_CLASS = 'contentflow-task-bubble'
-const ACTIONS_CLASS = 'contentflow-task-actions'
-const MENU_TOGGLE_CLASS = 'contentflow-task-menu-toggle'
-const MENU_CLASS = 'contentflow-task-menu'
-const CLAIMED_CLASS = 'contentflow-task-claimed'
-const ACTIVE_CLASS = 'contentflow-task-claimed-active'
-const HIGHLIGHT_CLASS = 'contentflow-task-highlight'
-const LEGEND_CLASS = 'contentflow-ve-legend'
+const BUBBLE_CLASS = 'editorialflow-task-bubble'
+const ACTIONS_CLASS = 'editorialflow-task-actions'
+const MENU_TOGGLE_CLASS = 'editorialflow-task-menu-toggle'
+const MENU_CLASS = 'editorialflow-task-menu'
+const CLAIMED_CLASS = 'editorialflow-task-claimed'
+const ACTIVE_CLASS = 'editorialflow-task-claimed-active'
+const HIGHLIGHT_CLASS = 'editorialflow-task-highlight'
+const LEGEND_CLASS = 'editorialflow-ve-legend'
 
-const MARKER_STYLE_ID = 'contentflow-ve-markers'
-const HUE_PROPERTY = '--contentflow-task-hue'
+const MARKER_STYLE_ID = 'editorialflow-ve-markers'
+const HUE_PROPERTY = '--editorialflow-task-hue'
 
 /*
  * Injected into the frontend document rather than shipped in Styles.css: that
@@ -160,7 +160,7 @@ const MARKER_STYLES = `
   border-color: hsl(var(${HUE_PROPERTY}, 0), 70%, 45%);
 }
 .${BUBBLE_CLASS}::after {
-  content: attr(data-contentflow-label);
+  content: attr(data-editorialflow-label);
   position: absolute;
   top: calc(100% + 6px);
   /* Anchored right so the label opens inwards - anchored left it would run off
@@ -266,8 +266,8 @@ export class TaskMarkers {
    */
   observeContentFrames() {
     this.contentFrames().forEach((frame) => {
-      if (frame.dataset.contentflowObserved !== '1') {
-        frame.dataset.contentflowObserved = '1'
+      if (frame.dataset.editorialflowObserved !== '1') {
+        frame.dataset.editorialflowObserved = '1'
         frame.addEventListener('load', () => this.markFrame(frame))
       }
       this.markFrame(frame)
@@ -292,10 +292,10 @@ export class TaskMarkers {
    * chevron again to get rid of it. Registered once per document.
    */
   dismissMenusOnOutsideClick(doc) {
-    if (doc.body.dataset.contentflowMenuDismiss === '1') {
+    if (doc.body.dataset.editorialflowMenuDismiss === '1') {
       return
     }
-    doc.body.dataset.contentflowMenuDismiss = '1'
+    doc.body.dataset.editorialflowMenuDismiss = '1'
     doc.addEventListener('click', (event) => {
       if (event.target?.closest?.('.' + ACTIONS_CLASS) === null) {
         this.closeAllMenus()
@@ -326,8 +326,8 @@ export class TaskMarkers {
       element.classList.toggle(HIGHLIGHT_CLASS, this.highlightedTaskUid === claim.taskUid)
 
       bubble.classList.toggle(ACTIVE_CLASS, claim.isActive)
-      bubble.dataset.contentflowLabel = tooltipFor({ ...task, title })
-      bubble.dataset.contentflowTask = String(claim.taskUid)
+      bubble.dataset.editorialflowLabel = tooltipFor({ ...task, title })
+      bubble.dataset.editorialflowTask = String(claim.taskUid)
       bubble.setAttribute(
         'aria-label',
         (claim.isActive ? labels.get('ve.marker.yourTask') : labels.get('ve.marker.claimedBy'))
@@ -336,11 +336,11 @@ export class TaskMarkers {
 
       // Stamped on the group rather than closed over, so a re-render that keeps
       // the existing nodes still acts on current data.
-      actions.dataset.contentflowTask = String(claim.taskUid)
-      actions.dataset.contentflowTable = claim.table
-      actions.dataset.contentflowUid = String(claim.uid)
-      actions.dataset.contentflowRecordTitle = claim.title || claim.table + ':' + claim.uid
-      actions.dataset.contentflowActive = claim.isActive ? '1' : '0'
+      actions.dataset.editorialflowTask = String(claim.taskUid)
+      actions.dataset.editorialflowTable = claim.table
+      actions.dataset.editorialflowUid = String(claim.uid)
+      actions.dataset.editorialflowRecordTitle = claim.title || claim.table + ':' + claim.uid
+      actions.dataset.editorialflowActive = claim.isActive ? '1' : '0'
 
       if (!existing) {
         element.append(actions)
@@ -360,7 +360,7 @@ export class TaskMarkers {
     // apart from a re-render, or marking would trigger marking.
     actions.contentEditable = 'false'
     actions.draggable = false
-    actions.dataset.contentflowMarker = '1'
+    actions.dataset.editorialflowMarker = '1'
 
     actions.append(this.createBubble(doc), this.createMenuToggle(doc))
 
@@ -378,7 +378,7 @@ export class TaskMarkers {
     bubble.addEventListener('click', (event) => {
       event.preventDefault()
       event.stopPropagation()
-      this.openTicket(Number(bubble.dataset.contentflowTask))
+      this.openTicket(Number(bubble.dataset.editorialflowTask))
     })
 
     return bubble
@@ -448,12 +448,12 @@ export class TaskMarkers {
     menu.className = MENU_CLASS
     menu.setAttribute('role', 'menu')
     menu.contentEditable = 'false'
-    menu.dataset.contentflowMarker = '1'
+    menu.dataset.editorialflowMarker = '1'
 
-    const table = actions.dataset.contentflowTable
-    const uid = Number(actions.dataset.contentflowUid)
-    const title = actions.dataset.contentflowRecordTitle || ''
-    const claimedBy = Number(actions.dataset.contentflowTask)
+    const table = actions.dataset.editorialflowTable
+    const uid = Number(actions.dataset.editorialflowUid)
+    const title = actions.dataset.editorialflowRecordTitle || ''
+    const claimedBy = Number(actions.dataset.editorialflowTask)
     const onDone = () => this.onMembershipChange()
 
     const entries = []
@@ -504,17 +504,17 @@ export class TaskMarkers {
    * the page per insertion is work nobody sees.
    */
   observeMutations(doc) {
-    if (doc.body.dataset.contentflowObserved === '1') {
+    if (doc.body.dataset.editorialflowObserved === '1') {
       return
     }
-    doc.body.dataset.contentflowObserved = '1'
+    doc.body.dataset.editorialflowObserved = '1'
 
     const view = doc.defaultView
     const observer = new view.MutationObserver((mutations) => {
       // Ignore the bubbles' own insertion and removal, or marking would trigger
       // marking.
       const relevant = mutations.some((mutation) => [...mutation.addedNodes, ...mutation.removedNodes].some(
-        (node) => node.nodeType === 1 && node.dataset?.contentflowMarker !== '1',
+        (node) => node.nodeType === 1 && node.dataset?.editorialflowMarker !== '1',
       ))
       if (!relevant || this.pendingPasses.get(doc)) {
         return
@@ -553,7 +553,7 @@ export class TaskMarkers {
     entries.forEach((entry) => {
       const swatch = this.doc.createElement('button')
       swatch.type = 'button'
-      swatch.className = 'contentflow-ve-legend-swatch'
+      swatch.className = 'editorialflow-ve-legend-swatch'
       swatch.classList.toggle(ACTIVE_CLASS, entry.isActive)
       swatch.style.setProperty(HUE_PROPERTY, String(entry.hue))
       swatch.title = tooltipFor(entry).replace('\n', ' - ')
@@ -565,10 +565,10 @@ export class TaskMarkers {
       // is mine" mark the bubbles use. Long titles are cut by CSS, with the
       // full text plus stage and assignee still in the tooltip above.
       const dot = this.doc.createElement('span')
-      dot.className = 'contentflow-ve-legend-dot'
+      dot.className = 'editorialflow-ve-legend-dot'
 
       const title = this.doc.createElement('span')
-      title.className = 'contentflow-ve-legend-title'
+      title.className = 'editorialflow-ve-legend-title'
       title.textContent = entry.title
 
       swatch.append(dot, title)
@@ -602,7 +602,7 @@ export class TaskMarkers {
    * Styles.css is loaded into.
    */
   openTicket(taskUid) {
-    const url = TYPO3.settings?.ajaxUrls?.contentflow_task_ticket
+    const url = TYPO3.settings?.ajaxUrls?.editorialflow_task_ticket
     if (!url || !taskUid) {
       return
     }

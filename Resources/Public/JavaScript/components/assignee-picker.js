@@ -6,14 +6,14 @@
  * inline rather than reaching for shadow-DOM isolation.
  */
 import { LitElement, html } from 'lit'
-import labels from '~labels/content_flow.messages'
+import labels from '~labels/editorial_flow.messages'
 
 const BASE_CHOICES = [
   { value: 'me', label: labels.get('assignee.me') },
   { value: 'open', label: labels.get('assignee.open') },
 ]
 
-export class ContentFlowAssigneePicker extends LitElement {
+export class EditorialFlowAssigneePicker extends LitElement {
   static properties = {
     users: { attribute: false },
     value: { type: String },
@@ -97,7 +97,7 @@ export class ContentFlowAssigneePicker extends LitElement {
   render() {
     const options = this._filteredOptions
     return html`
-      <div class="contentflow-assignee-picker">
+      <div class="editorialflow-assignee-picker">
         <input
           type="text"
           class="form-control"
@@ -111,7 +111,7 @@ export class ContentFlowAssigneePicker extends LitElement {
           @keydown=${(event) => this._onKeydown(event)}
           @blur=${() => this._close()}
         >
-        <ul class="contentflow-assignee-options" role="listbox" ?hidden=${!this._open}>
+        <ul class="editorialflow-assignee-options" role="listbox" ?hidden=${!this._open}>
           ${options.map(
             (option, index) => html`
               <li
@@ -123,11 +123,11 @@ export class ContentFlowAssigneePicker extends LitElement {
               >${option.label}</li>
             `,
           )}
-          ${options.length === 0 ? html`<li class="contentflow-assignee-options-empty">${labels.get('assignee.noMatches')}</li>` : ''}
+          ${options.length === 0 ? html`<li class="editorialflow-assignee-options-empty">${labels.get('assignee.noMatches')}</li>` : ''}
         </ul>
       </div>
     `
   }
 }
 
-customElements.define('contentflow-assignee-picker', ContentFlowAssigneePicker)
+customElements.define('editorialflow-assignee-picker', EditorialFlowAssigneePicker)

@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository;
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskChecklistRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
-use TYPO3\CMS\Core\DataHandling\TableColumnType;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
+use TYPO3\CMS\Core\DataHandling\TableColumnType;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Imaging\IconSize;
 use TYPO3\CMS\Core\Localization\LanguageService;
@@ -300,12 +300,12 @@ final class WorkspaceIntegrationService
      */
     private function getTaskComments(int $taskUid): array
     {
-        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_contentflow_comment');
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_editorialflow_comment');
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
         return $queryBuilder
             ->select('*')
-            ->from('tx_contentflow_comment')
+            ->from('tx_editorialflow_comment')
             ->where($queryBuilder->expr()->eq('task', $queryBuilder->createNamedParameter($taskUid, \TYPO3\CMS\Core\Database\Connection::PARAM_INT)))
             ->orderBy('crdate', 'ASC')
             ->executeQuery()
@@ -332,7 +332,7 @@ final class WorkspaceIntegrationService
         int $subjectUid = 0,
     ): array {
         // One conflict check for the whole ticket, not one per member - same
-        // batching rule as PageModuleEventListener/ContentFlowController.
+        // batching rule as PageModuleEventListener/EditorialFlowController.
         $liveUidsByTable = [];
         foreach ($members as $member) {
             $liveUidsByTable[(string)$member['record_table']][] = (int)$member['record_uid'];

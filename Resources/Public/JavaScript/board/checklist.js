@@ -7,17 +7,17 @@ import AjaxRequest from '@typo3/core/ajax/ajax-request.js';
 import Notification from '@typo3/backend/notification.js';
 import Modal from '@typo3/backend/modal.js';
 import { SeverityEnum } from '@typo3/backend/enum/severity.js';
-import { topDocument } from '@gb-web/content-flow/dom-scope.js';
+import { topDocument } from '@gb-web/editorial-flow/dom-scope.js';
 
 export function registerChecklistManagement() {
   // The gear button lives on the board itself (this script's own document), not
   // inside a modal - no top-document delegation needed here.
   document.addEventListener('click', async (event) => {
-    const button = event.target.closest('.contentflow-column-checklist-manage');
+    const button = event.target.closest('.editorialflow-column-checklist-manage');
     if (button === null) {
       return;
     }
-    const column = button.closest('.contentflow-column');
+    const column = button.closest('.editorialflow-column');
     if (column === null) {
       return;
     }
@@ -33,29 +33,29 @@ export function registerChecklistManagement() {
  */
 export function registerChecklistToggle() {
   topDocument().addEventListener('change', async (event) => {
-    const checkbox = event.target.closest('[data-contentflow-checklist-toggle]');
+    const checkbox = event.target.closest('[data-editorialflow-checklist-toggle]');
     if (checkbox === null) {
       return;
     }
 
-    const taskUid = parseInt(checkbox.dataset.contentflowChecklistToggle, 10);
+    const taskUid = parseInt(checkbox.dataset.editorialflowChecklistToggle, 10);
     const itemUid = parseInt(checkbox.dataset.itemUid, 10);
     const completed = checkbox.checked;
     const previous = !completed;
     checkbox.disabled = true;
 
     try {
-      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_checklist_toggle)
+      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.editorialflow_checklist_toggle)
         .post({ task: taskUid, itemUid, completed });
       const result = await response.resolve();
       if (result.success !== true) {
-        Notification.error('Content Flow', result.message || 'Could not update the checklist.');
+        Notification.error('Editorial Flow', result.message || 'Could not update the checklist.');
         checkbox.checked = previous;
         return;
       }
-      checkbox.closest('.contentflow-checklist-item')?.classList.toggle('is-completed', completed);
+      checkbox.closest('.editorialflow-checklist-item')?.classList.toggle('is-completed', completed);
     } catch (error) {
-      Notification.error('Content Flow', 'Could not reach the server.');
+      Notification.error('Editorial Flow', 'Could not reach the server.');
       checkbox.checked = previous;
     } finally {
       checkbox.disabled = false;
@@ -75,7 +75,7 @@ export function registerChecklistToggle() {
  */
 export function registerChecklistManageActions() {
   topDocument().addEventListener('submit', async (event) => {
-    const form = event.target.closest('.contentflow-checklist-manage-add');
+    const form = event.target.closest('.editorialflow-checklist-manage-add');
     if (form === null) {
       return;
     }
@@ -93,26 +93,26 @@ export function registerChecklistManageActions() {
     submit.disabled = true;
 
     try {
-      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_checklist_add)
+      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.editorialflow_checklist_add)
         .post({ workspaceUid, stageUid, title });
       const result = await response.resolve();
       if (result.success !== true) {
-        Notification.error('Content Flow', result.message || 'Could not add that checklist item.');
+        Notification.error('Editorial Flow', result.message || 'Could not add that checklist item.');
         return;
       }
-      const list = form.closest('.contentflow-checklist-manage').querySelector('.contentflow-checklist-manage-list');
-      list.querySelector('.contentflow-empty')?.remove();
+      const list = form.closest('.editorialflow-checklist-manage').querySelector('.editorialflow-checklist-manage-list');
+      list.querySelector('.editorialflow-empty')?.remove();
       list.appendChild(buildManageItemRow(workspaceUid, result.item));
       input.value = '';
     } catch (error) {
-      Notification.error('Content Flow', 'Could not reach the server.');
+      Notification.error('Editorial Flow', 'Could not reach the server.');
     } finally {
       submit.disabled = false;
     }
   });
 
   topDocument().addEventListener('click', async (event) => {
-    const removeButton = event.target.closest('.contentflow-checklist-manage-remove');
+    const removeButton = event.target.closest('.editorialflow-checklist-manage-remove');
     if (removeButton === null) {
       return;
     }
@@ -122,21 +122,21 @@ export function registerChecklistManageActions() {
     removeButton.disabled = true;
 
     try {
-      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_checklist_remove)
+      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.editorialflow_checklist_remove)
         .post({ workspaceUid, itemUid });
       const result = await response.resolve();
       if (result.success !== true) {
-        Notification.error('Content Flow', result.message || 'Could not remove that checklist item.');
+        Notification.error('Editorial Flow', result.message || 'Could not remove that checklist item.');
         removeButton.disabled = false;
         return;
       }
-      const list = removeButton.closest('.contentflow-checklist-manage-list');
+      const list = removeButton.closest('.editorialflow-checklist-manage-list');
       removeButton.closest('li').remove();
       if (list.children.length === 0) {
         list.appendChild(buildEmptyRow());
       }
     } catch (error) {
-      Notification.error('Content Flow', 'Could not reach the server.');
+      Notification.error('Editorial Flow', 'Could not reach the server.');
       removeButton.disabled = false;
     }
   });
@@ -144,7 +144,7 @@ export function registerChecklistManageActions() {
 
 function buildEmptyRow() {
   const empty = document.createElement('li');
-  empty.className = 'contentflow-empty';
+  empty.className = 'editorialflow-empty';
   empty.textContent = 'No checklist items yet.';
   return empty;
 }
@@ -157,7 +157,7 @@ function buildManageItemRow(workspaceUid, item) {
 
   const removeButton = document.createElement('button');
   removeButton.type = 'button';
-  removeButton.className = 'btn btn-xs btn-default contentflow-checklist-manage-remove';
+  removeButton.className = 'btn btn-xs btn-default editorialflow-checklist-manage-remove';
   removeButton.dataset.workspaceUid = String(workspaceUid);
   removeButton.dataset.itemUid = String(item.uid);
   removeButton.textContent = 'Remove';
@@ -167,20 +167,20 @@ function buildManageItemRow(workspaceUid, item) {
 }
 
 function openManageModal(column) {
-  const workspaceUid = parseInt(column.dataset.contentflowWorkspace || '0', 10);
-  const stageUid = parseInt(column.dataset.contentflowStage || '0', 10);
+  const workspaceUid = parseInt(column.dataset.editorialflowWorkspace || '0', 10);
+  const stageUid = parseInt(column.dataset.editorialflowStage || '0', 10);
   let items = [];
   try {
-    items = JSON.parse(column.dataset.contentflowChecklistItems || '[]');
+    items = JSON.parse(column.dataset.editorialflowChecklistItems || '[]');
   } catch {
     items = [];
   }
 
   const content = document.createElement('div');
-  content.className = 'contentflow-checklist-manage';
+  content.className = 'editorialflow-checklist-manage';
 
   const list = document.createElement('ul');
-  list.className = 'contentflow-checklist-manage-list';
+  list.className = 'editorialflow-checklist-manage-list';
   if (items.length === 0) {
     list.appendChild(buildEmptyRow());
   } else {
@@ -192,7 +192,7 @@ function openManageModal(column) {
   // via top-document delegation, since Modal.advanced() does not preserve listeners
   // bound to `content` before the hand-off (see that function's comment).
   const form = document.createElement('form');
-  form.className = 'contentflow-checklist-manage-add';
+  form.className = 'editorialflow-checklist-manage-add';
   form.dataset.workspaceUid = String(workspaceUid);
   form.dataset.stageUid = String(stageUid);
   const input = document.createElement('input');

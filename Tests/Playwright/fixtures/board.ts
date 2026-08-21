@@ -7,10 +7,10 @@ import { type Frame, type Page, expect } from '@playwright/test'
  * mixing them up is why a locator silently matches nothing.
  */
 
-export const boardPageId = process.env.CONTENTFLOW_TEST_PAGE_ID ?? '1'
+export const boardPageId = process.env.EDITORIALFLOW_TEST_PAGE_ID ?? '1'
 
 export async function openBoard(page: Page, pageId: string = boardPageId): Promise<Frame> {
-  await page.goto(`/typo3/module/web/contentflow?id=${pageId}`)
+  await page.goto(`/typo3/module/web/editorialflow?id=${pageId}`)
 
   /*
    * page.frame() is a synchronous look at the frames attached at that instant,
@@ -24,7 +24,7 @@ export async function openBoard(page: Page, pageId: string = boardPageId): Promi
     throw new Error('The backend content iframe (list_frame) never appeared.')
   }
 
-  await expect(frame.locator('[data-contentflow-column]').first()).toBeVisible()
+  await expect(frame.locator('[data-editorialflow-column]').first()).toBeVisible()
 
   return frame
 }
@@ -47,7 +47,7 @@ export function openVisualEditor(page: Page, pageId: string = boardPageId) {
       // The select is inserted by wizard.js from the chrome document once the
       // module document has loaded, so waiting on the module's own toolbar
       // first would still race the insertion.
-      await expect(moduleFrame.locator('.contentflow-ve-task-select select')).toBeVisible({ timeout: 20000 })
+      await expect(moduleFrame.locator('.editorialflow-ve-task-select select')).toBeVisible({ timeout: 20000 })
 
       return moduleFrame
     },
@@ -67,7 +67,7 @@ export function taskWizardModal(page: Page) {
 }
 
 export async function openTaskWizard(page: Page, frame: Frame) {
-  const trigger = frame.locator('[data-contentflow-action="create-task"]').first()
+  const trigger = frame.locator('[data-editorialflow-action="create-task"]').first()
   const modal = taskWizardModal(page)
 
   /*

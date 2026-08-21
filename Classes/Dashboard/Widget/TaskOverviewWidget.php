@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Dashboard\Widget;
+namespace GbWeb\EditorialFlow\Dashboard\Widget;
 
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Database\Connection;
@@ -39,7 +39,7 @@ final readonly class TaskOverviewWidget implements WidgetRendererInterface
 
     public function renderWidget(WidgetContext $context): WidgetResult
     {
-        $view = $this->backendViewFactory->create($context->request, ['gb-web/content-flow']);
+        $view = $this->backendViewFactory->create($context->request, ['gb-web/editorial-flow']);
         $view->assignMultiple([
             'countsByState' => $this->countByState(),
             'unassigned' => $this->countUnassigned(),
@@ -59,13 +59,13 @@ final readonly class TaskOverviewWidget implements WidgetRendererInterface
      */
     private function countByState(): array
     {
-        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_contentflow_task');
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_editorialflow_task');
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
         $rows = $queryBuilder
             ->select('state')
             ->addSelectLiteral($queryBuilder->expr()->count('uid', 'amount'))
-            ->from('tx_contentflow_task')
+            ->from('tx_editorialflow_task')
             ->where($queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)))
             ->groupBy('state')
             ->executeQuery()
@@ -81,12 +81,12 @@ final readonly class TaskOverviewWidget implements WidgetRendererInterface
 
     private function countUnassigned(): int
     {
-        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_contentflow_task');
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_editorialflow_task');
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
         return (int)$queryBuilder
             ->count('uid')
-            ->from('tx_contentflow_task')
+            ->from('tx_editorialflow_task')
             ->where(
                 $queryBuilder->expr()->eq('assignee', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),
                 $queryBuilder->expr()->eq('closed', $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)),

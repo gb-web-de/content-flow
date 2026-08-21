@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\View;
+namespace GbWeb\EditorialFlow\Tests\Functional\View;
 
-use GbWeb\ContentFlow\Service\TaskColor;
+use GbWeb\EditorialFlow\Service\TaskColor;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\View\ViewFactoryData;
 use TYPO3\CMS\Core\View\ViewFactoryInterface;
@@ -35,20 +35,20 @@ final class TemplateRendersTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     private function render(array $variables): string
     {
         $viewFactory = $this->get(ViewFactoryInterface::class);
         $view = $viewFactory->create(new ViewFactoryData(
-            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
-            partialRootPaths: ['EXT:content_flow/Resources/Private/Partials/'],
-            layoutRootPaths: ['EXT:content_flow/Resources/Private/Layouts/'],
+            templateRootPaths: ['EXT:editorial_flow/Resources/Private/Templates/'],
+            partialRootPaths: ['EXT:editorial_flow/Resources/Private/Partials/'],
+            layoutRootPaths: ['EXT:editorial_flow/Resources/Private/Layouts/'],
         ));
         $view->assignMultiple($variables);
 
-        return $view->render('ContentFlow/Index');
+        return $view->render('EditorialFlow/Index');
     }
 
     #[Test]
@@ -91,10 +91,10 @@ final class TemplateRendersTest extends FunctionalTestCase
         self::assertStringContainsString('About us', $output);
         self::assertStringContainsString('pages:2', $output);
         // The badge that marks a task nobody planned.
-        self::assertStringContainsString('contentflow-badge-auto', $output);
-        self::assertStringContainsString('data-contentflow-state="review"', $output);
-        self::assertStringContainsString('data-contentflow-stage="1"', $output);
-        self::assertStringContainsString('data-contentflow-workspace="1"', $output);
+        self::assertStringContainsString('editorialflow-badge-auto', $output);
+        self::assertStringContainsString('data-editorialflow-state="review"', $output);
+        self::assertStringContainsString('data-editorialflow-stage="1"', $output);
+        self::assertStringContainsString('data-editorialflow-workspace="1"', $output);
         // The live region every board change is announced through.
         self::assertStringContainsString('aria-live="polite"', $output);
     }
@@ -132,7 +132,7 @@ final class TemplateRendersTest extends FunctionalTestCase
             ],
         ]);
 
-        self::assertStringContainsString('contentflow-column-subtitle--collapsible', $output);
+        self::assertStringContainsString('editorialflow-column-subtitle--collapsible', $output);
         self::assertStringContainsString('5 workspaces', $output);
         self::assertStringContainsString('Editorial, Legal, Marketing, Sales, Support', $output);
     }
@@ -159,7 +159,7 @@ final class TemplateRendersTest extends FunctionalTestCase
             ],
         ]);
 
-        self::assertStringNotContainsString('contentflow-column-subtitle--collapsible', $output);
+        self::assertStringNotContainsString('editorialflow-column-subtitle--collapsible', $output);
         self::assertStringContainsString('Editorial, Legal', $output);
     }
 
@@ -191,7 +191,7 @@ final class TemplateRendersTest extends FunctionalTestCase
         // Asserted on the auto badge's own class, not on the badge container:
         // the container renders unconditionally, so a looser substring check passed
         // for the wrong reason.
-        self::assertStringNotContainsString('contentflow-badge-auto', $output);
+        self::assertStringNotContainsString('editorialflow-badge-auto', $output);
     }
 
     #[Test]
@@ -199,20 +199,20 @@ final class TemplateRendersTest extends FunctionalTestCase
     {
         $viewFactory = $this->get(ViewFactoryInterface::class);
         $view = $viewFactory->create(new ViewFactoryData(
-            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
+            templateRootPaths: ['EXT:editorial_flow/Resources/Private/Templates/'],
         ));
         $view->assignMultiple([
             'pageUid' => 2,
             'pageTitle' => 'About us',
             'tasks' => [],
             'activeTaskUid' => 0,
-            'boardUrl' => '/typo3/module/web/ContentFlow?id=2',
+            'boardUrl' => '/typo3/module/web/EditorialFlow?id=2',
         ]);
 
         $output = $view->render('PageModule/Banner');
 
-        self::assertStringContainsString('data-contentflow-page="2"', $output);
-        self::assertStringContainsString('data-contentflow-page-title="About us"', $output);
+        self::assertStringContainsString('data-editorialflow-page="2"', $output);
+        self::assertStringContainsString('data-editorialflow-page-title="About us"', $output);
         self::assertStringContainsString('Plan task for this page', $output);
     }
 
@@ -226,7 +226,7 @@ final class TemplateRendersTest extends FunctionalTestCase
     {
         $viewFactory = $this->get(ViewFactoryInterface::class);
         $view = $viewFactory->create(new ViewFactoryData(
-            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
+            templateRootPaths: ['EXT:editorial_flow/Resources/Private/Templates/'],
         ));
         $view->assignMultiple([
             'pageUid' => 2,
@@ -252,7 +252,7 @@ final class TemplateRendersTest extends FunctionalTestCase
                 ],
             ],
             'activeTaskUid' => 7,
-            'boardUrl' => '/typo3/module/web/ContentFlow?id=2',
+            'boardUrl' => '/typo3/module/web/EditorialFlow?id=2',
         ]);
 
         $output = $view->render('PageModule/Banner');
@@ -260,12 +260,12 @@ final class TemplateRendersTest extends FunctionalTestCase
         self::assertStringContainsString('Rewrite the intro', $output);
         self::assertStringContainsString('Fix the footer', $output);
         // Colour is never the only signal - the active task says so in words too.
-        self::assertStringContainsString('contentflow-page-banner-task--active', $output);
+        self::assertStringContainsString('editorialflow-page-banner-task--active', $output);
         self::assertStringContainsString('you are working on this', $output);
         // Each dot carries the same hue the Visual Editor draws that task in.
-        self::assertStringContainsString('--contentflow-task-hue: ' . TaskColor::hueFor(7), $output);
+        self::assertStringContainsString('--editorialflow-task-hue: ' . TaskColor::hueFor(7), $output);
         // Only the unassigned one offers to be taken.
-        self::assertSame(1, substr_count($output, 'contentflow-action-assign'));
+        self::assertSame(1, substr_count($output, 'editorialflow-action-assign'));
     }
 
     #[Test]
@@ -273,7 +273,7 @@ final class TemplateRendersTest extends FunctionalTestCase
     {
         $viewFactory = $this->get(ViewFactoryInterface::class);
         $view = $viewFactory->create(new ViewFactoryData(
-            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
+            templateRootPaths: ['EXT:editorial_flow/Resources/Private/Templates/'],
         ));
         $view->assignMultiple([
             'task' => [
@@ -316,7 +316,7 @@ final class TemplateRendersTest extends FunctionalTestCase
             'comments' => [],
         ]);
 
-        $output = $view->render('ContentFlow/Ticket');
+        $output = $view->render('EditorialFlow/Ticket');
 
         self::assertStringContainsString('About us', $output);
         // An unassigned task must read as "take me", not as an empty field.
@@ -334,8 +334,8 @@ final class TemplateRendersTest extends FunctionalTestCase
         // ... and can be acted on right there: this member has no pending
         // version in this fixture, and split/move are deliberately NOT gated on
         // one - moving work that has not started yet is planning.
-        self::assertStringContainsString('data-contentflow-split="1"', $output);
-        self::assertStringContainsString('data-contentflow-move="1"', $output);
+        self::assertStringContainsString('data-editorialflow-split="1"', $output);
+        self::assertStringContainsString('data-editorialflow-move="1"', $output);
         // Comments are no longer a separate panel - they live inside the timeline
         // entry they explain, so there is no standalone "comments" list any more.
         self::assertStringNotContainsString('No comments yet', $output);
@@ -352,7 +352,7 @@ final class TemplateRendersTest extends FunctionalTestCase
     {
         $viewFactory = $this->get(ViewFactoryInterface::class);
         $view = $viewFactory->create(new ViewFactoryData(
-            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
+            templateRootPaths: ['EXT:editorial_flow/Resources/Private/Templates/'],
         ));
         $view->assignMultiple([
             'task' => ['uid' => 1, 'state' => 'backlog', 'priority' => 2, 'workspace_uid' => 0, 'subject_pid' => 2],
@@ -372,10 +372,10 @@ final class TemplateRendersTest extends FunctionalTestCase
             'comments' => [],
         ]);
 
-        $output = $view->render('ContentFlow/Ticket');
+        $output = $view->render('EditorialFlow/Ticket');
 
-        self::assertStringNotContainsString('data-contentflow-split', $output);
-        self::assertStringNotContainsString('data-contentflow-move', $output);
+        self::assertStringNotContainsString('data-editorialflow-split', $output);
+        self::assertStringNotContainsString('data-editorialflow-move', $output);
     }
 
     #[Test]
@@ -383,7 +383,7 @@ final class TemplateRendersTest extends FunctionalTestCase
     {
         $viewFactory = $this->get(ViewFactoryInterface::class);
         $view = $viewFactory->create(new ViewFactoryData(
-            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
+            templateRootPaths: ['EXT:editorial_flow/Resources/Private/Templates/'],
         ));
         $view->assignMultiple([
             'task' => ['uid' => 1, 'state' => 'backlog', 'priority' => 2, 'workspace_uid' => 0, 'subject_pid' => 2],
@@ -397,7 +397,7 @@ final class TemplateRendersTest extends FunctionalTestCase
             'comments' => [],
         ]);
 
-        $output = $view->render('ContentFlow/Ticket');
+        $output = $view->render('EditorialFlow/Ticket');
 
         // TYPO3 drops change history after 30 days by default. Saying so turns a
         // confusing blank panel into an explained one - "nothing here" must not

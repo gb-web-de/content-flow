@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Post-start setup for the content_flow extension development instance.
+# Post-start setup for the editorial_flow extension development instance.
 #
 # Modelled on the TYPO3 core "tryout" scaffold's post-start hook, which solves the
 # three things that made the previous inline-hook version fail silently:
@@ -25,7 +25,7 @@ warn()    { echo -e "  ${YELLOW}!${NC} $1"; }
 error()   { echo -e "  ${RED}✗${NC} $1" >&2; }
 
 echo ""
-echo -e "${BOLD}Content Flow — dev instance setup${NC}"
+echo -e "${BOLD}Editorial Flow — dev instance setup${NC}"
 echo "═══════════════════════════════════════"
 
 # --- 1/4 Composer ---------------------------------------------------------
@@ -78,16 +78,16 @@ success "extensions ready"
 # distribution can provide.
 #
 # There is no TTY here, so the command keeps whatever already exists rather than
-# asking. Use `ddev contentflow-demo` for the interactive path.
+# asking. Use `ddev editorialflow-demo` for the interactive path.
 info "[4/4] demo content + workspace"
-.Build/bin/typo3 contentflow:democontent --no-interaction || warn "demo content step reported warnings"
+.Build/bin/typo3 editorialflow:democontent --no-interaction || warn "demo content step reported warnings"
 
 echo "═══════════════════════════════════════"
 success "ready"
 echo ""
-echo -e "  ${BOLD}Backend:${NC} ${DDEV_PRIMARY_URL:-https://content-flow.ddev.site}/typo3/"
+echo -e "  ${BOLD}Backend:${NC} ${DDEV_PRIMARY_URL:-https://editorial-flow.ddev.site}/typo3/"
 echo -e "  ${BOLD}Login:${NC}   admin / Password.1"
-echo -e "  ${BOLD}Module:${NC}  Web → Content Flow (switch to the 'Editorial' workspace first)"
+echo -e "  ${BOLD}Module:${NC}  Web → Editorial Flow (switch to the 'Editorial' workspace first)"
 echo ""
-echo -e "  ${BOLD}Demo data:${NC} ddev contentflow-demo    (re-check / recreate, asks first)"
+echo -e "  ${BOLD}Demo data:${NC} ddev editorialflow-demo    (re-check / recreate, asks first)"
 echo ""

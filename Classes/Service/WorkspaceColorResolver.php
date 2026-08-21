@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 

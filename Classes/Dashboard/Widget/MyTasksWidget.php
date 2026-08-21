@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Dashboard\Widget;
+namespace GbWeb\EditorialFlow\Dashboard\Widget;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Settings\SettingDefinition;
 use TYPO3\CMS\Dashboard\Widgets\WidgetConfigurationInterface;
@@ -56,7 +56,7 @@ final readonly class MyTasksWidget implements WidgetRendererInterface
             : (int)($this->options['limit'] ?? 10);
         $beUserId = (int)($this->getBackendUser()['uid'] ?? 0);
 
-        $view = $this->backendViewFactory->create($context->request, ['gb-web/content-flow']);
+        $view = $this->backendViewFactory->create($context->request, ['gb-web/editorial-flow']);
         $view->assignMultiple([
             'tasks' => $beUserId > 0 ? $this->taskRepository->findOpenByAssignee($beUserId, $limit) : [],
             'configuration' => $this->configuration,

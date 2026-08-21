@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\EventListener;
+namespace GbWeb\EditorialFlow\Tests\Functional\EventListener;
 
-use GbWeb\ContentFlow\Domain\Model\TaskState;
-use GbWeb\ContentFlow\EventListener\ContentElementTaskBadgeListener;
-use GbWeb\ContentFlow\Service\ActiveTaskSession;
-use GbWeb\ContentFlow\Service\TaskColor;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\EventListener\ContentElementTaskBadgeListener;
+use GbWeb\EditorialFlow\Service\ActiveTaskSession;
+use GbWeb\EditorialFlow\Service\TaskColor;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Backend\View\Event\AfterPageContentPreviewRenderedEvent;
 use TYPO3\CMS\Backend\View\PageLayoutContext;
@@ -34,7 +34,7 @@ final class ContentElementTaskBadgeListenerTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void
@@ -61,8 +61,8 @@ final class ContentElementTaskBadgeListenerTest extends FunctionalTestCase
      */
     private function createTask(array $overrides = []): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
-        $connection->insert('tx_contentflow_task', array_merge([
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task');
+        $connection->insert('tx_editorialflow_task', array_merge([
             'title' => 'Rewrite the intro',
             'subject_table' => 'pages',
             'subject_uid' => 2,
@@ -77,8 +77,8 @@ final class ContentElementTaskBadgeListenerTest extends FunctionalTestCase
 
     private function addMember(int $taskUid, int $recordUid): void
     {
-        $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task_item')->insert(
-            'tx_contentflow_task_item',
+        $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task_item')->insert(
+            'tx_editorialflow_task_item',
             ['task' => $taskUid, 'record_table' => 'tt_content', 'record_uid' => $recordUid, 'pid' => 2, 'closed' => 0],
         );
     }
@@ -114,10 +114,10 @@ final class ContentElementTaskBadgeListenerTest extends FunctionalTestCase
 
         $output = $this->renderPreviewFor(10);
 
-        self::assertStringContainsString('contentflow-element-badge', $output);
+        self::assertStringContainsString('editorialflow-element-badge', $output);
         // Never colour alone - the task is named, not just tinted.
         self::assertStringContainsString('Rewrite the intro', $output);
-        self::assertStringContainsString('--contentflow-task-hue: ' . TaskColor::hueFor($taskUid), $output);
+        self::assertStringContainsString('--editorialflow-task-hue: ' . TaskColor::hueFor($taskUid), $output);
         // The element's own preview survives; the badge is added, not swapped in.
         self::assertStringContainsString('the element as it renders today', $output);
     }
@@ -145,7 +145,7 @@ final class ContentElementTaskBadgeListenerTest extends FunctionalTestCase
 
         $output = $this->renderPreviewFor(10);
 
-        self::assertStringContainsString('contentflow-element-badge--active', $output);
+        self::assertStringContainsString('editorialflow-element-badge--active', $output);
     }
 
     /**
@@ -162,8 +162,8 @@ final class ContentElementTaskBadgeListenerTest extends FunctionalTestCase
 
         $output = $this->renderPreviewFor(10);
 
-        self::assertStringContainsString('data-contentflow-split="1"', $output);
-        self::assertStringContainsString('data-contentflow-move="1"', $output);
+        self::assertStringContainsString('data-editorialflow-split="1"', $output);
+        self::assertStringContainsString('data-editorialflow-move="1"', $output);
         self::assertStringContainsString('data-table="tt_content"', $output);
         self::assertStringContainsString('data-uid="10"', $output);
         // The dialogs say which record they are about, so the badge has to name it.
@@ -183,8 +183,8 @@ final class ContentElementTaskBadgeListenerTest extends FunctionalTestCase
 
         $output = $this->renderPreviewFor(10);
 
-        self::assertStringNotContainsString('data-contentflow-split', $output);
-        self::assertStringContainsString('data-contentflow-move="1"', $output);
+        self::assertStringNotContainsString('data-editorialflow-split', $output);
+        self::assertStringContainsString('data-editorialflow-move="1"', $output);
     }
 
     #[Test]
@@ -195,6 +195,6 @@ final class ContentElementTaskBadgeListenerTest extends FunctionalTestCase
 
         $output = $this->renderPreviewFor(10);
 
-        self::assertStringNotContainsString('contentflow-element-badge', $output);
+        self::assertStringNotContainsString('editorialflow-element-badge', $output);
     }
 }

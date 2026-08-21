@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\EventListener;
+namespace GbWeb\EditorialFlow\EventListener;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
-use GbWeb\ContentFlow\Service\ActivityLogger;
-use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Service\ActivityLogger;
+use GbWeb\EditorialFlow\Service\TaskMemberSynchronizer;
 use TYPO3\CMS\Core\Attribute\AsEventListener;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Workspaces\Event\AfterRecordPublishedEvent;
@@ -26,7 +26,7 @@ use TYPO3\CMS\Workspaces\Event\AfterRecordPublishedEvent;
  * Nothing is snapshotted here. Core migrates the version's sys_history rows onto
  * the live uid a few lines after dispatching this event
  * (RecordHistoryStore::publishRecord -> migrateWorkspaceHistory), so the trail
- * survives publishing on its own. What Content Flow keeps durably is written when
+ * survives publishing on its own. What Editorial Flow keeps durably is written when
  * each decision is made - see ActivityLogger.
  */
 final class CloseTaskAfterPublishListener
@@ -38,7 +38,7 @@ final class CloseTaskAfterPublishListener
     ) {
     }
 
-    #[AsEventListener(identifier: 'content-flow/close-task-after-publish')]
+    #[AsEventListener(identifier: 'editorial-flow/close-task-after-publish')]
     public function __invoke(AfterRecordPublishedEvent $event): void
     {
         $task = $this->taskRepository->findOpenTaskByMember($event->getTable(), $event->getRecordId());

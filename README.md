@@ -1,4 +1,4 @@
-# TYPO3 Extension `Content Flow`
+# TYPO3 Extension `Editorial Flow`
 
 An editorial task board for TYPO3 v14. It puts a **backlog in front of TYPO3 workspaces** and
 an **archive behind them**, and lets the workspace do the approval work in between.
@@ -8,11 +8,11 @@ Depends on TYPO3 core only — no third-party extensions.
 ```
  Backlog   Planned  │  In Progress   Review…   Ready  │  Done
  ─────────────────  │  ─────────────────────────────  │  ────────
-    Content Flow    │   TYPO3 core workspace stages   │  Content Flow
+    Editorial Flow    │   TYPO3 core workspace stages   │  Editorial Flow
 ```
 
 **Tasks open themselves.** An editor who just opens a page and starts typing gets a workspace
-version from TYPO3 and a task from Content Flow, without asking for either. When the version
+version from TYPO3 and a task from Editorial Flow, without asking for either. When the version
 goes live, the task closes with its history frozen into it.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the data model, the history-storage decision and the
@@ -34,9 +34,9 @@ installs TYPO3 v14 (once — it is guarded, not re-run on every start), sets up 
 and creates demo content. It aborts loudly on failure rather than leaving a half-built
 instance behind.
 
-- Frontend: https://content-flow.ddev.site/
-- Backend: https://content-flow.ddev.site/typo3/ (`admin` / `Password.1`)
-- Module: **Web → Content Flow**
+- Frontend: https://editorial-flow.ddev.site/
+- Backend: https://editorial-flow.ddev.site/typo3/ (`admin` / `Password.1`)
+- Module: **Web → Editorial Flow**
 
 **To see the workflow:** switch into the *Editorial* workspace (created by the demo step, with
 two review stages), open one of the demo pages, and change something. A card appears on the
@@ -52,10 +52,10 @@ exclusive with `--create-site`/`TYPO3_SETUP_CREATE_SITE` — the distribution cr
 configuration itself.
 
 What no distribution can provide is a **workspace with custom review stages**, and without
-those the board shows only the two fixed core stages. `content_flow` adds that:
+those the board shows only the two fixed core stages. `editorial_flow` adds that:
 
 ```bash
-ddev contentflow-demo
+ddev editorialflow-demo
 ```
 
 It verifies the Camino content arrived and creates the *Editorial* workspace with the stages
@@ -64,7 +64,7 @@ deletes the workspace and any versions inside it) only happens after you confirm
 `--force`.
 
 > During `ddev start` the same command runs non-interactively. DDEV hooks have no TTY, so it
-> can only report and keep, never ask — use `ddev contentflow-demo` when you want the prompt.
+> can only report and keep, never ask — use `ddev editorialflow-demo` when you want the prompt.
 
 `typo3/cms-styleguide` is also installed if you want bulk TCA test records on top (backend
 module *System → Styleguide*).
@@ -75,7 +75,7 @@ module *System → Styleguide*).
 ddev composer install
 ddev exec .Build/bin/typo3 setup --no-interaction --force --server-type=other
 ddev exec .Build/bin/typo3 extension:setup
-ddev contentflow-demo
+ddev editorialflow-demo
 ```
 
 (The `setup` call picks up database, admin user and `TYPO3_SETUP_DISTRIBUTION` from the
@@ -102,11 +102,11 @@ unique across worktrees:
 
 ```bash
 npm ci && npx playwright install --with-deps chromium
-CONTENTFLOW_BASE_URL=$(ddev describe -j | jq -r .raw.primary_url) npm run test:e2e
+EDITORIALFLOW_BASE_URL=$(ddev describe -j | jq -r .raw.primary_url) npm run test:e2e
 ```
 
 CI serves the same installation without DDEV: `typo3 setup` on SQLite,
-`extension:setup` for the Camino content, `contentflow:democontent` for the
+`extension:setup` for the Camino content, `editorialflow:democontent` for the
 workspace, then PHP's built-in server via
 [`Build/playwright/router.php`](Build/playwright/router.php).
 

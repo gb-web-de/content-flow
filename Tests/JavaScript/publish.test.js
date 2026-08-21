@@ -32,15 +32,15 @@ describe('publishing a task', () => {
     resetModals()
     document.body.innerHTML = ''
     button = document.createElement('button')
-    button.className = 'contentflow-action-publish'
+    button.className = 'editorialflow-action-publish'
     button.dataset.taskUid = '9'
     button.dataset.taskTitle = 'Nordheidehalle (Buchholz)'
     document.body.appendChild(button)
 
     global.TYPO3 = {
       settings: {
-        ContentFlow: { canPublish: true },
-        ajaxUrls: { contentflow_task_publish: '/publish' },
+        EditorialFlow: { canPublish: true },
+        ajaxUrls: { editorialflow_task_publish: '/publish' },
       },
     }
     vi.stubGlobal('location', { reload: vi.fn() })
@@ -91,6 +91,46 @@ describe('publishing a task', () => {
 
     expect(notifications[0].severity).toBe('error')
     expect(notifications[0].message).toBe('This task belongs to another workspace.')
+    expect(window.location.reload).not.toHaveBeenCalled()
+  })
+
+  /*
+   * AjaxRequest throws on the 400 TaskAjaxController::publishTaskAction()
+   * actually answers with for every rejection - the real bug behind the
+   * generic "Server error while publishing." toast an editor used to see for
+   * a task like "still pending review in another workspace", which is
+   * anything but a server error. `behaviour.resolved` alone (used above)
+   * never exercised this path.
+   */
+  it('keeps the server\'s message when it answers with a rejection status', async () => {
+    behaviour.rejectWith = {
+      resolve: async () => ({
+        success: false,
+        code: 'pending-in-other-workspace',
+        message: 'This record is still pending review in Redaktion Buchholz, not here yet.',
+      }),
+    }
+
+    button.click()
+    await Promise.resolve()
+    await press('ok')
+    await flush()
+
+    expect(notifications[0].severity).toBe('error')
+    expect(notifications[0].message).toBe('This record is still pending review in Redaktion Buchholz, not here yet.')
+    expect(window.location.reload).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the generic message when a rejection carries no body at all', async () => {
+    behaviour.rejectWith = new TypeError('Failed to fetch')
+
+    button.click()
+    await Promise.resolve()
+    await press('ok')
+    await flush()
+
+    expect(notifications[0].severity).toBe('error')
+    expect(notifications[0].message).toBe('Server error while publishing.')
     expect(window.location.reload).not.toHaveBeenCalled()
   })
 })

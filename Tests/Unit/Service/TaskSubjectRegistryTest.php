@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Unit\Service;
+namespace GbWeb\EditorialFlow\Tests\Unit\Service;
 
-use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
+use GbWeb\EditorialFlow\Service\TaskSubjectRegistry;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\Schema\TcaSchema;
 use TYPO3\CMS\Core\Schema\TcaSchemaFactory;
@@ -32,7 +32,7 @@ final class TaskSubjectRegistryTest extends UnitTestCase
 
     protected function tearDown(): void
     {
-        unset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']);
+        unset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['editorial_flow']);
         parent::tearDown();
     }
 
@@ -48,7 +48,7 @@ final class TaskSubjectRegistryTest extends UnitTestCase
     #[Test]
     public function configuredTablesBecomeSubjects(): void
     {
-        $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['subjectTables'] = ['tx_news_domain_model_news'];
+        $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['editorial_flow']['subjectTables'] = ['tx_news_domain_model_news'];
         $registry = $this->registryFor('pages', 'tt_content', 'tx_news_domain_model_news');
 
         // A news record is a record, but behaves like a page - so it gets its own task.
@@ -66,7 +66,7 @@ final class TaskSubjectRegistryTest extends UnitTestCase
     #[Test]
     public function aSubjectResolvesToItself(): void
     {
-        $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['subjectTables'] = ['tx_news_domain_model_news'];
+        $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['editorial_flow']['subjectTables'] = ['tx_news_domain_model_news'];
         $registry = $this->registryFor('pages', 'tx_news_domain_model_news');
 
         self::assertSame(

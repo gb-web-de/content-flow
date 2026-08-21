@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Workspaces\Service\StagesService;
 
@@ -44,7 +44,7 @@ final readonly class PendingPageClaimService
 
         $workspaceUid = (int)$backendUser->workspace;
         if ($workspaceUid < 1) {
-            // The wizard was used on Live. Content Flow's workflow starts when
+            // The wizard was used on Live. Editorial Flow's workflow starts when
             // work becomes reviewable, so there is nothing to attach the ticket
             // to yet - and claiming the page without a workspace would leave the
             // ticket claiming to be in Editing with nothing pending.

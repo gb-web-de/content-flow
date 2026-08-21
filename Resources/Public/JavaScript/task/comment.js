@@ -9,21 +9,21 @@
  */
 import AjaxRequest from '@typo3/core/ajax/ajax-request.js';
 import Notification from '@typo3/backend/notification.js';
-import { topDocument } from '@gb-web/content-flow/dom-scope.js';
+import { topDocument } from '@gb-web/editorial-flow/dom-scope.js';
 
 export function registerCommentForm() {
   topDocument().addEventListener('submit', async (event) => {
-    const form = event.target.closest('[data-contentflow-comment-form]');
+    const form = event.target.closest('[data-editorialflow-comment-form]');
     if (form === null) {
       return;
     }
     event.preventDefault();
 
-    const taskUid = parseInt(form.dataset.contentflowCommentForm, 10);
+    const taskUid = parseInt(form.dataset.editorialflowCommentForm, 10);
     const textarea = form.querySelector('textarea');
     const content = textarea.value.trim();
     if (content === '') {
-      Notification.warning('Content Flow', 'The comment is empty.');
+      Notification.warning('Editorial Flow', 'The comment is empty.');
       textarea.focus();
       return;
     }
@@ -32,23 +32,23 @@ export function registerCommentForm() {
     button.disabled = true;
 
     try {
-      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_task_comment)
+      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.editorialflow_task_comment)
         .post({ task: taskUid, content });
       const result = await response.resolve();
 
       if (result.success !== true) {
-        Notification.error('Content Flow', result.message || 'Could not post the comment.');
+        Notification.error('Editorial Flow', result.message || 'Could not post the comment.');
         button.disabled = false;
         return;
       }
 
-      Notification.success('Content Flow', 'Comment posted.');
+      Notification.success('Editorial Flow', 'Comment posted.');
       // Reload so the comment appears in the timeline in its correct
       // chronological place, rather than being appended client-side and
       // disagreeing with the server on ordering.
       window.location.reload();
     } catch (error) {
-      Notification.error('Content Flow', 'Could not reach the server.');
+      Notification.error('Editorial Flow', 'Could not reach the server.');
       button.disabled = false;
     }
   });

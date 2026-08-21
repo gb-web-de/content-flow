@@ -59,9 +59,9 @@ once it is *at* one of those two stages. This is unrelated to `responsible_perso
 **Where this bit us**: `BoardColumnRegistry` and the board's drag-and-drop
 coloring were first built checking `isAllowed` against the **drop target**
 column. Fixed to check the **card's own current stage** instead
-(`ContentFlowController::buildBoard()` builds a `stageUid → isAllowed` map from
+(`EditorialFlowController::buildBoard()` builds a `stageUid → isAllowed` map from
 the columns and stamps `canAct` onto each task; `board.js` gates
-`canDropCardIntoColumn()` off `card.dataset.contentflowCanAct`, not the column).
+`canDropCardIntoColumn()` off `card.dataset.editorialflowCanAct`, not the column).
 
 ## `custom_stages` is a maintained counter, not a boolean
 
@@ -77,7 +77,7 @@ if ($workspaceRec['custom_stages'] > 0 && $stage !== 0 && $stage !== -10) {
 }
 ```
 
-**Where this bit us**: `contentflow:democontent` originally created stage records
+**Where this bit us**: `editorialflow:democontent` originally created stage records
 with a *second*, separate `DataHandler` call setting `parentid` directly - never
 going through the workspace's own `custom_stages` field, so core never ran its
 counter-maintenance step. The column silently stayed `0` even with two real
@@ -97,7 +97,7 @@ $dataHandler->start([
 $dataHandler->process_datamap();
 ```
 
-Done on every `contentflow:democontent` run now (`syncCustomStagesCounter()`),
+Done on every `editorialflow:democontent` run now (`syncCustomStagesCounter()`),
 not just workspace creation - it has to re-run even when the workspace already
 existed and only the demo users are being (re)ensured.
 
@@ -163,9 +163,9 @@ if (!$this->tcaSchemaFactory->has($tableName)) {
 }
 ```
 
-Content Flow's own tables (`tx_contentflow_task`, `tx_contentflow_task_item`,
-`tx_contentflow_comment`, `tx_contentflow_activity`,
-`tx_contentflow_stage_checklist_item`) deliberately have **no TCA** (see
+Editorial Flow's own tables (`tx_editorialflow_task`, `tx_editorialflow_task_item`,
+`tx_editorialflow_comment`, `tx_editorialflow_activity`,
+`tx_editorialflow_stage_checklist_item`) deliberately have **no TCA** (see
 `ext_tables.sql`'s header comment). So `->getRestrictions()->add(new
 DeletedRestriction())`, used throughout the existing repositories, has silently
 never filtered `deleted = 1` rows for any of them. Confirmed directly: inserted a
@@ -183,7 +183,7 @@ already does.
 
 ## Demo users: what it actually takes to get a non-admin be_user working at all
 
-Getting `editor`/`reviewer`/`approver` (see `contentflow:democontent`) to the
+Getting `editor`/`reviewer`/`approver` (see `editorialflow:democontent`) to the
 point where they could even attempt an edit took four separate, independently
 silent failure modes, verified one at a time against a real backend session
 (not just read from source):
@@ -200,13 +200,13 @@ silent failure modes, verified one at a time against a real backend session
    page permissions to subpages on its own.
 3. **`tables_select`/`tables_modify` on the `be_group`.** Standard TCA-level
    record permission, needed for `pages`/`tt_content`/etc - not needed for
-   Content Flow's own tables, since those have no TCA and are never touched
+   Editorial Flow's own tables, since those have no TCA and are never touched
    through FormEngine/Recordlist permission checks.
 4. **`custom_stages`** - see above; without it, permission setup 1-3 gets a
    non-owner user as far as the Editing stage and no further, which looks
    identical to a page-permission problem but isn't one.
 
-None of this is Content Flow-specific - it's the ordinary TYPO3 backend-user
+None of this is Editorial Flow-specific - it's the ordinary TYPO3 backend-user
 permission model, encountered because the extension previously only had one
 real, non-admin-equivalent user to test with (`_cli_`/`admin`, both
 `admin = 1`, which bypasses essentially all of it).

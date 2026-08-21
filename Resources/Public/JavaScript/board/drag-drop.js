@@ -11,20 +11,20 @@ export function registerDragAndDrop(board) {
   let draggedCard = null;
 
   const clearDropTargetStyles = () => {
-    board.board.querySelectorAll('.contentflow-column').forEach((column) => {
+    board.board.querySelectorAll('.editorialflow-column').forEach((column) => {
       column.classList.remove('is-drop-target-valid', 'is-drop-target-invalid');
     });
   };
 
   const updateDropTargetStyles = (card) => {
-    board.board.querySelectorAll('.contentflow-column').forEach((column) => {
+    board.board.querySelectorAll('.editorialflow-column').forEach((column) => {
       const valid = board.canDropCardIntoColumn(card, column);
       column.classList.toggle('is-drop-target-valid', valid);
       column.classList.toggle('is-drop-target-invalid', !valid);
     });
   };
 
-  board.board.querySelectorAll('.contentflow-card').forEach((card) => {
+  board.board.querySelectorAll('.editorialflow-card').forEach((card) => {
     card.addEventListener('dragstart', (event) => {
       draggedCard = card;
       card.classList.add('is-dragged');
@@ -32,7 +32,7 @@ export function registerDragAndDrop(board) {
 
       if (event.dataTransfer !== null) {
         event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', card.dataset.contentflowTask || '');
+        event.dataTransfer.setData('text/plain', card.dataset.editorialflowTask || '');
       }
     });
 
@@ -45,7 +45,7 @@ export function registerDragAndDrop(board) {
     });
   });
 
-  board.board.querySelectorAll('.contentflow-column').forEach((column) => {
+  board.board.querySelectorAll('.editorialflow-column').forEach((column) => {
     column.addEventListener('dragover', (event) => {
       if (draggedCard === null) {
         return;
@@ -64,13 +64,13 @@ export function registerDragAndDrop(board) {
         return;
       }
 
-      const taskUid = event.dataTransfer?.getData('text/plain') || draggedCard.dataset.contentflowTask || '';
+      const taskUid = event.dataTransfer?.getData('text/plain') || draggedCard.dataset.editorialflowTask || '';
       const valid = board.canDropCardIntoColumn(draggedCard, column);
       clearDropTargetStyles();
 
       if (!valid) {
         const message = board.getDropRejectionMessage(draggedCard, column);
-        Notification.warning('Content Flow', message);
+        Notification.warning('Editorial Flow', message);
         board.announce(message);
         return;
       }

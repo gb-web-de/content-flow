@@ -12,53 +12,53 @@
     across both surfaces. Colour is never the only signal: the active task also
     says so in words.
 </f:comment>
-<div class="contentflow-page-banner">
-    <div class="contentflow-page-banner-info">
+<div class="editorialflow-page-banner">
+    <div class="editorialflow-page-banner-info">
         <core:icon identifier="apps-pagetree-page-default" size="medium" />
         <div>
             <f:if condition="{tasks}">
                 <f:then>
-                    <div class="contentflow-page-banner-title">
-                        <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:banner.heading" default="Content Flow" />
-                        <span class="contentflow-page-banner-count">{tasks -> f:count()}</span>
+                    <div class="editorialflow-page-banner-title">
+                        <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:banner.heading" default="Editorial Flow" />
+                        <span class="editorialflow-page-banner-count">{tasks -> f:count()}</span>
                     </div>
-                    <ul class="contentflow-page-banner-tasks">
+                    <ul class="editorialflow-page-banner-tasks">
                         <f:for each="{tasks}" as="task">
-                            <li class="contentflow-page-banner-task{f:if(condition: task.isActive, then: ' contentflow-page-banner-task--active')}"
-                                style="--contentflow-task-hue: {task.hue}">
-                                <span class="contentflow-task-dot"></span>
+                            <li class="editorialflow-page-banner-task{f:if(condition: task.isActive, then: ' editorialflow-page-banner-task--active')}"
+                                style="--editorialflow-task-hue: {task.hue}">
+                                <span class="editorialflow-task-dot"></span>
                                 <button type="button"
-                                        class="contentflow-page-banner-task-title"
-                                        data-contentflow-open-ticket="{task.uid}">{task.title}</button>
+                                        class="editorialflow-page-banner-task-title"
+                                        data-editorialflow-open-ticket="{task.uid}">{task.title}</button>
                                 <span class="badge badge-info">{task.state}</span>
                                 <f:if condition="{task.isActive}">
-                                    <span class="badge contentflow-badge-active"
-                                          title="This is your active Content Flow task">
-                                        <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:banner.active" default="you are working on this" />
+                                    <span class="badge editorialflow-badge-active"
+                                          title="This is your active Editorial Flow task">
+                                        <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:banner.active" default="you are working on this" />
                                     </span>
                                 </f:if>
                                 <f:if condition="{task.subject_uid} > 0">
                                     <f:if condition="{task.isActive}">
                                         <f:then>
                                             <button type="button" class="btn btn-xs btn-warning"
-                                                    data-contentflow-stop-editing data-contentflow-task-uid="{task.uid}"
-                                                    data-contentflow-reload="true">
-                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:active.stop" default="Stop editing" />
+                                                    data-editorialflow-stop-editing data-editorialflow-task-uid="{task.uid}"
+                                                    data-editorialflow-reload="true">
+                                                <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:active.stop" default="Stop editing" />
                                             </button>
                                         </f:then>
                                         <f:else>
                                             <button type="button" class="btn btn-xs btn-default"
-                                                    data-contentflow-set-active="{task.uid}"
-                                                    data-contentflow-context-table="{task.subject_table}"
-                                                    data-contentflow-context-uid="{task.subject_uid}"
-                                                    data-contentflow-reload="true">
-                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:active.start" default="Work on this task" />
+                                                    data-editorialflow-set-active="{task.uid}"
+                                                    data-editorialflow-context-table="{task.subject_table}"
+                                                    data-editorialflow-context-uid="{task.subject_uid}"
+                                                    data-editorialflow-reload="true">
+                                                <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:active.start" default="Work on this task" />
                                             </button>
                                         </f:else>
                                     </f:if>
                                 </f:if>
                                 <f:if condition="{task.assigneeName}">
-                                    <span class="contentflow-page-banner-assignee">
+                                    <span class="editorialflow-page-banner-assignee">
                                         <core:icon identifier="actions-user" size="small" /> {task.assigneeName}
                                     </span>
                                 </f:if>
@@ -66,19 +66,19 @@
                                     <span class="badge badge-secondary" title="Created automatically when editing started">auto</span>
                                 </f:if>
                                 <f:if condition="{task.hasConflict}">
-                                    <span class="badge badge-warning contentflow-badge-conflict"
-                                          title="{f:translate(key: 'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.title', default: 'This record was also edited in another workspace - compare before publishing either side.')}">
+                                    <span class="badge badge-warning editorialflow-badge-conflict"
+                                          title="{f:translate(key: 'LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.title', default: 'This record was also edited in another workspace - compare before publishing either side.')}">
                                         <core:icon identifier="actions-exclamation-triangle" size="small" />
-                                        <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.banner" default="Also edited in %1$s" arguments="{0: task.conflictLabel}" />
+                                        <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.banner" default="Also edited in %1$s" arguments="{0: task.conflictLabel}" />
                                     </span>
                                     <button type="button" class="btn btn-xs btn-warning"
-                                            data-contentflow-open-conflict-diff="{task.conflictTable}:{task.conflictUid}"
-                                            data-contentflow-conflict-title="{task.title}">
-                                        <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.view" default="Compare versions" />
+                                            data-editorialflow-open-conflict-diff="{task.conflictTable}:{task.conflictUid}"
+                                            data-editorialflow-conflict-title="{task.title}">
+                                        <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.view" default="Compare versions" />
                                     </button>
                                 </f:if>
                                 <f:if condition="{task.assigneeName} == ''">
-                                    <button type="button" class="btn btn-xs btn-default contentflow-action-assign" data-task-uid="{task.uid}">
+                                    <button type="button" class="btn btn-xs btn-default editorialflow-action-assign" data-task-uid="{task.uid}">
                                         <core:icon identifier="actions-user" size="small" /> Assign to me
                                     </button>
                                 </f:if>
@@ -87,15 +87,15 @@
                     </ul>
                 </f:then>
                 <f:else>
-                    <div class="contentflow-page-banner-title">
-                        Content Flow: <em>No open task for this page</em>
+                    <div class="editorialflow-page-banner-title">
+                        Editorial Flow: <em>No open task for this page</em>
                     </div>
                 </f:else>
             </f:if>
         </div>
     </div>
 
-    <div class="contentflow-page-banner-actions">
+    <div class="editorialflow-page-banner-actions">
         <f:if condition="{tasks}">
             <f:then>
                 <a href="{boardUrl}" class="btn btn-sm btn-primary">
@@ -105,9 +105,9 @@
             <f:else>
                 <button type="button"
                         class="btn btn-sm btn-primary"
-                        data-contentflow-action="create-task"
-                        data-contentflow-page="{pageUid}"
-                        data-contentflow-page-title="{pageTitle}">
+                        data-editorialflow-action="create-task"
+                        data-editorialflow-page="{pageUid}"
+                        data-editorialflow-page-title="{pageTitle}">
                     <core:icon identifier="actions-plus" size="small" /> Plan task for this page
                 </button>
             </f:else>

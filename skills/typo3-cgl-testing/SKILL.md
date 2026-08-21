@@ -117,7 +117,7 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 final class TaskRepositoryTest extends FunctionalTestCase
 {
     protected array $coreExtensionsToLoad = ['workspaces', 'dashboard'];
-    protected array $testExtensionsToLoad = ['typo3conf/ext/content_flow'];
+    protected array $testExtensionsToLoad = ['typo3conf/ext/editorial_flow'];
 
     protected function setUp(): void
     {

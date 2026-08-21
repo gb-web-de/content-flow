@@ -18,13 +18,13 @@ import AjaxRequest from '@typo3/core/ajax/ajax-request.js'
 import { html } from 'lit'
 import Modal from '@typo3/backend/modal.js'
 import { SeverityEnum } from '@typo3/backend/enum/severity.js'
-import labels from '~labels/content_flow.messages'
+import labels from '~labels/editorial_flow.messages'
 
-import { WIZARD_MODAL_SIZE } from '@gb-web/content-flow/wizard/task-wizard.js'
-import { taskContextTitle } from '@gb-web/content-flow/task/task-context-title.js'
-import { observeVisualEditorTaskSelect } from '@gb-web/content-flow/task/visual-editor-task-select.js'
+import { WIZARD_MODAL_SIZE } from '@gb-web/editorial-flow/wizard/task-wizard.js'
+import { taskContextTitle } from '@gb-web/editorial-flow/task/task-context-title.js'
+import { observeVisualEditorTaskSelect } from '@gb-web/editorial-flow/task/visual-editor-task-select.js'
 
-class ContentFlowWizard {
+class EditorialFlowWizard {
   constructor() {
     DocumentService.ready().then(() => {
       this.checkPendingWizard()
@@ -48,12 +48,12 @@ class ContentFlowWizard {
   }
 
   async checkPendingWizard() {
-    if (!TYPO3.settings?.ajaxUrls?.contentflow_task_wizard_pending) {
+    if (!TYPO3.settings?.ajaxUrls?.editorialflow_task_wizard_pending) {
       return
     }
 
     try {
-      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_task_wizard_pending).get()
+      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.editorialflow_task_wizard_pending).get()
       const result = await response.resolve()
 
       if (result.success !== true || !result.pending) {
@@ -70,7 +70,7 @@ class ContentFlowWizard {
     Modal.advanced({
       type: Modal.types.default,
       title: taskContextTitle(pending, labels),
-      content: html`<contentflow-task-wizard .pending=${pending}></contentflow-task-wizard>`,
+      content: html`<editorialflow-task-wizard .pending=${pending}></editorialflow-task-wizard>`,
       severity: SeverityEnum.notice,
       size: WIZARD_MODAL_SIZE,
       staticBackdrop: true,
@@ -79,4 +79,4 @@ class ContentFlowWizard {
   }
 }
 
-export default new ContentFlowWizard()
+export default new EditorialFlowWizard()

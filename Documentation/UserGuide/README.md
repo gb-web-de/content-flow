@@ -1,22 +1,22 @@
-# Content Flow — Editor's Guide
+# Editorial Flow — Editor's Guide
 
 *A tour of the whole task lifecycle, from "New task" to published — with real
 screenshots from a working board.*
 
-Content Flow puts a lightweight to‑do list **in front of** TYPO3's workspace
+Editorial Flow puts a lightweight to‑do list **in front of** TYPO3's workspace
 review process, and a closed, permanent record **behind** it. You never have
 to learn a separate tool: you plan the work here, and TYPO3's own Editor,
-Layout and Records views are where you actually do it. Content Flow just
+Layout and Records views are where you actually do it. Editorial Flow just
 follows along and keeps the board honest.
 
 ```
  Backlog   Planned  │  Editing   Review …   Ready to publish  │  Done
  ─────────────────  │  ──────────────────────────────────────  │  ────────
-    Content Flow    │        your TYPO3 workspace stages        │  Content Flow
+    Editorial Flow    │        your TYPO3 workspace stages        │  Editorial Flow
    (not versioned)   │        (however many you configured)      │ (published)
 ```
 
-The middle section is **not** something Content Flow invents — it is read
+The middle section is **not** something Editorial Flow invents — it is read
 directly from your workspace's own stages (*Settings → Workspaces*). This
 demo installation has two: **Review** and **Approval**. Yours may have more,
 fewer, or different names; everything below still applies, just relabel the
@@ -26,7 +26,7 @@ middle columns in your head.
 
 ## 1. Creating your first task
 
-Open **Web → Content Flow** on any page and click **+ New task**. You get a
+Open **Web → Editorial Flow** on any page and click **+ New task**. You get a
 choice of four starting points:
 
 ![The "how do you want to start?" choice: plan a new page, pick an existing page, select a record, or create a new record](Images/02-new-task-entry-choice.png)
@@ -56,8 +56,8 @@ Finish the wizard, and the card lands on the board:
 
 ![A new card sitting in the Backlog column, assigned to Erin Editor](Images/04-board-backlog-card.png)
 
-**Backlog vs. Planned** are Content Flow's own columns — TYPO3's workspaces
-have no concept of "not started yet", so this is the part Content Flow adds
+**Backlog vs. Planned** are Editorial Flow's own columns — TYPO3's workspaces
+have no concept of "not started yet", so this is the part Editorial Flow adds
 in front. Moving a card between the two is just a drag, no dialog:
 
 ![The same card, now in the Planned column after a drag](Images/05-board-card-planned.png)
@@ -69,7 +69,7 @@ in front. Moving a card between the two is just a drag, no dialog:
 You don't have to keep the board open. Open the page in **Web → Layout**
 and a banner tells you what's going on, right where you're about to work:
 
-![The Content Flow banner in the Layout module, showing the task, its state, and its assignee](Images/06-layout-banner-planned.png)
+![The Editorial Flow banner in the Layout module, showing the task, its state, and its assignee](Images/06-layout-banner-planned.png)
 
 If a page has **no** open task yet, the banner offers **Plan task for this
 page** instead — same wizard, one click closer.
@@ -78,11 +78,11 @@ page** instead — same wizard, one click closer.
 
 ## 3. The magic part: tasks open (and advance) themselves
 
-This is the thing that makes Content Flow different from a normal
+This is the thing that makes Editorial Flow different from a normal
 kanban board: **you don't have to move the card yourself for the first
 step.** The moment you actually edit something — in the Layout module, the
 Visual Editor, or a plain record form — TYPO3 creates a workspace version of
-it, and Content Flow notices and moves the task into **Editing** for you.
+it, and Editorial Flow notices and moves the task into **Editing** for you.
 
 Watch what happens after saving one small change to a page that was sitting
 in *Planned*:
@@ -198,7 +198,7 @@ a task never silently vanishes just because your scope widened.
 
 ## 7. Who can do what
 
-None of the permission logic above is something Content Flow invents — it
+None of the permission logic above is something Editorial Flow invents — it
 is entirely TYPO3's own workspace-stage model, applied the same way it
 always has been. The rule in one sentence:
 
@@ -218,7 +218,7 @@ sitting between *Editing* and *Ready to publish*:
 
 Who counts as "responsible for a stage" is configured entirely in
 **Settings → Workspaces → *(your workspace)* → Stages** — a person, a
-group, or several. Content Flow adds no separate permission system on top
+group, or several. Editorial Flow adds no separate permission system on top
 of it; if someone can already act on a stage in TYPO3's own Workspaces
 module, they can do the exact same thing by dragging a card here.
 
@@ -245,7 +245,7 @@ Back on the page itself, the loop closes exactly where it started:
 Four widgets are available for **Web → Dashboard** (add them via *Add a
 widget* if they're not already on yours):
 
-![Four Content Flow dashboard widgets: My tasks, Recent activity, Recent comments, and Task overview](Images/20-dashboard-widgets.png)
+![Four Editorial Flow dashboard widgets: My tasks, Recent activity, Recent comments, and Task overview](Images/20-dashboard-widgets.png)
 
 - **My tasks** — everything currently assigned to you, across every page.
 - **Recent activity** — the newest entries from every task's history,
@@ -286,7 +286,7 @@ getting there required fixing **five separate TYPO3 permission settings**
 that a fresh installation does not grant automatically to a normal editor
 group. If your editors report that the board "doesn't work" — buttons
 missing, drags failing, dashboard empty — this is very likely why, not a bug
-in Content Flow itself:
+in Editorial Flow itself:
 
 1. **Page edits refused** ("No page edit permission…") until the group's
    **Page Types** permission includes the relevant doktype.
@@ -297,13 +297,13 @@ in Content Flow itself:
 3. **Dragging a card into a review stage fails** ("Could not open the
    TYPO3 workspace dialog") unless the group also has module access to
    **Workspaces** — even though editors never open that module directly.
-   Content Flow's stage dialog reuses TYPO3's own workspace AJAX endpoint,
+   Editorial Flow's stage dialog reuses TYPO3's own workspace AJAX endpoint,
    which is gated on that access regardless.
 4. **The Dashboard menu item is missing entirely** until the group has
    module access to **Dashboard**.
 5. **"No widgets are available with your current permissions"** even with
    Dashboard access, until the group's **Available widgets** list includes
-   Content Flow's four widgets specifically.
+   Editorial Flow's four widgets specifically.
 
 None of this is visible from an administrator account, since admins bypass
 every one of these checks — which is exactly why it's easy to ship a demo

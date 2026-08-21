@@ -4,55 +4,58 @@ services:
     autoconfigure: true
     public: false
 
-  GbWeb\ContentFlow\:
+  GbWeb\EditorialFlow\:
     resource: '../Classes/*'
     exclude: '../Classes/Domain/Model/*'
 
   # Listed explicitly so constructor changes in these entry-point classes are
   # reflected in TYPO3's compiled container as soon as Services.yaml changes.
-  GbWeb\ContentFlow\Controller\ContentFlowController:
+  GbWeb\EditorialFlow\Controller\EditorialFlowController:
     public: true
 
-  GbWeb\ContentFlow\Controller\TaskAjaxController:
+  GbWeb\EditorialFlow\Controller\TaskAjaxController:
     public: true
 
-  GbWeb\ContentFlow\EventListener\PageModuleEventListener:
+  GbWeb\EditorialFlow\EventListener\PageModuleEventListener:
     public: true
 
-  GbWeb\ContentFlow\Hooks\TaskAutoCreationDataHandlerHook:
+  GbWeb\EditorialFlow\Hooks\TaskAutoCreationDataHandlerHook:
     public: true
 
-  GbWeb\ContentFlow\Updates\MigrateExistingWorkspaceChangesToTasksUpdate:
+  GbWeb\EditorialFlow\Updates\MigrateExistingWorkspaceChangesToTasksUpdate:
     public: true
 
-  GbWeb\ContentFlow\Dashboard\Widget\TaskOverviewWidget:
+  GbWeb\EditorialFlow\Updates\MigrateLegacyContentFlowTablesUpdate:
+    public: true
+
+  GbWeb\EditorialFlow\Dashboard\Widget\TaskOverviewWidget:
     tags:
       - name: dashboard.widget
-        identifier: contentFlowTaskOverview
+        identifier: editorialFlowTaskOverview
         groupNames: 'general'
-        title: 'Content Flow: Task overview'
+        title: 'Editorial Flow: Task overview'
         description: 'How much work sits in each state, and what nobody has taken yet'
         iconIdentifier: apps-pagetree-page-default
         height: 'medium'
         width: 'medium'
 
-  GbWeb\ContentFlow\Dashboard\Widget\MyTasksWidget:
+  GbWeb\EditorialFlow\Dashboard\Widget\MyTasksWidget:
     tags:
       - name: dashboard.widget
-        identifier: contentFlowMyTasks
+        identifier: editorialFlowMyTasks
         groupNames: 'general'
-        title: 'Content Flow: My tasks'
+        title: 'Editorial Flow: My tasks'
         description: 'Tasks assigned to you'
         iconIdentifier: status-user-backend
         height: 'medium'
         width: 'medium'
 
-  GbWeb\ContentFlow\Dashboard\Widget\RecentActivityWidget:
+  GbWeb\EditorialFlow\Dashboard\Widget\RecentActivityWidget:
     tags:
       - name: dashboard.widget
-        identifier: contentFlowRecentActivity
+        identifier: editorialFlowRecentActivity
         groupNames: 'general'
-        title: 'Content Flow: Recent activity'
+        title: 'Editorial Flow: Recent activity'
         description: 'Latest editorial decisions across the board'
         iconIdentifier: actions-document-history
         height: 'medium'
@@ -61,12 +64,12 @@ services:
   # The one widget xima/xima-typo3-content-planner has that the three above did
   # not cover - a feed to catch up on discussion. See RecentCommentsWidget's
   # docblock for why the other two xima widgets were not copied.
-  GbWeb\ContentFlow\Dashboard\Widget\RecentCommentsWidget:
+  GbWeb\EditorialFlow\Dashboard\Widget\RecentCommentsWidget:
     tags:
       - name: dashboard.widget
-        identifier: contentFlowRecentComments
+        identifier: editorialFlowRecentComments
         groupNames: 'general'
-        title: 'Content Flow: Recent comments'
+        title: 'Editorial Flow: Recent comments'
         description: 'Catch up on discussion across the board'
         iconIdentifier: actions-message
         height: 'medium'

@@ -11,7 +11,7 @@ defined('TYPO3') or die();
 // PostProcessDatabaseOperationsEvent was reverted - that event does not exist, and
 // removing the registration silently switched auto-creation off entirely.
 $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processDatamapClass'][] =
-    \GbWeb\ContentFlow\Hooks\TaskAutoCreationDataHandlerHook::class;
+    \GbWeb\EditorialFlow\Hooks\TaskAutoCreationDataHandlerHook::class;
 
 // Page-like tables: records that stand on their own and get their own card,
 // instead of joining the task of the page they sit on. `pages` is implicit.
@@ -20,14 +20,14 @@ $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['proc
 // page and therefore reads as a page to an editor. Only the integrator knows
 // which of their tables work that way, so this is configuration - other
 // extensions may append to it from their own ext_localconf.php.
-$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['subjectTables'] ??= [];
+$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['editorial_flow']['subjectTables'] ??= [];
 
 // How urgently a card's due date is flagged on the board (see
-// ContentFlowController::dueDateUrgency() and the Styles.css rules it feeds
-// via injected --contentflow-due-* custom properties). An integrator can
+// EditorialFlowController::dueDateUrgency() and the Styles.css rules it feeds
+// via injected --editorialflow-due-* custom properties). An integrator can
 // override any of these from their own ext_localconf.php; these are only the
 // defaults if they don't.
-$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['dueDateThresholds'] ??= [
+$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['editorial_flow']['dueDateThresholds'] ??= [
     // A card starts showing as "due soon" this many days before its due date.
     'warningDays' => 3,
     'warningColor' => '#e0a810',

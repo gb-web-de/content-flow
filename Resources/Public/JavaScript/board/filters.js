@@ -6,12 +6,12 @@ export function registerFilters(board) {
     const searchInput = document.querySelector('#cf-search-input');
     const assigneeSelect = document.querySelector('#cf-filter-assignee');
     const statusSelect = document.querySelector('#cf-filter-status');
-    // Only present when ContentFlowController::indexAction() found more than one
+    // Only present when EditorialFlowController::indexAction() found more than one
     // workspace the current user has access to - see Index.html. A checkbox per
     // workspace, not a single select: several other workspaces' stages are
     // merged straight into the board's own stage columns now, so narrowing is
     // no longer a single choice.
-    const workspaceCheckboxes = document.querySelectorAll('[data-contentflow-filter-workspace]');
+    const workspaceCheckboxes = document.querySelectorAll('[data-editorialflow-filter-workspace]');
     const workspaceCountBadge = document.querySelector('#cf-filter-workspace-count');
     const clearBtn = document.querySelector('#cf-clear-filters');
 
@@ -25,7 +25,7 @@ export function registerFilters(board) {
       // always match - this filter only ever narrows which *other*
       // workspaces' merged-in cards are visible, mirroring the old single
       // -select's documented intent.
-      const currentWorkspaceId = String(TYPO3.settings.ContentFlow?.currentWorkspaceId ?? 0);
+      const currentWorkspaceId = String(TYPO3.settings.EditorialFlow?.currentWorkspaceId ?? 0);
       const checkedWorkspaces = Array.from(workspaceCheckboxes).filter((checkbox) => checkbox.checked);
       const selectedWorkspaceIds = new Set(checkedWorkspaces.map((checkbox) => checkbox.value));
       if (workspaceCountBadge) {
@@ -34,27 +34,27 @@ export function registerFilters(board) {
 
       let totalVisible = 0;
       let totalCards = 0;
-      board.board.querySelectorAll('.contentflow-column').forEach((column) => {
+      board.board.querySelectorAll('.editorialflow-column').forEach((column) => {
         let visibleCount = 0;
-        column.querySelectorAll('.contentflow-card').forEach((card) => {
+        column.querySelectorAll('.editorialflow-card').forEach((card) => {
           totalCards++;
-          const title = (card.dataset.contentflowTitle || '').toLowerCase();
-          const record = (card.dataset.contentflowRecord || '').toLowerCase();
-          const cardAssignee = parseInt(card.dataset.contentflowAssignee || '0', 10);
-          const isAuto = card.dataset.contentflowAuto === '1';
-          const isWarned = parseInt(card.dataset.contentflowWarned || '0', 10) > 0;
-          const cardWorkspace = card.dataset.contentflowWorkspace || '0';
+          const title = (card.dataset.editorialflowTitle || '').toLowerCase();
+          const record = (card.dataset.editorialflowRecord || '').toLowerCase();
+          const cardAssignee = parseInt(card.dataset.editorialflowAssignee || '0', 10);
+          const isAuto = card.dataset.editorialflowAuto === '1';
+          const isWarned = parseInt(card.dataset.editorialflowWarned || '0', 10) > 0;
+          const cardWorkspace = card.dataset.editorialflowWorkspace || '0';
 
           // Match search query
           const matchesQuery = query === '' || title.includes(query) || record.includes(query);
 
           // Match Assignee filter
           let matchesAssignee = true;
-          const currentUserId = TYPO3.settings.ContentFlow?.currentUserId || 0;
+          const currentUserId = TYPO3.settings.EditorialFlow?.currentUserId || 0;
           if (assigneeFilter === 'me') {
-            matchesAssignee = (cardAssignee > 0 && currentUserId > 0 && cardAssignee === currentUserId) || card.querySelector('.contentflow-card-assignee') !== null;
+            matchesAssignee = (cardAssignee > 0 && currentUserId > 0 && cardAssignee === currentUserId) || card.querySelector('.editorialflow-card-assignee') !== null;
           } else if (assigneeFilter === 'unassigned') {
-            matchesAssignee = cardAssignee === 0 && card.querySelector('.contentflow-card-assignee') === null;
+            matchesAssignee = cardAssignee === 0 && card.querySelector('.editorialflow-card-assignee') === null;
           }
 
           // Match Status filter
@@ -82,7 +82,7 @@ export function registerFilters(board) {
         });
 
         // Update column pill count badge dynamically
-        const badge = column.querySelector('.contentflow-column-header .badge');
+        const badge = column.querySelector('.editorialflow-column-header .badge');
         if (badge) {
           badge.textContent = visibleCount;
         }

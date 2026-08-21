@@ -6,7 +6,7 @@
 <f:comment>
     No layout and no sections on purpose. The core DocHeader (breadcrumb,
     page-tree toggle, shortcut button) is configured in
-    ContentFlowController::indexAction() and rendered by ModuleTemplate around
+    EditorialFlowController::indexAction() and rendered by ModuleTemplate around
     this template, so nothing here needs to reproduce it.
     See ARCHITECTURE.md and web-vision/kanban-workspaces#43.
 
@@ -24,17 +24,17 @@
     <f:else>
         <!-- Screen readers get every board change announced here; see the
              accessibility commitments in ARCHITECTURE.md. -->
-        <div class="contentflow-announcer" role="status" aria-live="polite" aria-atomic="true"></div>
+        <div class="editorialflow-announcer" role="status" aria-live="polite" aria-atomic="true"></div>
 
-        <div class="contentflow-toolbar">
-            <div class="contentflow-toolbar-actions">
-                <button type="button" class="btn btn-primary" data-contentflow-action="create-task">
+        <div class="editorialflow-toolbar">
+            <div class="editorialflow-toolbar-actions">
+                <button type="button" class="btn btn-primary" data-editorialflow-action="create-task">
                     <core:icon identifier="actions-plus" size="small" />
-                    <f:translate key="button.createTask" extensionName="ContentFlow" default="New task" />
+                    <f:translate key="button.createTask" extensionName="EditorialFlow" default="New task" />
                 </button>
             </div>
 
-            <div class="contentflow-filters">
+            <div class="editorialflow-filters">
                 <div class="input-group">
                     <label class="form-label visually-hidden" for="cf-search-input">Search tasks</label>
                     <span class="input-group-addon"><core:icon identifier="actions-search" size="small" /></span>
@@ -59,7 +59,7 @@
                     Permission-gated: only rendered when the current backend user
                     actually has access to more than one workspace
                     (WorkspaceService::getAvailableWorkspaces() in
-                    ContentFlowController::indexAction() is already filtered through
+                    EditorialFlowController::indexAction() is already filtered through
                     core's own checkWorkspace()) - a single-workspace editor never
                     sees a filter with nothing meaningful to filter.
                 </f:comment>
@@ -83,7 +83,7 @@
                                     <li>
                                         <label class="dropdown-item">
                                             <span class="form-check">
-                                                <input type="checkbox" class="form-check-input" value="{otherWorkspace.uid}" checked="checked" data-contentflow-filter-workspace>
+                                                <input type="checkbox" class="form-check-input" value="{otherWorkspace.uid}" checked="checked" data-editorialflow-filter-workspace>
                                                 <span class="form-check-label">{otherWorkspace.title}</span>
                                             </span>
                                         </label>
@@ -100,20 +100,20 @@
             </div>
         </div>
 
-        <div class="contentflow-board">
+        <div class="editorialflow-board">
             <f:for each="{columns}" as="column">
-                <section class="contentflow-column"
-                         data-contentflow-column="{column.key}"
-                         data-contentflow-state="{column.state}"
-                         data-contentflow-stage="{column.stageUid}"
-                         data-contentflow-workspace="{workspaceUid}"
-                         data-contentflow-accepts-drop="{f:if(condition: column.acceptsDrop, then: 'true', else: 'false')}"
-                         data-contentflow-checklist-items="{column.checklistItemsJson}"
+                <section class="editorialflow-column"
+                         data-editorialflow-column="{column.key}"
+                         data-editorialflow-state="{column.state}"
+                         data-editorialflow-stage="{column.stageUid}"
+                         data-editorialflow-workspace="{workspaceUid}"
+                         data-editorialflow-accepts-drop="{f:if(condition: column.acceptsDrop, then: 'true', else: 'false')}"
+                         data-editorialflow-checklist-items="{column.checklistItemsJson}"
                          aria-labelledby="cf-col-{column.key}">
-                    <h3 class="contentflow-column-header {f:if(condition: column.colorShared, then: 'contentflow-column-header--shared')} {f:if(condition: column.colorOwn, then: 'contentflow-column-header--own')}"
+                    <h3 class="editorialflow-column-header {f:if(condition: column.colorShared, then: 'editorialflow-column-header--shared')} {f:if(condition: column.colorOwn, then: 'editorialflow-column-header--own')}"
                         id="cf-col-{column.key}"
                         style="{column.style}">
-                        <span class="contentflow-column-title">{column.label}</span>
+                        <span class="editorialflow-column-title">{column.label}</span>
                         <f:if condition="{column.contributingWorkspaceTitles}">
                             <f:then>
                                 <f:comment>
@@ -128,48 +128,48 @@
                                 </f:comment>
                                 <f:if condition="{column.contributingWorkspaceCount} > 3">
                                     <f:then>
-                                        <details class="contentflow-column-subtitle contentflow-column-subtitle--collapsible">
+                                        <details class="editorialflow-column-subtitle editorialflow-column-subtitle--collapsible">
                                             <summary>
-                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:column.workspaceCount" default="%1$d workspaces" arguments="{0: column.contributingWorkspaceCount}" />
+                                                <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:column.workspaceCount" default="%1$d workspaces" arguments="{0: column.contributingWorkspaceCount}" />
                                             </summary>
-                                            <span class="contentflow-column-subtitle-list">{column.contributingWorkspaceTitles}</span>
+                                            <span class="editorialflow-column-subtitle-list">{column.contributingWorkspaceTitles}</span>
                                         </details>
                                     </f:then>
                                     <f:else>
-                                        <span class="contentflow-column-subtitle" title="{column.contributingWorkspaceTitles}">{column.contributingWorkspaceTitles}</span>
+                                        <span class="editorialflow-column-subtitle" title="{column.contributingWorkspaceTitles}">{column.contributingWorkspaceTitles}</span>
                                     </f:else>
                                 </f:if>
                             </f:then>
                         </f:if>
                         <span class="badge badge-pill badge-secondary">{column.cards -> f:count()}</span>
                         <f:if condition="{column.canManageChecklist}">
-                            <button type="button" class="btn btn-xs btn-default contentflow-column-checklist-manage"
+                            <button type="button" class="btn btn-xs btn-default editorialflow-column-checklist-manage"
                                     title="Manage review checklist for this stage"
                                     aria-label="Manage review checklist for this stage">
                                 <core:icon identifier="actions-cog" size="small" />
                             </button>
                         </f:if>
                     </h3>
-                    <ul class="contentflow-column-cards" role="listbox" aria-multiselectable="true">
+                    <ul class="editorialflow-column-cards" role="listbox" aria-multiselectable="true">
                         <f:for each="{column.cards}" as="card">
-                            <li class="contentflow-card {f:if(condition: card.foreignWorkspace, then: 'contentflow-card--foreign-workspace')} {f:if(condition: card.isActive, then: 'contentflow-card--active')} {card.dueDateCardClass}"
+                            <li class="editorialflow-card {f:if(condition: card.foreignWorkspace, then: 'editorialflow-card--foreign-workspace')} {f:if(condition: card.isActive, then: 'editorialflow-card--active')} {card.dueDateCardClass}"
                                 draggable="{f:if(condition: card.foreignWorkspace, then: 'false', else: 'true')}"
                                 tabindex="0"
                                 role="option"
                                 aria-selected="false"
-                                data-contentflow-task="{card.uid}"
-                                data-contentflow-record="{card.subject_table}:{card.subject_uid}"
-                                data-contentflow-title="{card.title}"
-                                data-contentflow-assignee="{card.assignee}"
-                                data-contentflow-state="{card.state}"
-                                data-contentflow-stage="{card.stage_uid}"
-                                data-contentflow-workspace="{card.workspace_uid}"
-                                data-contentflow-auto="{card.auto_created}"
-                                data-contentflow-active="{f:if(condition: card.isActive, then: 'true', else: 'false')}"
-                                data-contentflow-warned="{card.warnedCount}"
-                                data-contentflow-can-act="{f:if(condition: card.canAct, then: 'true', else: 'false')}">
-                                <div class="contentflow-card-header">
-                                    <span class="contentflow-card-icon">
+                                data-editorialflow-task="{card.uid}"
+                                data-editorialflow-record="{card.subject_table}:{card.subject_uid}"
+                                data-editorialflow-title="{card.title}"
+                                data-editorialflow-assignee="{card.assignee}"
+                                data-editorialflow-state="{card.state}"
+                                data-editorialflow-stage="{card.stage_uid}"
+                                data-editorialflow-workspace="{card.workspace_uid}"
+                                data-editorialflow-auto="{card.auto_created}"
+                                data-editorialflow-active="{f:if(condition: card.isActive, then: 'true', else: 'false')}"
+                                data-editorialflow-warned="{card.warnedCount}"
+                                data-editorialflow-can-act="{f:if(condition: card.canAct, then: 'true', else: 'false')}">
+                                <div class="editorialflow-card-header">
+                                    <span class="editorialflow-card-icon">
                                         <f:if condition="{card.iconIdentifier}">
                                             <core:icon identifier="{card.iconIdentifier}" size="small" />
                                         </f:if>
@@ -180,12 +180,12 @@
                                         its own control that is reachable by keyboard.
                                     </f:comment>
                                     <button type="button"
-                                            class="contentflow-card-title"
-                                            data-contentflow-open-ticket="{card.uid}">{card.title}</button>
+                                            class="editorialflow-card-title"
+                                            data-editorialflow-open-ticket="{card.uid}">{card.title}</button>
                                 </div>
 
-                                <div class="contentflow-card-body">
-                                    <span class="contentflow-card-meta">
+                                <div class="editorialflow-card-body">
+                                    <span class="editorialflow-card-meta">
                                         <f:comment>
                                             The page in words, not "pages:5": a task's own title
                                             is inherited from its page when it was created
@@ -196,10 +196,10 @@
                                         </f:comment>
                                         <f:if condition="{card.subject_table} == 'pages' && {card.subject_uid} == 0">
                                             <f:then>
-                                                <span class="contentflow-record-ref contentflow-record-ref--pending" title="This page is created once the ticket moves into Editing">not yet created</span>
+                                                <span class="editorialflow-record-ref editorialflow-record-ref--pending" title="This page is created once the ticket moves into Editing">not yet created</span>
                                             </f:then>
                                             <f:else>
-                                                <span class="contentflow-record-ref" title="{card.subject_table}:{card.subject_uid}">
+                                                <span class="editorialflow-record-ref" title="{card.subject_table}:{card.subject_uid}">
                                                     <core:icon identifier="apps-pagetree-page-default" size="small" />
                                                     <f:if condition="{card.subjectPageTitle}">
                                                         <f:then>{card.subjectPageTitle}</f:then>
@@ -209,13 +209,13 @@
                                             </f:else>
                                         </f:if>
                                     </span>
-                                    <div class="contentflow-card-badges">
+                                    <div class="editorialflow-card-badges">
                                         <f:if condition="{card.auto_created}">
-                                            <span class="badge badge-info contentflow-badge-auto" title="Created automatically when editing started">auto</span>
+                                            <span class="badge badge-info editorialflow-badge-auto" title="Created automatically when editing started">auto</span>
                                         </f:if>
                                         <f:if condition="{card.isActive}">
-                                            <span class="badge contentflow-badge-active">
-                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:banner.active" default="you are working on this" />
+                                            <span class="badge editorialflow-badge-active">
+                                                <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:banner.active" default="you are working on this" />
                                             </span>
                                         </f:if>
                                         <f:if condition="{card.warnedCount} > 0">
@@ -224,82 +224,82 @@
                                             </span>
                                         </f:if>
                                         <f:if condition="{card.foreignWorkspace}">
-                                            <span class="badge contentflow-badge-foreign-workspace" title="Belongs to workspace &quot;{card.foreignWorkspaceTitle}&quot; - switch to it to act on this task">
+                                            <span class="badge editorialflow-badge-foreign-workspace" title="Belongs to workspace &quot;{card.foreignWorkspaceTitle}&quot; - switch to it to act on this task">
                                                 <core:icon identifier="actions-workspace" size="small" /> {card.foreignWorkspaceTitle}
                                             </span>
                                         </f:if>
                                         <f:if condition="{card.hasConflict}">
-                                            <span class="badge badge-warning contentflow-badge-conflict"
-                                                  title="{f:translate(key: 'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.title', default: 'This record was also edited in another workspace - compare before publishing either side.')}">
+                                            <span class="badge badge-warning editorialflow-badge-conflict"
+                                                  title="{f:translate(key: 'LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.title', default: 'This record was also edited in another workspace - compare before publishing either side.')}">
                                                 <core:icon identifier="actions-exclamation-triangle" size="small" />
-                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.banner" default="Also edited in %1$s" arguments="{0: card.conflictLabel}" />
+                                                <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.banner" default="Also edited in %1$s" arguments="{0: card.conflictLabel}" />
                                             </span>
                                             <button type="button" class="btn btn-xs btn-warning"
-                                                    data-contentflow-open-conflict-diff="{card.conflictTable}:{card.conflictUid}"
-                                                    data-contentflow-conflict-title="{card.title}">
-                                                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.view" default="Compare versions" />
+                                                    data-editorialflow-open-conflict-diff="{card.conflictTable}:{card.conflictUid}"
+                                                    data-editorialflow-conflict-title="{card.title}">
+                                                <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.view" default="Compare versions" />
                                             </button>
                                         </f:if>
                                         <f:comment>
                                             Never color-only: the card's left-border accent
-                                            (contentflow-card--due-soon/-overdue, see
-                                            ContentFlowController::computeDueDateUrgency())
+                                            (editorialflow-card--due-soon/-overdue, see
+                                            EditorialFlowController::computeDueDateUrgency())
                                             always comes with this same label in words.
                                         </f:comment>
                                         <f:if condition="{card.dueDateLabel}">
-                                            <span class="badge contentflow-badge-due-date">
+                                            <span class="badge editorialflow-badge-due-date">
                                                 <core:icon identifier="actions-calendar" size="small" /> {card.dueDateLabel}
                                             </span>
                                         </f:if>
                                     </div>
                                 </div>
 
-                                <div class="contentflow-card-footer">
+                                <div class="editorialflow-card-footer">
                                     <f:if condition="{card.assigneeName}">
                                         <f:then>
-                                            <span class="contentflow-card-assignee" title="Assigned to {card.assigneeName}">
+                                            <span class="editorialflow-card-assignee" title="Assigned to {card.assigneeName}">
                                                 <core:icon identifier="status-user-backend" size="small" />
                                                 <span>{card.assigneeName}</span>
                                             </span>
                                         </f:then>
                                         <f:else>
-                                            <button type="button" class="btn btn-xs btn-default contentflow-action-assign" data-task-uid="{card.uid}">
+                                            <button type="button" class="btn btn-xs btn-default editorialflow-action-assign" data-task-uid="{card.uid}">
                                                 <core:icon identifier="actions-user" size="small" /> Assign me
                                             </button>
                                         </f:else>
                                     </f:if>
 
-                                    <div class="contentflow-card-actions">
+                                    <div class="editorialflow-card-actions">
                                         <f:if condition="{card.subject_uid} > 0 && !{card.foreignWorkspace}">
                                             <f:then>
                                                 <f:if condition="{card.isActive}">
                                                     <f:then>
                                                         <button type="button" class="btn btn-xs btn-warning"
-                                                                data-contentflow-stop-editing data-contentflow-task-uid="{card.uid}"
-                                                                data-contentflow-reload="true">
-                                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:active.stop" default="Stop editing" />
+                                                                data-editorialflow-stop-editing data-editorialflow-task-uid="{card.uid}"
+                                                                data-editorialflow-reload="true">
+                                                            <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:active.stop" default="Stop editing" />
                                                         </button>
                                                     </f:then>
                                                     <f:else>
                                                         <button type="button" class="btn btn-xs btn-default"
-                                                                data-contentflow-set-active="{card.uid}"
-                                                                data-contentflow-context-table="{card.subject_table}"
-                                                                data-contentflow-context-uid="{card.subject_uid}"
-                                                                data-contentflow-reload="true">
-                                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:active.start" default="Work on this task" />
+                                                                data-editorialflow-set-active="{card.uid}"
+                                                                data-editorialflow-context-table="{card.subject_table}"
+                                                                data-editorialflow-context-uid="{card.subject_uid}"
+                                                                data-editorialflow-reload="true">
+                                                            <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:active.start" default="Work on this task" />
                                                         </button>
                                                     </f:else>
                                                 </f:if>
                                             </f:then>
                                         </f:if>
                                         <f:if condition="{card.workspace_uid} > 0 && !{card.foreignWorkspace}">
-                                            <button type="button" class="btn btn-xs btn-primary contentflow-action-publish"
+                                            <button type="button" class="btn btn-xs btn-primary editorialflow-action-publish"
                                                     data-task-uid="{card.uid}" data-task-title="{card.title}">
                                                 <core:icon identifier="actions-cloud-upload" size="small" /> Publish
                                             </button>
                                         </f:if>
                                         <f:if condition="{card.comments} > 0">
-                                            <span class="contentflow-comments-count" title="{card.comments} comments">
+                                            <span class="editorialflow-comments-count" title="{card.comments} comments">
                                                 <core:icon identifier="actions-message" size="small" /> {card.comments}
                                             </span>
                                         </f:if>

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Controller;
+namespace GbWeb\EditorialFlow\Tests\Functional\Controller;
 
-use GbWeb\ContentFlow\Controller\TaskAjaxController;
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
-use GbWeb\ContentFlow\Service\ActivityLogger;
+use GbWeb\EditorialFlow\Controller\TaskAjaxController;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Service\ActivityLogger;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -39,7 +39,7 @@ final class TaskMembershipMovesTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void
@@ -271,8 +271,8 @@ final class TaskMembershipMovesTest extends FunctionalTestCase
      */
     private function createTask(array $overrides = []): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
-        $connection->insert('tx_contentflow_task', array_merge([
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task');
+        $connection->insert('tx_editorialflow_task', array_merge([
             'title' => 'Another task',
             'subject_table' => 'pages',
             'subject_uid' => 2,
@@ -319,12 +319,12 @@ final class TaskMembershipMovesTest extends FunctionalTestCase
      */
     private function activityEvents(int $taskUid, string $event): array
     {
-        $queryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tx_contentflow_activity');
+        $queryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tx_editorialflow_activity');
         $queryBuilder->getRestrictions()->removeAll();
 
         return $queryBuilder
             ->select('*')
-            ->from('tx_contentflow_activity')
+            ->from('tx_editorialflow_activity')
             ->where(
                 $queryBuilder->expr()->eq('task', $queryBuilder->createNamedParameter($taskUid)),
                 $queryBuilder->expr()->eq('event', $queryBuilder->createNamedParameter($event)),

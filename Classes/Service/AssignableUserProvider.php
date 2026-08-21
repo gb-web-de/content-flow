@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
 use TYPO3\CMS\Core\Database\ConnectionPool;
 
@@ -15,7 +15,7 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
  * instead of sent whole on every backend page load.
  *
  * Shared between LoadWizardModuleEventListener (the outer backend chrome) and
- * ContentFlowController (the board's own content iframe) - two genuinely
+ * EditorialFlowController (the board's own content iframe) - two genuinely
  * separate PageRenderer/TYPO3.settings contexts that do not share inline
  * settings with each other, so both need this added independently. See
  * LoadWizardModuleEventListener's docblock for why that split exists at all.

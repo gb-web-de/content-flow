@@ -1,4 +1,4 @@
-# Content Flow — Scenario: Content Element Edit & Task Routing Wizard
+# Editorial Flow — Scenario: Content Element Edit & Task Routing Wizard
 
 ## User Story / Scenario
 User A edits a Content Element (e.g. `tt_content`) and clicks **Save**.
@@ -13,7 +13,7 @@ User A edits a Content Element (e.g. `tt_content`) and clicks **Save**.
    - **Behavior**: Skip the wizard automatically. No popup/question is shown to the editor.
 
 3. **First Save with No Existing Task (Auto-Create + Details Wizard)**:
-   - If neither the record nor its page has an open task yet, Content Flow opens the right task immediately (page task for page-bound content, own task for page-like subjects).
+   - If neither the record nor its page has an open task yet, Editorial Flow opens the right task immediately (page task for page-bound content, own task for page-like subjects).
    - Present a post-save wizard asking the editor to confirm the **mandatory title** and optionally fill:
      - Description
      - Assignee
@@ -36,4 +36,4 @@ User A edits a Content Element (e.g. `tt_content`) and clicks **Save**.
 
 6. **Technical Implementation**:
    - **Backend**: `TaskAutoCreationDataHandlerHook` delegates to `TaskAutoCreationService`, which creates or routes the task immediately and stores one pending wizard payload in backend-user session data.
-   - **Frontend**: `wizard.js` uses TYPO3's supported `@typo3/backend/multi-step-wizard.js` API and submits choices to AJAX route `contentflow_task_wizard_submit`.
+   - **Frontend**: `wizard.js` uses TYPO3's supported `@typo3/backend/multi-step-wizard.js` API and submits choices to AJAX route `editorialflow_task_wizard_submit`.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -24,7 +24,7 @@ use TYPO3\CMS\Core\DataHandling\History\RecordHistoryStore;
  *   archived task therefore has no trail left after a month or two.
  *
  * So this table is not a second truth, it is the durable one. sys_history is a
- * volatile operational log; Content Flow keeps the decision itself (who moved this
+ * volatile operational log; Editorial Flow keeps the decision itself (who moved this
  * from which stage to which, with what comment) and stores `history_uid` as a pointer
  * to core's full field-level detail *for as long as that detail exists*. Readers must
  * treat a dangling history_uid as "detail expired", never as an error.
@@ -35,7 +35,7 @@ use TYPO3\CMS\Core\DataHandling\History\RecordHistoryStore;
  */
 final class ActivityLogger
 {
-    private const TABLE = 'tx_contentflow_activity';
+    private const TABLE = 'tx_editorialflow_activity';
 
     public const EVENT_TASK_CREATED = 'task_created';
     public const EVENT_WORK_STARTED = 'work_started';
@@ -121,7 +121,7 @@ final class ActivityLogger
      *
      * Used to pick up the sys_history uid of a stage change that core wrote, and to
      * reconcile transitions made outside the board (e.g. in the Workspaces module),
-     * which Content Flow never sees happen.
+     * which Editorial Flow never sees happen.
      *
      * Pass the version uid while the version lives, or the live uid after publishing -
      * core migrates `recuid` to the live uid at publish time, so both are correct at

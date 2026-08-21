@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Wizard;
+namespace GbWeb\EditorialFlow\Wizard;
 
-use GbWeb\ContentFlow\Domain\Model\TaskPriority;
-use GbWeb\ContentFlow\Domain\Model\TaskState;
-use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
-use GbWeb\ContentFlow\Notification\AssignmentNotificationService;
-use GbWeb\ContentFlow\Service\ActivityLogger;
-use GbWeb\ContentFlow\Service\RecordCreationTargetProvider;
-use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
+use GbWeb\EditorialFlow\Domain\Model\TaskPriority;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Domain\Repository\CommentRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Notification\AssignmentNotificationService;
+use GbWeb\EditorialFlow\Service\ActivityLogger;
+use GbWeb\EditorialFlow\Service\RecordCreationTargetProvider;
+use GbWeb\EditorialFlow\Service\TaskSubjectRegistry;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
@@ -57,14 +57,14 @@ use TYPO3\CMS\Core\Type\Bitmask\Permission;
  *    refine the auto-generated "reopened for editing" comment B5's regression
  *    already wrote - the transition itself already happened.
  */
-#[AsTaggedItem(index: 'contentflow_task_wizard')]
+#[AsTaggedItem(index: 'editorialflow_task_wizard')]
 final readonly class TaskWizardProvider implements WizardProviderInterface
 {
     /**
      * Translation domain of Resources/Private/Language/locallang.xlf, which the
      * path resolves to rather than anything registering it.
      */
-    private const LANGUAGE_DOMAIN = 'content_flow.messages';
+    private const LANGUAGE_DOMAIN = 'editorial_flow.messages';
 
     public function __construct(
         private TaskRepository $taskRepository,
@@ -106,7 +106,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
 
         if ($mode === 'regression_comment') {
             return Configuration::create([
-                Step::create('@gb-web/content-flow/wizard/steps/comment-step.js')
+                Step::create('@gb-web/editorial-flow/wizard/steps/comment-step.js')
                     ->withConfigurationData(['defaultComment' => (string)($pending['defaultComment'] ?? '')]),
             ]);
         }
@@ -116,7 +116,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
 
             if ($destination === null) {
                 return Configuration::create([
-                    Step::create('@gb-web/content-flow/wizard/steps/route-choice-step.js')
+                    Step::create('@gb-web/editorial-flow/wizard/steps/route-choice-step.js')
                         ->withConfigurationData([
                             'pageTaskTitle' => (string)($pending['pageTaskTitle'] ?? $this->translate('task.untitled')),
                         ]),
@@ -126,7 +126,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
             if ($destination === 'create_new_task') {
                 return Configuration::create([
                     $this->taskDetailsStep((string)($pending['defaultTitle'] ?? $pending['recordTitle'] ?? '')),
-                    Step::create('@gb-web/content-flow/wizard/steps/stage-choice-step.js'),
+                    Step::create('@gb-web/editorial-flow/wizard/steps/stage-choice-step.js'),
                 ]);
             }
 
@@ -135,7 +135,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
         }
 
         return Configuration::create([
-            Step::create('@gb-web/content-flow/wizard/steps/error-step.js')
+            Step::create('@gb-web/editorial-flow/wizard/steps/error-step.js')
                 ->withConfigurationData(['message' => $this->translate('wizard.error.invalidSubmission')]),
         ]);
     }
@@ -159,7 +159,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
 
     private function taskDetailsStep(string $defaultTitle, bool $showExtraFields = false): Step
     {
-        return Step::create('@gb-web/content-flow/wizard/steps/task-details-step.js')
+        return Step::create('@gb-web/editorial-flow/wizard/steps/task-details-step.js')
             ->withConfigurationData([
                 'defaultTitle' => $defaultTitle,
                 'showExtraFields' => $showExtraFields,
@@ -452,7 +452,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
             Finisher::createCustomFinisher(
                 'reload',
                 '@typo3/backend/wizard/finisher/reload-finisher.js',
-                'Content Flow',
+                'Editorial Flow',
                 $message,
                 ['task' => $taskUid],
             ),
@@ -549,7 +549,7 @@ final readonly class TaskWizardProvider implements WizardProviderInterface
             $subjectTitle,
             (string)$this->uriBuilder->buildUriFromRoute('record_edit', [
                 'edit' => [$subjectTable => [$subjectUid => 'edit']],
-                'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_contentflow', ['id' => $pageUid]),
+                'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_editorialflow', ['id' => $pageUid]),
             ]),
         );
     }

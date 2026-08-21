@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 
 /**
@@ -12,7 +12,7 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
  */
 final readonly class PendingSubjectHandoff
 {
-    private const SESSION_KEY = 'content_flow_pending_subject_handoff';
+    private const SESSION_KEY = 'editorial_flow_pending_subject_handoff';
     private const LIFETIME_SECONDS = 600;
 
     public function __construct(

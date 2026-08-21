@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Domain\Repository;
+namespace GbWeb\EditorialFlow\Tests\Functional\Domain\Repository;
 
-use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
+use GbWeb\EditorialFlow\Domain\Repository\CommentRepository;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -23,7 +23,7 @@ final class CommentRepositoryTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     /**
@@ -39,8 +39,8 @@ final class CommentRepositoryTest extends FunctionalTestCase
 
     private function createTask(): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
-        $connection->insert('tx_contentflow_task', [
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task');
+        $connection->insert('tx_editorialflow_task', [
             'title' => 'About us',
             'subject_table' => 'pages',
             'subject_uid' => 2,
@@ -54,12 +54,12 @@ final class CommentRepositoryTest extends FunctionalTestCase
 
     private function commentCounterOf(int $taskUid): int
     {
-        $queryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tx_contentflow_task');
+        $queryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tx_editorialflow_task');
         $queryBuilder->getRestrictions()->removeAll();
 
         return (int)$queryBuilder
             ->select('comments')
-            ->from('tx_contentflow_task')
+            ->from('tx_editorialflow_task')
             ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($taskUid)))
             ->executeQuery()
             ->fetchOne();

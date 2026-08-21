@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\EventListener;
+namespace GbWeb\EditorialFlow\EventListener;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
-use GbWeb\ContentFlow\Service\ActiveTaskSession;
-use GbWeb\ContentFlow\Service\TaskColor;
-use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
-use GbWeb\ContentFlow\Service\WorkspaceConflictDetector;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Service\ActiveTaskSession;
+use GbWeb\EditorialFlow\Service\TaskColor;
+use GbWeb\EditorialFlow\Service\TaskSubjectRegistry;
+use GbWeb\EditorialFlow\Service\WorkspaceConflictDetector;
 use TYPO3\CMS\Backend\Controller\Event\ModifyPageLayoutContentEvent;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
@@ -48,7 +48,7 @@ final class PageModuleEventListener
         return $GLOBALS['BE_USER'];
     }
 
-    #[AsEventListener(identifier: 'content-flow/page-module-header')]
+    #[AsEventListener(identifier: 'editorial-flow/page-module-header')]
     public function __invoke(ModifyPageLayoutContentEvent $event): void
     {
         $pageUid = (int)($event->getRequest()->getQueryParams()['id'] ?? 0);
@@ -80,28 +80,28 @@ final class PageModuleEventListener
         $pageRecord = BackendUtility::getRecord('pages', $pageUid) ?? [];
         $pageTitle = $pageRecord !== [] ? BackendUtility::getRecordTitle('pages', $pageRecord) : '';
 
-        $this->pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css');
-        $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/board.js');
+        $this->pageRenderer->addCssFile('EXT:editorial_flow/Resources/Public/Css/Styles.css');
+        $this->pageRenderer->loadJavaScriptModule('@gb-web/editorial-flow/board.js');
         $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
+            'EditorialFlow',
             'elementBrowserUrl',
             (string)$this->uriBuilder->buildUriFromRoute('wizard_element_browser'),
         );
         $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
+            'EditorialFlow',
             'createTargetTables',
             $this->getCreateTargetTables(),
         );
         $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
+            'EditorialFlow',
             'currentPageId',
             $pageUid,
         );
 
         $view = $this->viewFactory->create(new ViewFactoryData(
-            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
-            partialRootPaths: ['EXT:content_flow/Resources/Private/Partials/'],
-            layoutRootPaths: ['EXT:content_flow/Resources/Private/Layouts/'],
+            templateRootPaths: ['EXT:editorial_flow/Resources/Private/Templates/'],
+            partialRootPaths: ['EXT:editorial_flow/Resources/Private/Partials/'],
+            layoutRootPaths: ['EXT:editorial_flow/Resources/Private/Layouts/'],
             request: $event->getRequest(),
         ));
         $view->assignMultiple([
@@ -109,7 +109,7 @@ final class PageModuleEventListener
             'pageTitle' => $pageTitle,
             'tasks' => $tasks,
             'activeTaskUid' => $activeTaskUid,
-            'boardUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_contentflow', ['id' => $pageUid]),
+            'boardUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_editorialflow', ['id' => $pageUid]),
         ]);
 
         $event->addHeaderContent($view->render('PageModule/Banner'));

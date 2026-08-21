@@ -19,9 +19,9 @@ describe('membership actions', () => {
     global.TYPO3 = {
       settings: {
         ajaxUrls: {
-          contentflow_task_attach: '/attach',
-          contentflow_task_detach: '/detach',
-          contentflow_task_move_targets: '/move-targets',
+          editorialflow_task_attach: '/attach',
+          editorialflow_task_detach: '/detach',
+          editorialflow_task_move_targets: '/move-targets',
         },
       },
     }
@@ -113,7 +113,7 @@ describe('the move dialog', () => {
     resetAjax()
     resetNotifications()
     resetModals()
-    global.TYPO3 = { settings: { ajaxUrls: { contentflow_task_move_targets: '/move-targets', contentflow_task_attach: '/attach' } } }
+    global.TYPO3 = { settings: { ajaxUrls: { editorialflow_task_move_targets: '/move-targets', editorialflow_task_attach: '/attach' } } }
   })
 
   it('offers every task the server named, with where it currently sits', async () => {

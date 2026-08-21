@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\EventListener;
+namespace GbWeb\EditorialFlow\EventListener;
 
 use TYPO3\CMS\Backend\Template\Components\ButtonBar;
 use TYPO3\CMS\Backend\Template\Components\ComponentFactory;
@@ -19,14 +19,14 @@ final readonly class ActiveTaskButtonBarEventListener
     ) {
     }
 
-    #[AsEventListener(identifier: 'content-flow/active-task-button-bar')]
+    #[AsEventListener(identifier: 'editorial-flow/active-task-button-bar')]
     public function __invoke(ModifyButtonBarEvent $event): void
     {
         [$table, $uid] = $this->recordContext($event->getRequest()->getQueryParams());
 
         $control = sprintf(
-            '<span class="contentflow-active-control" data-contentflow-active-control'
-                . ' data-contentflow-context-table="%s" data-contentflow-context-uid="%d"'
+            '<span class="editorialflow-active-control" data-editorialflow-active-control'
+                . ' data-editorialflow-context-table="%s" data-editorialflow-context-uid="%d"'
                 . ' aria-live="polite"></span>',
             htmlspecialchars($table, ENT_QUOTES | ENT_HTML5),
             $uid,
@@ -37,8 +37,8 @@ final readonly class ActiveTaskButtonBarEventListener
         $buttons[ButtonBar::BUTTON_POSITION_RIGHT][15][] = $button;
         $event->setButtons($buttons);
 
-        $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/task/active-task-control.js');
-        $this->pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css');
+        $this->pageRenderer->loadJavaScriptModule('@gb-web/editorial-flow/task/active-task-control.js');
+        $this->pageRenderer->addCssFile('EXT:editorial_flow/Resources/Public/Css/Styles.css');
     }
 
     /**

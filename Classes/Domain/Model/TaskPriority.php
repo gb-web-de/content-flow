@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Domain\Model;
+namespace GbWeb\EditorialFlow\Domain\Model;
 
 /**
  * How urgent a task is.

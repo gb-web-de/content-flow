@@ -21,7 +21,7 @@ describe('TaskWizardSubmissionService', () => {
     await new TaskWizardSubmissionService(contextWith({ pending: { mode: 'create_from_picker' } })).execute()
 
     expect(recorded.url).toBe('/typo3/ajax/wizard/submit')
-    expect(recorded.queryArguments).toEqual({ mode: 'contentflow_task_wizard' })
+    expect(recorded.queryArguments).toEqual({ mode: 'editorialflow_task_wizard' })
   })
 
   it('flattens pending, destination, details and stage into one body', async () => {

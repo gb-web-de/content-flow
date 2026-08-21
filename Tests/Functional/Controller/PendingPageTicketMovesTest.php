@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Controller;
+namespace GbWeb\EditorialFlow\Tests\Functional\Controller;
 
-use GbWeb\ContentFlow\Controller\TaskAjaxController;
-use GbWeb\ContentFlow\Domain\Model\TaskState;
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
-use GbWeb\ContentFlow\Service\PendingPageHandoff;
+use GbWeb\EditorialFlow\Controller\TaskAjaxController;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Service\PendingPageHandoff;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -44,7 +44,7 @@ final class PendingPageTicketMovesTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void
@@ -89,8 +89,8 @@ final class PendingPageTicketMovesTest extends FunctionalTestCase
      */
     private function createPendingTicket(array $overrides = []): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
-        $connection->insert('tx_contentflow_task', array_merge([
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task');
+        $connection->insert('tx_editorialflow_task', array_merge([
             'title' => 'Trail guide',
             'subject_table' => 'pages',
             'subject_uid' => 0,

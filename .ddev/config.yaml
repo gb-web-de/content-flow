@@ -1,4 +1,4 @@
-name: content-flow
+name: editorial-flow
 type: typo3
 docroot: .Build/Web
 php_version: "8.3"
@@ -29,7 +29,7 @@ web_environment:
   - TYPO3_SETUP_ADMIN_USERNAME=admin
   - TYPO3_SETUP_ADMIN_PASSWORD=Password.1
   - TYPO3_SETUP_ADMIN_EMAIL=admin@example.com
-  - TYPO3_PROJECT_NAME=Content Flow
+  - TYPO3_PROJECT_NAME=Editorial Flow
   # Imports theme-camino/Initialisation/data.xml - a full demo site (Camino,
   # FAQs, Packing List, Route Comparison, images). The distribution creates the
   # site configuration itself, which is why TYPO3_SETUP_CREATE_SITE must NOT be

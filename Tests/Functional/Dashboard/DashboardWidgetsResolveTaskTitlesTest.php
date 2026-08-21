@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Dashboard;
+namespace GbWeb\EditorialFlow\Tests\Functional\Dashboard;
 
-use GbWeb\ContentFlow\Dashboard\Widget\RecentActivityWidget;
-use GbWeb\ContentFlow\Dashboard\Widget\RecentCommentsWidget;
+use GbWeb\EditorialFlow\Dashboard\Widget\RecentActivityWidget;
+use GbWeb\EditorialFlow\Dashboard\Widget\RecentCommentsWidget;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -36,7 +36,7 @@ final class DashboardWidgetsResolveTaskTitlesTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void
@@ -59,8 +59,8 @@ final class DashboardWidgetsResolveTaskTitlesTest extends FunctionalTestCase
 
     private function createTask(string $title): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
-        $connection->insert('tx_contentflow_task', [
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task');
+        $connection->insert('tx_editorialflow_task', [
             'title' => $title,
             'subject_table' => 'pages',
             'subject_uid' => 2,
@@ -75,8 +75,8 @@ final class DashboardWidgetsResolveTaskTitlesTest extends FunctionalTestCase
     public function recentActivityWidgetShowsTheTaskTitleItReferences(): void
     {
         $taskUid = $this->createTask('About us');
-        $this->getConnectionPool()->getConnectionForTable('tx_contentflow_activity')->insert(
-            'tx_contentflow_activity',
+        $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_activity')->insert(
+            'tx_editorialflow_activity',
             ['task' => $taskUid, 'event' => 'work_started', 'crdate' => time()],
         );
 
@@ -95,8 +95,8 @@ final class DashboardWidgetsResolveTaskTitlesTest extends FunctionalTestCase
     public function recentCommentsWidgetShowsTheTaskTitleItReferences(): void
     {
         $taskUid = $this->createTask('Products');
-        $this->getConnectionPool()->getConnectionForTable('tx_contentflow_comment')->insert(
-            'tx_contentflow_comment',
+        $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_comment')->insert(
+            'tx_editorialflow_comment',
             ['task' => $taskUid, 'content' => 'Looks good to me.', 'crdate' => time()],
         );
 

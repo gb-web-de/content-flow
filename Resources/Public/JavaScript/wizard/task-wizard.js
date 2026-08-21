@@ -10,13 +10,13 @@
  * declared via the plain `static properties` form instead of @property().
  */
 import { LitElement, html } from 'lit'
-import labels from '~labels/content_flow.messages'
+import labels from '~labels/editorial_flow.messages'
 import { Size } from '@typo3/backend/modal.js'
 import '@typo3/backend/wizard/wizard.js'
 import { loadDynamicSteps } from '@typo3/backend/wizard/helper/dynamic-steps-loader.js'
 import { AutoAdvanceEvent } from '@typo3/backend/wizard/events/auto-advance-event.js'
 
-import { TaskWizardSubmissionService } from '@gb-web/content-flow/wizard/task-wizard-submission-service.js'
+import { TaskWizardSubmissionService } from '@gb-web/editorial-flow/wizard/task-wizard-submission-service.js'
 
 /*
  * Every Modal.advanced() that hosts this element has to pass this as its
@@ -63,7 +63,7 @@ export class TaskWizard extends LitElement {
     this.context.setStoreData('pending', this.pending)
     this.submissionService = new TaskWizardSubmissionService(this.context)
 
-    loadDynamicSteps('contentflow_task_wizard', this.context).then((steps) => {
+    loadDynamicSteps('editorialflow_task_wizard', this.context).then((steps) => {
       this.initialSteps = steps
     })
   }
@@ -83,10 +83,10 @@ export class TaskWizard extends LitElement {
     if (event.detail.currentStepKey !== 'destination') {
       return
     }
-    event.detail.result = loadDynamicSteps('contentflow_task_wizard', this.context).then((steps) => {
+    event.detail.result = loadDynamicSteps('editorialflow_task_wizard', this.context).then((steps) => {
       this.followUpSteps = steps
     })
   }
 }
 
-customElements.define('contentflow-task-wizard', TaskWizard)
+customElements.define('editorialflow-task-wizard', TaskWizard)

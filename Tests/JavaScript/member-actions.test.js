@@ -25,13 +25,13 @@ describe('discarding a member\'s pending changes', () => {
     resetModals()
     document.body.innerHTML = ''
     discardButton = document.createElement('button')
-    discardButton.className = 'contentflow-member-discard'
+    discardButton.className = 'editorialflow-member-discard'
     discardButton.dataset.table = 'tt_content'
     discardButton.dataset.uid = '12'
     discardButton.dataset.title = 'Intro'
     document.body.appendChild(discardButton)
 
-    global.TYPO3 = { settings: { ajaxUrls: { contentflow_task_discard_member: '/discard' } } }
+    global.TYPO3 = { settings: { ajaxUrls: { editorialflow_task_discard_member: '/discard' } } }
     vi.stubGlobal('location', { reload: vi.fn() })
 
     registerMemberActions()

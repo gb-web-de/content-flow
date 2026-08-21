@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Controller;
+namespace GbWeb\EditorialFlow\Controller;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
-use GbWeb\ContentFlow\Service\ActiveTaskSession;
-use GbWeb\ContentFlow\Service\AssignableUserProvider;
-use GbWeb\ContentFlow\Service\BoardColumnRegistry;
-use GbWeb\ContentFlow\Service\BoardScopeResolver;
-use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
-use GbWeb\ContentFlow\Service\WorkspaceConflictDetector;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Service\ActiveTaskSession;
+use GbWeb\EditorialFlow\Service\AssignableUserProvider;
+use GbWeb\EditorialFlow\Service\BoardColumnRegistry;
+use GbWeb\EditorialFlow\Service\BoardScopeResolver;
+use GbWeb\EditorialFlow\Service\TaskSubjectRegistry;
+use GbWeb\EditorialFlow\Service\WorkspaceConflictDetector;
 use Psr\Http\Message\ResponseInterface;
 use TYPO3\CMS\Backend\Attribute\AsController;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
@@ -24,14 +24,14 @@ use TYPO3\CMS\Workspaces\Authorization\WorkspacePublishGate;
 use TYPO3\CMS\Workspaces\Service\WorkspaceService;
 
 /**
- * The Content Flow board.
+ * The Editorial Flow board.
  *
  * Renders one column set (see BoardColumnRegistry) and distributes the page's open
  * tasks into it. Cards are grouped in PHP from a single query - the number of review
  * stages an integrator configures never changes the number of queries.
  */
 #[AsController]
-final class ContentFlowController extends ActionController
+final class EditorialFlowController extends ActionController
 {
     public function __construct(
         protected readonly ModuleTemplateFactory $moduleTemplateFactory,
@@ -72,7 +72,7 @@ final class ContentFlowController extends ActionController
         $pageTitle = $pageRecord !== [] ? BackendUtility::getRecordTitle('pages', $pageRecord) : '';
 
         $moduleTitle = $this->getLanguageService()->sL(
-            'LLL:EXT:content_flow/Resources/Private/Language/locallang_mod.xlf:mlang_tabs_tab'
+            'LLL:EXT:editorial_flow/Resources/Private/Language/locallang_mod.xlf:mlang_tabs_tab'
         );
         $moduleTemplate->setTitle($moduleTitle, $pageTitle);
         $docHeader = $moduleTemplate->getDocHeaderComponent();
@@ -80,7 +80,7 @@ final class ContentFlowController extends ActionController
             $docHeader->setPageBreadcrumb($pageRecord);
         }
         $docHeader->setShortcutContext(
-            'web_contentflow',
+            'web_editorialflow',
             sprintf('%s: %s [%d]', $moduleTitle, $pageTitle !== '' ? $pageTitle : '/', $pageUid),
             ['id' => $pageUid],
         );
@@ -96,9 +96,9 @@ final class ContentFlowController extends ActionController
             'otherWorkspaces' => $otherWorkspaces,
         ]);
 
-        $this->pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css');
-        $this->pageRenderer->addCssInlineBlock('content-flow-due-date-colors', $this->dueDateColorCss(), csp: true);
-        $this->pageRenderer->loadJavaScriptModule('@gb-web/content-flow/board.js');
+        $this->pageRenderer->addCssFile('EXT:editorial_flow/Resources/Public/Css/Styles.css');
+        $this->pageRenderer->addCssInlineBlock('editorial-flow-due-date-colors', $this->dueDateColorCss(), csp: true);
+        $this->pageRenderer->loadJavaScriptModule('@gb-web/editorial-flow/board.js');
         // Core's element browser gives the "+" button a page tree with live search
         // and depth navigation - no bespoke picker needed.
         //
@@ -107,7 +107,7 @@ final class ContentFlowController extends ActionController
         // useEvents as query params). The old pipe-delimited `bparams` string is
         // deprecated in v14 and silently produced a browser that selected nothing.
         $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
+            'EditorialFlow',
             'elementBrowserUrl',
             (string)$this->backendUriBuilder->buildUriFromRoute('wizard_element_browser'),
         );
@@ -118,12 +118,12 @@ final class ContentFlowController extends ActionController
         // returnUrl depend on which page is selected on the board, so
         // create-wizard.js appends them client-side.
         $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
+            'EditorialFlow',
             'newContentElementWizardUrl',
             (string)$this->backendUriBuilder->buildUriFromRoute('new_content_element_wizard'),
         );
         $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
+            'EditorialFlow',
             'currentUserId',
             (int)($backendUser->user['uid'] ?? 0),
         );
@@ -131,12 +131,12 @@ final class ContentFlowController extends ActionController
         // regardless of the workspace checkbox filter - that filter only ever
         // narrows which *other* workspaces' merged-in cards are visible.
         $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
+            'EditorialFlow',
             'currentWorkspaceId',
             $workspaceUid,
         );
         $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
+            'EditorialFlow',
             'createTargetTables',
             $this->getCreateTargetTables(),
         );
@@ -146,12 +146,12 @@ final class ContentFlowController extends ActionController
         // added there. Needed here for the assignee picker in the "+ New task"
         // wizard steps, which run inside this iframe, not the outer chrome.
         $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
+            'EditorialFlow',
             'assignableUsers',
             $this->assignableUserProvider->getAssignableUsers(),
         );
         $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
+            'EditorialFlow',
             'currentPageId',
             $pageUid,
         );
@@ -161,11 +161,11 @@ final class ContentFlowController extends ActionController
         // that a task can only ever hold a real pending version once its own
         // workspace_uid is set to this same current workspace.
         $this->pageRenderer->addInlineSetting(
-            'ContentFlow',
+            'EditorialFlow',
             'canPublish',
             $workspaceUid > 0 && $this->workspacePublishGate->isGranted($backendUser, $workspaceUid),
         );
-        return $moduleTemplate->renderResponse('ContentFlow/Index');
+        return $moduleTemplate->renderResponse('EditorialFlow/Index');
     }
 
     /**
@@ -255,8 +255,8 @@ final class ContentFlowController extends ActionController
             $task['dueDateUrgency'] = $this->computeDueDateUrgency($dueDate);
             $task['dueDateLabel'] = $this->computeDueDateLabel($dueDate);
             $task['dueDateCardClass'] = match ($task['dueDateUrgency']) {
-                'overdue' => 'contentflow-card--overdue',
-                'due-soon' => 'contentflow-card--due-soon',
+                'overdue' => 'editorialflow-card--overdue',
+                'due-soon' => 'editorialflow-card--due-soon',
                 default => '',
             };
 
@@ -288,7 +288,7 @@ final class ContentFlowController extends ActionController
             // setting. It already covers every case this could be asked to
             // support: `be_users_<uid>` for one person, `be_groups_<uid>` for a
             // team, several of either combined, or a group with every editor in
-            // it for "anyone may act here". Content Flow deliberately adds no
+            // it for "anyone may act here". Editorial Flow deliberately adds no
             // parallel permission model of its own on top of it.
             $task['canAct'] = $backendUser->workspaceCheckStageForCurrent((int)($task['stage_uid'] ?? 0));
             return $task;
@@ -336,7 +336,7 @@ final class ContentFlowController extends ActionController
      * the other ones merged into the board - see BoardColumnRegistry) belongs to
      * the merged column whose stageUidByWorkspace entry for its own workspace
      * matches its own stage_uid. An unversioned task belongs to the column of its
-     * Content Flow state instead, and only ever to one from the active workspace
+     * Editorial Flow state instead, and only ever to one from the active workspace
      * (or none) - a foreign workspace never owns a Backlog/Planned/Done task,
      * since those states only exist before/after a workspace version does.
      *
@@ -397,7 +397,7 @@ final class ContentFlowController extends ActionController
             return 'overdue';
         }
 
-        $warningDays = (int)($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['dueDateThresholds']['warningDays'] ?? 3);
+        $warningDays = (int)($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['editorial_flow']['dueDateThresholds']['warningDays'] ?? 3);
 
         return $daysRemaining <= $warningDays ? 'due-soon' : null;
     }
@@ -436,17 +436,17 @@ final class ContentFlowController extends ActionController
 
     /**
      * Injects the configured warning/overdue colors as CSS custom properties
-     * so Styles.css can consume them via var(--contentflow-due-soon, ...) the
+     * so Styles.css can consume them via var(--editorialflow-due-soon, ...) the
      * same way it already consumes every --typo3-* design token, with a safe
      * fallback if EXTCONF holds something that isn't a color at all.
      */
     private function dueDateColorCss(): string
     {
-        $thresholds = $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['dueDateThresholds'] ?? [];
+        $thresholds = $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['editorial_flow']['dueDateThresholds'] ?? [];
         $warningColor = $this->sanitizeCssColor((string)($thresholds['warningColor'] ?? ''), '#e0a810');
         $overdueColor = $this->sanitizeCssColor((string)($thresholds['overdueColor'] ?? ''), '#d9534f');
 
-        return sprintf(':root { --contentflow-due-soon: %s; --contentflow-overdue: %s; }', $warningColor, $overdueColor);
+        return sprintf(':root { --editorialflow-due-soon: %s; --editorialflow-overdue: %s; }', $warningColor, $overdueColor);
     }
 
     private function sanitizeCssColor(string $color, string $fallback): string

@@ -16,13 +16,13 @@ export default defineConfig({
       '@typo3/backend/notification.js': `${doubles}/notification.js`,
       '@typo3/backend/modal.js': `${doubles}/modal.js`,
       '@typo3/backend/enum/severity.js': `${doubles}/severity.js`,
-      '~labels/content_flow.messages': `${doubles}/labels.js`,
+      '~labels/editorial_flow.messages': `${doubles}/labels.js`,
       // The picker is a LitElement imported purely for its custom-element
       // registration; standing it in keeps lit out of the test environment.
-      '@gb-web/content-flow/components/assignee-picker.js': `${doubles}/assignee-picker.js`,
+      '@gb-web/editorial-flow/components/assignee-picker.js': `${doubles}/assignee-picker.js`,
       // This extension's own modules resolve to themselves - the importmap
       // maps the same prefix onto Resources/Public/JavaScript/ in the browser.
-      '@gb-web/content-flow': fileURLToPath(new URL('./Resources/Public/JavaScript', import.meta.url)),
+      '@gb-web/editorial-flow': fileURLToPath(new URL('./Resources/Public/JavaScript', import.meta.url)),
     },
   },
   test: {

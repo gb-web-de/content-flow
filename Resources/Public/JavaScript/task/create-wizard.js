@@ -14,20 +14,20 @@ import { html } from 'lit'
 import AjaxRequest from '@typo3/core/ajax/ajax-request.js'
 import { Categories } from '@typo3/backend/new-record-wizard.js'
 
-import labels from '~labels/content_flow.messages'
+import labels from '~labels/editorial_flow.messages'
 
-import { WIZARD_MODAL_SIZE } from '@gb-web/content-flow/wizard/task-wizard.js'
-import { taskContextTitle } from '@gb-web/content-flow/task/task-context-title.js'
+import { WIZARD_MODAL_SIZE } from '@gb-web/editorial-flow/wizard/task-wizard.js'
+import { taskContextTitle } from '@gb-web/editorial-flow/task/task-context-title.js'
 
-const ELEMENT_BROWSER_FIELD_REFERENCE_PREFIX = 'contentflow-create-target'
+const ELEMENT_BROWSER_FIELD_REFERENCE_PREFIX = 'editorialflow-create-target'
 const PAGE_TABLE = 'pages'
 const CONTENT_ELEMENT_TABLE = 'tt_content'
 
 // The extension's name, not a sentence - it stays out of the label file.
-const NOTIFICATION_TITLE = 'Content Flow'
+const NOTIFICATION_TITLE = 'Editorial Flow'
 
 function getAllowedCreateTables() {
-  const configuredTables = TYPO3.settings.ContentFlow?.createTargetTables
+  const configuredTables = TYPO3.settings.EditorialFlow?.createTargetTables
   if (!Array.isArray(configuredTables) || configuredTables.length === 0) {
     return [PAGE_TABLE]
   }
@@ -70,9 +70,9 @@ function openNewTaskWizard(table, uid, recordTitle) {
   Modal.advanced({
     type: Modal.types.default,
     title: taskContextTitle(pending, labels),
-    content: html`<contentflow-task-wizard
+    content: html`<editorialflow-task-wizard
       .pending=${pending}
-    ></contentflow-task-wizard>`,
+    ></editorialflow-task-wizard>`,
     severity: SeverityEnum.notice,
     size: WIZARD_MODAL_SIZE,
     staticBackdrop: true,
@@ -87,14 +87,14 @@ function openNewTaskWizard(table, uid, recordTitle) {
  * TaskAjaxController::materializePendingPage()).
  */
 function openPendingPageWizard() {
-  const parentPid = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
+  const parentPid = parseInt(TYPO3.settings.EditorialFlow?.currentPageId || '0', 10)
   const pending = { mode: 'create_pending_page', parentPid }
   Modal.advanced({
     type: Modal.types.default,
     title: taskContextTitle(pending, labels),
-    content: html`<contentflow-task-wizard
+    content: html`<editorialflow-task-wizard
       .pending=${pending}
-    ></contentflow-task-wizard>`,
+    ></editorialflow-task-wizard>`,
     severity: SeverityEnum.notice,
     size: WIZARD_MODAL_SIZE,
     staticBackdrop: true,
@@ -108,12 +108,12 @@ function openPendingPageWizard() {
  * wizard component. Nothing left to collect here but task details.
  */
 function openPendingRecordWizard(table, label) {
-  const parentPid = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
+  const parentPid = parseInt(TYPO3.settings.EditorialFlow?.currentPageId || '0', 10)
   const pending = { mode: 'create_pending_record', parentPid, table, recordTypeLabel: label }
   Modal.advanced({
     type: Modal.types.default,
     title: taskContextTitle(pending, labels),
-    content: html`<contentflow-task-wizard .pending=${pending}></contentflow-task-wizard>`,
+    content: html`<editorialflow-task-wizard .pending=${pending}></editorialflow-task-wizard>`,
     severity: SeverityEnum.notice,
     size: WIZARD_MODAL_SIZE,
     staticBackdrop: true,
@@ -124,7 +124,7 @@ function openPendingRecordWizard(table, label) {
 /*
  * "Create a new record": a grouped, iconed picker for which table to plan -
  * TYPO3 core's own <typo3-backend-new-record-wizard> component (the "New page
- * content" wizard's UI), fed content_flow's own creatable-tables data. That
+ * content" wizard's UI), fed editorial_flow's own creatable-tables data. That
  * component acts on a click immediately (dispatches its configured event, then
  * dismisses its own modal) rather than sitting inside a multi-step sequence, so
  * it gets its own standalone modal here - same shape as openRecordPicker()
@@ -132,7 +132,7 @@ function openPendingRecordWizard(table, label) {
  * chosen in the iframe browser.
  */
 async function openRecordTypePicker() {
-  const url = TYPO3.settings?.ajaxUrls?.contentflow_task_record_type_categories
+  const url = TYPO3.settings?.ajaxUrls?.editorialflow_task_record_type_categories
   if (!url) {
     Notification.error(NOTIFICATION_TITLE, labels.get('wizard.error.recordTypeCategoriesMissing'))
     return
@@ -158,7 +158,7 @@ async function openRecordTypePicker() {
 
   // Built imperatively rather than through a lit `html` content template: the
   // component dispatches its selection event on itself without `bubbles: true`
-  // (unlike content_flow's own now-removed record-type-step.js, which set that
+  // (unlike editorial_flow's own now-removed record-type-step.js, which set that
   // explicitly), so the listener has to sit on this exact element, not on the
   // modal wrapper a few DOM levels up.
   //
@@ -175,8 +175,8 @@ async function openRecordTypePicker() {
   // TYPO3.ModuleMenu rather than assuming its own frame's globals apply.
   const picker = top.document.createElement('typo3-backend-new-record-wizard')
   picker.categories = categories
-  picker.setAttribute('store-name', 'contentflow-new-record-type')
-  picker.addEventListener('contentflow:record-type-chosen', (event) => {
+  picker.setAttribute('store-name', 'editorialflow-new-record-type')
+  picker.addEventListener('editorialflow:record-type-chosen', (event) => {
     const item = event.detail?.item
     if (!item?.identifier) {
       return
@@ -219,8 +219,8 @@ async function openRecordTypePicker() {
  * "+Content" without a fixed column would in the page module itself.
  */
 function openNewContentElementWizard() {
-  const baseUrl = TYPO3.settings.ContentFlow?.newContentElementWizardUrl
-  const pageId = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
+  const baseUrl = TYPO3.settings.EditorialFlow?.newContentElementWizardUrl
+  const pageId = parseInt(TYPO3.settings.EditorialFlow?.currentPageId || '0', 10)
   if (!baseUrl || pageId < 1) {
     Notification.error(NOTIFICATION_TITLE, labels.get('wizard.error.newContentElementWizardMissing'))
     return
@@ -251,13 +251,13 @@ function openNewContentElementWizard() {
 }
 
 function openRecordPicker(allowedTypesOverride, titleLabelKey = 'entry.recordPicker.title') {
-  const baseUrl = TYPO3.settings.ContentFlow?.elementBrowserUrl
+  const baseUrl = TYPO3.settings.EditorialFlow?.elementBrowserUrl
   if (!baseUrl) {
     Notification.error(NOTIFICATION_TITLE, labels.get('wizard.error.elementBrowserMissing'))
     return
   }
 
-  const currentPageId = parseInt(TYPO3.settings.ContentFlow?.currentPageId || '0', 10)
+  const currentPageId = parseInt(TYPO3.settings.EditorialFlow?.currentPageId || '0', 10)
   const allowedTypes = allowedTypesOverride || getAllowedCreateTables()
   if (allowedTypes.length === 0) {
     Notification.warning(NOTIFICATION_TITLE, labels.get('entry.record.empty'))
@@ -351,30 +351,30 @@ function openEntryChoiceWizard() {
   let modal
 
   const content = document.createElement('div')
-  content.className = 'contentflow-entry-chooser'
+  content.className = 'editorialflow-entry-chooser'
 
   const buildChoiceSection = ({ title, choices }) => {
     const section = document.createElement('section')
-    section.className = 'contentflow-entry-section'
+    section.className = 'editorialflow-entry-section'
     section.setAttribute('aria-label', title)
 
     const heading = document.createElement('h3')
-    heading.className = 'contentflow-entry-section-title'
+    heading.className = 'editorialflow-entry-section-title'
     heading.textContent = title
 
     const list = document.createElement('div')
-    list.className = 'contentflow-entry-choices'
+    list.className = 'editorialflow-entry-choices'
     choices.forEach(({ label, description, action }) => {
       const button = document.createElement('button')
       button.type = 'button'
-      button.className = 'btn btn-default contentflow-entry-choice'
+      button.className = 'btn btn-default editorialflow-entry-choice'
 
       const title = document.createElement('span')
-      title.className = 'contentflow-entry-choice-title'
+      title.className = 'editorialflow-entry-choice-title'
       title.textContent = label
 
       const hint = document.createElement('span')
-      hint.className = 'contentflow-entry-choice-hint'
+      hint.className = 'editorialflow-entry-choice-hint'
       hint.textContent = description
 
       button.append(title, hint)
@@ -408,16 +408,16 @@ function openEntryChoiceWizard() {
 }
 
 export function registerCreateButton(board) {
-  document.querySelectorAll('[data-contentflow-action="create-task"]').forEach((button) => {
+  document.querySelectorAll('[data-editorialflow-action="create-task"]').forEach((button) => {
     button.addEventListener('click', (event) => {
       event.preventDefault()
 
-      const bannerPageId = parseInt(button.dataset.contentflowPage || '0', 10)
+      const bannerPageId = parseInt(button.dataset.editorialflowPage || '0', 10)
       if (bannerPageId > 0) {
         openNewTaskWizard(
           'pages',
           bannerPageId,
-          button.dataset.contentflowPageTitle || ('Page ' + bannerPageId),
+          button.dataset.editorialflowPageTitle || ('Page ' + bannerPageId),
         )
         return
       }

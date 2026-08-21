@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Domain\Repository;
+namespace GbWeb\EditorialFlow\Domain\Repository;
 
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use TYPO3\CMS\Core\Database\Connection;
@@ -12,16 +12,16 @@ use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 /**
  * A stage's review checklist, and one task's progress against it.
  *
- * Two tables on purpose: `tx_contentflow_stage_checklist_item` is the
+ * Two tables on purpose: `tx_editorialflow_stage_checklist_item` is the
  * definition (a stage's own policy, reused by every task passing through it),
- * `tx_contentflow_task_checklist_state` is one task's completion of it. Mirrors
+ * `tx_editorialflow_task_checklist_state` is one task's completion of it. Mirrors
  * TaskRepository's member/item split - the relationship (has this task checked
  * this item?) has its own row and lifecycle, independent of both sides.
  */
 final class TaskChecklistRepository
 {
-    private const TABLE_ITEM = 'tx_contentflow_stage_checklist_item';
-    private const TABLE_STATE = 'tx_contentflow_task_checklist_state';
+    private const TABLE_ITEM = 'tx_editorialflow_stage_checklist_item';
+    private const TABLE_STATE = 'tx_editorialflow_task_checklist_state';
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,

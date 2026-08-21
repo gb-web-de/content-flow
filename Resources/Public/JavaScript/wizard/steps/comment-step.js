@@ -14,7 +14,7 @@
  * case there.
  */
 import { html } from 'lit'
-import labels from '~labels/content_flow.messages'
+import labels from '~labels/editorial_flow.messages'
 
 export class CommentStep {
   constructor(context, configurationData = {}) {

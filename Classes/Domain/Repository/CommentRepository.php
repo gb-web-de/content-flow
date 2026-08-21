@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Domain\Repository;
+namespace GbWeb\EditorialFlow\Domain\Repository;
 
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -18,8 +18,8 @@ use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
  */
 final class CommentRepository
 {
-    private const TABLE = 'tx_contentflow_comment';
-    private const TABLE_TASK = 'tx_contentflow_task';
+    private const TABLE = 'tx_editorialflow_comment';
+    private const TABLE_TASK = 'tx_editorialflow_task';
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,

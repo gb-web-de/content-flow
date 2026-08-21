@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Controller;
+namespace GbWeb\EditorialFlow\Controller;
 
 /**
  * One rejected action, with two audiences.

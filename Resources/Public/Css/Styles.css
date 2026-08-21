@@ -1,30 +1,30 @@
 /**
- * Content Flow - Modern TYPO3 Core Backend Design System
+ * Editorial Flow - Modern TYPO3 Core Backend Design System
  */
 :root {
-    --contentflow-gap: 16px;
-    --contentflow-col-width: 310px;
-    --contentflow-col-bg: var(--typo3-surface-container-low, #f3f3f3);
-    --contentflow-col-border: var(--typo3-component-border-color, #e0e0e0);
-    --contentflow-card-bg: var(--typo3-surface-base, #ffffff);
-    --contentflow-card-border: var(--typo3-component-border-color, #e2e4e8);
-    --contentflow-card-radius: var(--typo3-component-border-radius, 6px);
-    --contentflow-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-    --contentflow-card-hover-shadow: 0 6px 16px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
-    --contentflow-accent: var(--typo3-component-primary-color, #0078d4);
-    --contentflow-drag-over-bg: var(--typo3-state-info-bg, #e3f2fd);
-    --contentflow-typo3-green: #68a614;
-    --contentflow-typo3-green-bg: rgba(104, 166, 20, 0.12);
-    --contentflow-typo3-red: #d9534f;
-    --contentflow-typo3-red-bg: rgba(217, 83, 79, 0.12);
+    --editorialflow-gap: 16px;
+    --editorialflow-col-width: 310px;
+    --editorialflow-col-bg: var(--typo3-surface-container-low, #f3f3f3);
+    --editorialflow-col-border: var(--typo3-component-border-color, #e0e0e0);
+    --editorialflow-card-bg: var(--typo3-surface-base, #ffffff);
+    --editorialflow-card-border: var(--typo3-component-border-color, #e2e4e8);
+    --editorialflow-card-radius: var(--typo3-component-border-radius, 6px);
+    --editorialflow-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+    --editorialflow-card-hover-shadow: 0 6px 16px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+    --editorialflow-accent: var(--typo3-component-primary-color, #0078d4);
+    --editorialflow-drag-over-bg: var(--typo3-state-info-bg, #e3f2fd);
+    --editorialflow-typo3-green: #68a614;
+    --editorialflow-typo3-green-bg: rgba(104, 166, 20, 0.12);
+    --editorialflow-typo3-red: #d9534f;
+    --editorialflow-typo3-red-bg: rgba(217, 83, 79, 0.12);
     /* Deliberately its own hue, distinct from the warning color already used for
        "needs attention" (shared/foreign-page members) - a foreign-workspace card
        is a different kind of fact (whose workspace this is), not a warning. */
-    --contentflow-foreign-accent: #6f42c1;
-    --contentflow-foreign-accent-bg: rgba(111, 66, 193, 0.12);
+    --editorialflow-foreign-accent: #6f42c1;
+    --editorialflow-foreign-accent-bg: rgba(111, 66, 193, 0.12);
 }
 
-.contentflow-toolbar {
+.editorialflow-toolbar {
     padding: 16px 20px 0;
     display: flex;
     justify-content: space-between;
@@ -33,17 +33,17 @@
     flex-wrap: wrap;
 }
 
-.contentflow-filters {
+.editorialflow-filters {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
 }
 
-.contentflow-filters .input-group {
+.editorialflow-filters .input-group {
     display: flex;
     align-items: stretch;
-    /* flex-shrink: 0, not just a width - .contentflow-filters is a
+    /* flex-shrink: 0, not just a width - .editorialflow-filters is a
        non-wrapping-per-item flex row (only the row itself wraps) sharing
        space with three selects that each carry their own min-width below;
        without an equally protected basis here, this was the one item with no
@@ -52,107 +52,107 @@
        is what actually caused the invisible/unusable input, not the missing
        flex/border rules alone. */
     flex: 0 0 260px;
-    border: 1px solid var(--contentflow-card-border);
-    border-radius: var(--contentflow-card-radius);
+    border: 1px solid var(--editorialflow-card-border);
+    border-radius: var(--editorialflow-card-radius);
     overflow: hidden;
-    background: var(--contentflow-card-bg);
+    background: var(--editorialflow-card-bg);
 }
 
-.contentflow-filters .input-group-addon {
+.editorialflow-filters .input-group-addon {
     display: flex;
     align-items: center;
     padding: 0 8px;
     opacity: 0.6;
 }
 
-.contentflow-filters .input-group .form-control {
+.editorialflow-filters .input-group .form-control {
     flex: 1 1 auto;
     min-width: 0;
     border: none;
     background: transparent;
 }
 
-.contentflow-filters .input-group .form-control:focus {
+.editorialflow-filters .input-group .form-control:focus {
     outline: none;
     box-shadow: none;
 }
 
-.contentflow-filters select {
+.editorialflow-filters select {
     min-width: 140px;
 }
 
-.contentflow-entry-chooser {
+.editorialflow-entry-chooser {
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-.contentflow-entry-section-title {
+.editorialflow-entry-section-title {
     margin: 0 0 8px;
     font-size: 13px;
     font-weight: 700;
     color: var(--typo3-text-color-base, #212529);
 }
 
-.contentflow-entry-choices {
+.editorialflow-entry-choices {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-.contentflow-entry-choice {
+.editorialflow-entry-choice {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 2px;
     padding: 10px 14px;
     text-align: left;
-    border: 1px solid var(--contentflow-card-border);
-    border-radius: var(--contentflow-card-radius);
-    background: var(--contentflow-card-bg);
+    border: 1px solid var(--editorialflow-card-border);
+    border-radius: var(--editorialflow-card-radius);
+    background: var(--editorialflow-card-bg);
 }
 
-.contentflow-entry-choice:hover,
-.contentflow-entry-choice:focus-visible {
-    border-color: var(--contentflow-accent);
-    background: var(--contentflow-col-bg);
+.editorialflow-entry-choice:hover,
+.editorialflow-entry-choice:focus-visible {
+    border-color: var(--editorialflow-accent);
+    background: var(--editorialflow-col-bg);
 }
 
-.contentflow-entry-choice-title {
+.editorialflow-entry-choice-title {
     font-weight: 600;
 }
 
-.contentflow-entry-choice-hint {
+.editorialflow-entry-choice-hint {
     font-size: 12px;
     opacity: 0.75;
 }
 
-.contentflow-record-ref--pending {
+.editorialflow-record-ref--pending {
     font-style: italic;
     opacity: 0.7;
 }
 
-.contentflow-board {
+.editorialflow-board {
     display: flex;
-    gap: var(--contentflow-gap);
+    gap: var(--editorialflow-gap);
     padding: 16px 20px 24px;
     overflow-x: auto;
     align-items: flex-start;
     min-height: calc(100vh - 180px);
 }
 
-.contentflow-column {
-    flex: 0 0 var(--contentflow-col-width);
+.editorialflow-column {
+    flex: 0 0 var(--editorialflow-col-width);
     /* Flex items default to a content-based automatic minimum size, which
        wins over flex-basis when a descendant can't wrap (e.g. a long
        nowrap workspace list) - the column would grow to fit that text
-       instead of holding at --contentflow-col-width. min-width: 0 turns
+       instead of holding at --editorialflow-col-width. min-width: 0 turns
        that automatic minimum off, so the fixed width above is the actual
-       width, and .contentflow-column-subtitle's own overflow/ellipsis is
+       width, and .editorialflow-column-subtitle's own overflow/ellipsis is
        what clips the short-list case. */
     min-width: 0;
-    background: var(--contentflow-col-bg);
-    border: 1px solid var(--contentflow-col-border);
+    background: var(--editorialflow-col-bg);
+    border: 1px solid var(--editorialflow-col-border);
     border-radius: 8px;
     padding: 12px;
     display: flex;
@@ -161,7 +161,7 @@
     transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-.contentflow-column-header {
+.editorialflow-column-header {
     font-size: 13px;
     font-weight: 700;
     margin: 0 0 12px 0;
@@ -178,7 +178,7 @@
     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-.contentflow-column-subtitle {
+.editorialflow-column-subtitle {
     flex-basis: 100%;
     font-size: 10px;
     font-weight: 400;
@@ -197,28 +197,28 @@
    look as the plain-list case above; expanding it wraps normally instead of
    forcing a single unbroken line, so the column's fixed width holds either
    way - only its height grows. */
-.contentflow-column-subtitle--collapsible {
+.editorialflow-column-subtitle--collapsible {
     cursor: pointer;
 }
 
-.contentflow-column-subtitle--collapsible summary {
+.editorialflow-column-subtitle--collapsible summary {
     list-style: none;
 }
 
-.contentflow-column-subtitle--collapsible summary::-webkit-details-marker {
+.editorialflow-column-subtitle--collapsible summary::-webkit-details-marker {
     display: none;
 }
 
-.contentflow-column-subtitle--collapsible summary::before {
+.editorialflow-column-subtitle--collapsible summary::before {
     content: '▸ ';
     font-size: 8px;
 }
 
-.contentflow-column-subtitle--collapsible[open] summary::before {
+.editorialflow-column-subtitle--collapsible[open] summary::before {
     content: '▾ ';
 }
 
-.contentflow-column-subtitle-list {
+.editorialflow-column-subtitle-list {
     display: block;
     margin-top: 2px;
     white-space: normal;
@@ -227,29 +227,29 @@
 
 /* A step shared by 2+ workspaces on the board - see BoardColumnRegistry's
    buildStageColumn(). Reuses the same purple already used for a single
-   foreign-workspace card (contentflow-card--foreign-workspace above), so
+   foreign-workspace card (editorialflow-card--foreign-workspace above), so
    "more than one workspace is involved in this step" reads as one consistent
    color across the whole board rather than a new, unrelated hue. */
-.contentflow-column-header--shared {
-    background: var(--contentflow-foreign-accent-bg);
-    color: var(--contentflow-foreign-accent);
-    border-left: 3px solid var(--contentflow-foreign-accent);
+.editorialflow-column-header--shared {
+    background: var(--editorialflow-foreign-accent-bg);
+    color: var(--editorialflow-foreign-accent);
+    border-left: 3px solid var(--editorialflow-foreign-accent);
 }
 
 /* A step that exists in exactly one other (not the active) workspace -
    colored with that workspace's own color: sys_workspace.color, the same
    field TYPO3's own workspace selector and top-bar indicator already use, so
    this is the same color an editor already knows that workspace by. The
-   --contentflow-stage-color-* custom properties are written inline on this
+   --editorialflow-stage-color-* custom properties are written inline on this
    element by BoardColumnRegistry (one of core's own --typo3-state-*-bg/-color
    tokens, so both light and dark mode already work with no extra CSS here). */
-.contentflow-column-header--own {
-    background: var(--contentflow-stage-color, transparent);
-    color: var(--contentflow-stage-color-text, inherit);
-    border-left: 3px solid var(--contentflow-stage-color-border, transparent);
+.editorialflow-column-header--own {
+    background: var(--editorialflow-stage-color, transparent);
+    color: var(--editorialflow-stage-color-text, inherit);
+    border-left: 3px solid var(--editorialflow-stage-color-border, transparent);
 }
 
-.contentflow-column-cards {
+.editorialflow-column-cards {
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -261,58 +261,58 @@
 }
 
 /* Card Styling */
-.contentflow-card {
-    background: var(--contentflow-card-bg);
-    border: 1px solid var(--contentflow-card-border);
-    border-radius: var(--contentflow-card-radius);
+.editorialflow-card {
+    background: var(--editorialflow-card-bg);
+    border: 1px solid var(--editorialflow-card-border);
+    border-radius: var(--editorialflow-card-radius);
     padding: 12px 14px;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    box-shadow: var(--contentflow-card-shadow);
+    box-shadow: var(--editorialflow-card-shadow);
     cursor: grab;
     transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
     user-select: none;
     position: relative;
 }
 
-.contentflow-card:hover {
+.editorialflow-card:hover {
     transform: translateY(-2px);
-    box-shadow: var(--contentflow-card-hover-shadow);
-    border-color: var(--contentflow-accent);
+    box-shadow: var(--editorialflow-card-hover-shadow);
+    border-color: var(--editorialflow-accent);
 }
 
-.contentflow-card:active {
+.editorialflow-card:active {
     cursor: grabbing;
 }
 
-.contentflow-card:focus-visible {
-    outline: 2px solid var(--contentflow-accent);
+.editorialflow-card:focus-visible {
+    outline: 2px solid var(--editorialflow-accent);
     outline-offset: 2px;
 }
 
-.contentflow-card.is-selected {
-    border-color: var(--contentflow-accent);
-    box-shadow: inset 4px 0 0 var(--contentflow-accent), var(--contentflow-card-hover-shadow);
+.editorialflow-card.is-selected {
+    border-color: var(--editorialflow-accent);
+    box-shadow: inset 4px 0 0 var(--editorialflow-accent), var(--editorialflow-card-hover-shadow);
 }
 
-.contentflow-card--active {
-    border-color: var(--contentflow-accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--contentflow-accent) 30%, transparent), var(--contentflow-card-shadow);
+.editorialflow-card--active {
+    border-color: var(--editorialflow-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--editorialflow-accent) 30%, transparent), var(--editorialflow-card-shadow);
 }
 
-.contentflow-active-control {
+.editorialflow-active-control {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     min-height: 24px;
 }
 
-.contentflow-active-control-select {
+.editorialflow-active-control-select {
     width: min(280px, 28vw);
 }
 
-.contentflow-active-control-status {
+.editorialflow-active-control-status {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -322,62 +322,62 @@
     white-space: nowrap;
 }
 
-.contentflow-active-control-status > span:last-child {
+.editorialflow-active-control-status > span:last-child {
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.contentflow-active-control-empty {
+.editorialflow-active-control-empty {
     font-size: 12px;
     opacity: .65;
 }
 
-.contentflow-stage-active-choice {
+.editorialflow-stage-active-choice {
     margin-top: 16px;
     padding: 12px;
     border: 1px solid var(--typo3-component-border-color, #d1d5db);
-    border-radius: var(--contentflow-card-radius);
+    border-radius: var(--editorialflow-card-radius);
     background: var(--typo3-surface-container-low, #f6f6f6);
 }
 
-.contentflow-stage-notify {
+.editorialflow-stage-notify {
     margin-bottom: 16px;
     padding: 12px;
     border: 1px solid var(--typo3-component-border-color, #d1d5db);
-    border-radius: var(--contentflow-card-radius);
+    border-radius: var(--editorialflow-card-radius);
     background: var(--typo3-surface-container-low, #f6f6f6);
 }
 
-.contentflow-stage-notify-summary {
+.editorialflow-stage-notify-summary {
     font-weight: 600;
     cursor: pointer;
 }
 
-.contentflow-stage-notify[open] .contentflow-stage-notify-summary {
+.editorialflow-stage-notify[open] .editorialflow-stage-notify-summary {
     margin-bottom: 10px;
 }
-.contentflow-stage-active-choice .form-text {
+.editorialflow-stage-active-choice .form-text {
     margin-left: 24px;
 }
 
 /* Read-only: belongs to a workspace other than the one currently active - see
-   ContentFlowController::buildBoard()'s `foreignWorkspace` flag. Not draggable
+   EditorialFlowController::buildBoard()'s `foreignWorkspace` flag. Not draggable
    (cursor communicates that too), Preview/Discard/Publish are all withheld. */
-.contentflow-card--foreign-workspace {
+.editorialflow-card--foreign-workspace {
     cursor: default;
-    border-left: 3px solid var(--contentflow-foreign-accent);
-    background: var(--contentflow-foreign-accent-bg);
+    border-left: 3px solid var(--editorialflow-foreign-accent);
+    background: var(--editorialflow-foreign-accent-bg);
 }
 
-.contentflow-card--foreign-workspace:hover {
+.editorialflow-card--foreign-workspace:hover {
     transform: none;
-    border-color: var(--contentflow-foreign-accent);
+    border-color: var(--editorialflow-foreign-accent);
 }
 
-.contentflow-badge-foreign-workspace {
-    background: var(--contentflow-foreign-accent-bg);
-    color: var(--contentflow-foreign-accent);
-    border: 1px solid var(--contentflow-foreign-accent);
+.editorialflow-badge-foreign-workspace {
+    background: var(--editorialflow-foreign-accent-bg);
+    color: var(--editorialflow-foreign-accent);
+    border: 1px solid var(--editorialflow-foreign-accent);
 }
 
 /* WorkspaceConflictDetector: the same live record has a pending version in
@@ -386,79 +386,79 @@
    are never mistaken for each other even before reading the text - never
    color alone. Uses core's own badge-warning background/text color; only the
    icon gap needs styling here. */
-.contentflow-badge-conflict {
+.editorialflow-badge-conflict {
     display: inline-flex;
     align-items: center;
     gap: 4px;
 }
 
-.contentflow-foreign-notice {
+.editorialflow-foreign-notice {
     font-size: 11px;
     font-style: italic;
     opacity: 0.75;
 }
 
-/* Due-date urgency - colors come from EXTCONF via ContentFlowController::
-   dueDateColorCss() (--contentflow-due-soon/--contentflow-overdue), not
+/* Due-date urgency - colors come from EXTCONF via EditorialFlowController::
+   dueDateColorCss() (--editorialflow-due-soon/--editorialflow-overdue), not
    hardcoded, so an integrator can retune the warning color without touching
-   this file. The badge (contentflow-badge-due-date, see Index.html) is what
+   this file. The badge (editorialflow-badge-due-date, see Index.html) is what
    actually carries the "why" in words - the border is only ever a repeat of
    that, never the sole signal. */
-.contentflow-card--due-soon {
-    border-left: 3px solid var(--contentflow-due-soon, #e0a810);
+.editorialflow-card--due-soon {
+    border-left: 3px solid var(--editorialflow-due-soon, #e0a810);
 }
 
-.contentflow-card--overdue {
-    border-left: 3px solid var(--contentflow-overdue, #d9534f);
+.editorialflow-card--overdue {
+    border-left: 3px solid var(--editorialflow-overdue, #d9534f);
 }
 
-.contentflow-badge-due-date {
+.editorialflow-badge-due-date {
     background: var(--typo3-surface-container-low, #eee);
     color: var(--typo3-text-color-variant, #555);
 }
 
-.contentflow-card--due-soon .contentflow-badge-due-date {
-    background: color-mix(in srgb, var(--contentflow-due-soon, #e0a810) 15%, transparent);
-    color: var(--contentflow-due-soon, #e0a810);
+.editorialflow-card--due-soon .editorialflow-badge-due-date {
+    background: color-mix(in srgb, var(--editorialflow-due-soon, #e0a810) 15%, transparent);
+    color: var(--editorialflow-due-soon, #e0a810);
 }
 
-.contentflow-card--overdue .contentflow-badge-due-date {
-    background: color-mix(in srgb, var(--contentflow-overdue, #d9534f) 15%, transparent);
-    color: var(--contentflow-overdue, #d9534f);
+.editorialflow-card--overdue .editorialflow-badge-due-date {
+    background: color-mix(in srgb, var(--editorialflow-overdue, #d9534f) 15%, transparent);
+    color: var(--editorialflow-overdue, #d9534f);
 }
 
 /* Drag & Drop States: Valid (TYPO3 Green) vs Invalid (Red) */
-.contentflow-card.is-dragged {
+.editorialflow-card.is-dragged {
     opacity: 0.4;
     transform: scale(0.97);
 }
 
-.contentflow-column.is-drop-target-valid {
-    background-color: var(--contentflow-typo3-green-bg) !important;
-    border-color: var(--contentflow-typo3-green) !important;
+.editorialflow-column.is-drop-target-valid {
+    background-color: var(--editorialflow-typo3-green-bg) !important;
+    border-color: var(--editorialflow-typo3-green) !important;
     border-style: solid !important;
     box-shadow: 0 0 12px rgba(104, 166, 20, 0.35) !important;
 }
 
-.contentflow-column.is-drop-target-invalid {
-    background-color: var(--contentflow-typo3-red-bg) !important;
-    border-color: var(--contentflow-typo3-red) !important;
+.editorialflow-column.is-drop-target-invalid {
+    background-color: var(--editorialflow-typo3-red-bg) !important;
+    border-color: var(--editorialflow-typo3-red) !important;
     border-style: dashed !important;
     cursor: not-allowed !important;
 }
 
-.contentflow-card-header {
+.editorialflow-card-header {
     display: flex;
     align-items: flex-start;
     gap: 8px;
 }
 
-.contentflow-card-icon {
+.editorialflow-card-icon {
     flex-shrink: 0;
     margin-top: 1px;
 }
 
-.contentflow-card-title {
+.editorialflow-card-title {
     font-size: 13px;
     font-weight: 600;
     line-height: 1.35;
@@ -466,7 +466,7 @@
     word-break: break-word;
 }
 
-.contentflow-card-body {
+.editorialflow-card-body {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -474,18 +474,18 @@
     font-size: 11px;
 }
 
-.contentflow-card-meta {
+.editorialflow-card-meta {
     color: var(--typo3-text-color-variant, #777);
     font-family: var(--typo3-font-family-monospace, monospace);
 }
 
-.contentflow-card-badges {
+.editorialflow-card-badges {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
 }
 
-.contentflow-card-footer {
+.editorialflow-card-footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -494,7 +494,7 @@
     font-size: 11px;
 }
 
-.contentflow-card-assignee {
+.editorialflow-card-assignee {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -504,7 +504,7 @@
     font-weight: 500;
 }
 
-.contentflow-comments-count {
+.editorialflow-comments-count {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -512,7 +512,7 @@
 }
 
 /* Announcer */
-.contentflow-announcer {
+.editorialflow-announcer {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -525,12 +525,12 @@
 }
 
 /* Page Module Integration Banner */
-.contentflow-page-banner {
+.editorialflow-page-banner {
     margin: 12px 16px;
     padding: 12px 16px;
     background: var(--typo3-surface-container-low, #f8f9fa);
     border: 1px solid var(--typo3-component-border-color, #d1d5db);
-    border-left: 4px solid var(--contentflow-accent);
+    border-left: 4px solid var(--editorialflow-accent);
     border-radius: 6px;
     display: flex;
     align-items: center;
@@ -538,18 +538,18 @@
     gap: 16px;
 }
 
-.contentflow-page-banner-info {
+.editorialflow-page-banner-info {
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-.contentflow-page-banner-title {
+.editorialflow-page-banner-title {
     font-size: 13px;
     font-weight: 600;
 }
 
-.contentflow-page-banner-actions {
+.editorialflow-page-banner-actions {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -561,7 +561,7 @@
  * the Visual Editor - that correspondence is the only reason the dots are here
  * rather than plain text.
  */
-.contentflow-page-banner-count {
+.editorialflow-page-banner-count {
     display: inline-block;
     min-width: 18px;
     margin-left: 6px;
@@ -574,7 +574,7 @@
     text-align: center;
 }
 
-.contentflow-page-banner-tasks {
+.editorialflow-page-banner-tasks {
     margin: 4px 0 0;
     padding: 0;
     list-style: none;
@@ -583,7 +583,7 @@
     gap: 3px;
 }
 
-.contentflow-page-banner-task {
+.editorialflow-page-banner-task {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -591,22 +591,22 @@
     line-height: 1.8;
 }
 
-.contentflow-task-dot {
+.editorialflow-task-dot {
     flex: none;
     width: 12px;
     height: 12px;
-    border: 2px solid hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+    border: 2px solid hsl(var(--editorialflow-task-hue, 0), 70%, 45%);
     border-radius: 50%;
-    background: hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+    background: hsl(var(--editorialflow-task-hue, 0), 70%, 45%);
 }
 
 /* A ring rather than a filled dot for the task the editor picked - the same
    "this one is mine" mark the Visual Editor's bubbles use. */
-.contentflow-page-banner-task--active .contentflow-task-dot {
+.editorialflow-page-banner-task--active .editorialflow-task-dot {
     background: transparent;
 }
 
-.contentflow-page-banner-task-title {
+.editorialflow-page-banner-task-title {
     padding: 0;
     border: 0;
     background: none;
@@ -618,18 +618,18 @@
     cursor: pointer;
 }
 
-.contentflow-page-banner-task-title:hover,
-.contentflow-page-banner-task-title:focus-visible {
+.editorialflow-page-banner-task-title:hover,
+.editorialflow-page-banner-task-title:focus-visible {
     text-decoration-style: solid;
 }
 
 /* Never colour alone: the ring above is repeated here in words. */
-.contentflow-badge-active {
-    background: hsl(var(--contentflow-task-hue, 0), 70%, 90%);
-    color: hsl(var(--contentflow-task-hue, 0), 70%, 20%);
+.editorialflow-badge-active {
+    background: hsl(var(--editorialflow-task-hue, 0), 70%, 90%);
+    color: hsl(var(--editorialflow-task-hue, 0), 70%, 20%);
 }
 
-.contentflow-page-banner-assignee {
+.editorialflow-page-banner-assignee {
     opacity: .8;
 }
 
@@ -638,21 +638,21 @@
  * the Page module (ContentElementTaskBadgeListener). Same colour, so a task
  * looks like itself on both surfaces.
  */
-.contentflow-element-badge {
+.editorialflow-element-badge {
     display: inline-flex;
     align-items: center;
     gap: 5px;
     margin-bottom: 6px;
     padding: 1px 8px 1px 5px;
-    border: 1px solid hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+    border: 1px solid hsl(var(--editorialflow-task-hue, 0), 70%, 45%);
     border-radius: 10px;
-    background: hsl(var(--contentflow-task-hue, 0), 70%, 45%, .12);
+    background: hsl(var(--editorialflow-task-hue, 0), 70%, 45%, .12);
     font-size: 11px;
     line-height: 1.7;
 }
 
-.contentflow-element-badge--active {
-    background: hsl(var(--contentflow-task-hue, 0), 70%, 45%, .25);
+.editorialflow-element-badge--active {
+    background: hsl(var(--editorialflow-task-hue, 0), 70%, 45%, .25);
     font-weight: 600;
 }
 
@@ -661,15 +661,15 @@
  * "who owns this", and these are the two follow-up questions, not a call to
  * action competing with the page module's own controls.
  */
-.contentflow-element-actions {
+.editorialflow-element-actions {
     display: inline-flex;
     gap: 4px;
     margin-left: 6px;
 }
 
-.contentflow-element-action {
+.editorialflow-element-action {
     padding: 0 4px;
-    border: 1px solid hsl(var(--contentflow-task-hue, 0), 70%, 45%, .5);
+    border: 1px solid hsl(var(--editorialflow-task-hue, 0), 70%, 45%, .5);
     border-radius: 8px;
     background: transparent;
     color: inherit;
@@ -678,16 +678,16 @@
     cursor: pointer;
 }
 
-.contentflow-element-action:hover,
-.contentflow-element-action:focus-visible {
-    background: hsl(var(--contentflow-task-hue, 0), 70%, 45%, .2);
+.editorialflow-element-action:hover,
+.editorialflow-element-action:focus-visible {
+    background: hsl(var(--editorialflow-task-hue, 0), 70%, 45%, .2);
 }
 
 /* A second, independent badge next to the task-colour one above (see
    ContentElementTaskBadgeListener::renderConflictBadge()) - not tied to any
    task's hue, because the record it warns about may belong to no task at
    all on the side that has not been claimed. */
-.contentflow-element-conflict {
+.editorialflow-element-conflict {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -702,14 +702,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .contentflow-card,
-    .contentflow-column {
+    .editorialflow-card,
+    .editorialflow-column {
         transition: none !important;
     }
 }
 
 /* Modal & Diffs Styling */
-.contentflow-modal-nav {
+.editorialflow-modal-nav {
     display: flex;
     gap: 8px;
     border-bottom: 1px solid var(--typo3-component-border-color, #ddd);
@@ -717,7 +717,7 @@
     padding-bottom: 8px;
 }
 
-.contentflow-modal-nav button {
+.editorialflow-modal-nav button {
     background: none;
     border: none;
     padding: 6px 12px;
@@ -728,31 +728,31 @@
     color: var(--typo3-text-color-variant, #555);
 }
 
-.contentflow-modal-nav button.active {
-    background: var(--contentflow-accent);
+.editorialflow-modal-nav button.active {
+    background: var(--editorialflow-accent);
     color: #fff;
 }
 
-.contentflow-diff-table {
+.editorialflow-diff-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
     margin-top: 8px;
 }
 
-.contentflow-diff-table th,
-.contentflow-diff-table td {
+.editorialflow-diff-table th,
+.editorialflow-diff-table td {
     padding: 8px 10px;
     border: 1px solid var(--typo3-component-border-color, #e0e0e0);
     text-align: left;
 }
 
-.contentflow-diff-table th {
+.editorialflow-diff-table th {
     background: var(--typo3-surface-container-low, #f3f4f6);
     font-weight: 600;
 }
 
-.contentflow-diff-old {
+.editorialflow-diff-old {
     background-color: var(--typo3-state-danger-bg, #fde8e8);
     color: var(--typo3-state-danger-color, #9b1c1c);
     text-decoration: line-through;
@@ -760,7 +760,7 @@
     border-radius: 3px;
 }
 
-.contentflow-diff-new {
+.editorialflow-diff-new {
     background-color: var(--typo3-state-success-bg, #def7ec);
     color: var(--typo3-state-success-color, #03543f);
     font-weight: 600;
@@ -770,50 +770,50 @@
 
 /* ---- Workspace-vs-workspace comparison (ConflictDiff.html) ------------- */
 
-.contentflow-conflict-diff-header {
+.editorialflow-conflict-diff-header {
     padding-bottom: 12px;
     margin-bottom: 12px;
     border-bottom: 1px solid var(--typo3-component-border-color, #ddd);
 }
 
-.contentflow-conflict-diff-title {
+.editorialflow-conflict-diff-title {
     margin: 0 0 4px;
 }
 
-.contentflow-conflict-diff-subtitle {
+.editorialflow-conflict-diff-subtitle {
     margin: 0;
     color: var(--typo3-text-color-variant, #555);
     font-size: 12px;
 }
 
-.contentflow-conflict-diff-table-wrap {
+.editorialflow-conflict-diff-table-wrap {
     overflow-x: auto;
 }
 
-.contentflow-conflict-diff-table {
+.editorialflow-conflict-diff-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
 }
 
-.contentflow-conflict-diff-table th,
-.contentflow-conflict-diff-table td {
+.editorialflow-conflict-diff-table th,
+.editorialflow-conflict-diff-table td {
     padding: 8px 10px;
     border: 1px solid var(--typo3-component-border-color, #e0e0e0);
     text-align: left;
     vertical-align: top;
 }
 
-.contentflow-conflict-diff-table thead th {
+.editorialflow-conflict-diff-table thead th {
     background: var(--typo3-surface-container-low, #f3f4f6);
     font-weight: 600;
 }
 
-.contentflow-conflict-diff-live {
+.editorialflow-conflict-diff-live {
     color: var(--typo3-text-color-variant, #555);
 }
 
-.contentflow-conflict-diff-unchanged {
+.editorialflow-conflict-diff-unchanged {
     color: var(--typo3-text-color-variant, #999);
 }
 
@@ -821,12 +821,12 @@
    situation in this table that needs a human decision before either side
    publishes. Never color-only: the row's th also carries the "conflicting"
    badge in words (see ConflictDiff.html). */
-.contentflow-conflict-diff-row--conflict th,
-.contentflow-conflict-diff-row--conflict td {
+.editorialflow-conflict-diff-row--conflict th,
+.editorialflow-conflict-diff-row--conflict td {
     background: var(--typo3-state-danger-bg, #fde8e8);
 }
 
-.contentflow-timeline {
+.editorialflow-timeline {
     list-style: none;
     padding: 0;
     margin: 0;
@@ -835,14 +835,14 @@
     gap: 12px;
 }
 
-.contentflow-timeline-item {
+.editorialflow-timeline-item {
     position: relative;
     padding-left: 20px;
     border-left: 2px solid var(--typo3-component-border-color, #ddd);
     font-size: 12px;
 }
 
-.contentflow-timeline-item::before {
+.editorialflow-timeline-item::before {
     content: '';
     position: absolute;
     left: -5px;
@@ -850,17 +850,17 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--contentflow-accent);
+    background: var(--editorialflow-accent);
 }
 
 
 /* ---- Ticket view ------------------------------------------------------- */
 
-.contentflow-ticket {
+.editorialflow-ticket {
     padding: 4px 2px 8px;
 }
 
-.contentflow-ticket-header {
+.editorialflow-ticket-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -869,40 +869,40 @@
     border-bottom: 1px solid var(--typo3-component-border-color, #ddd);
 }
 
-.contentflow-ticket-title {
+.editorialflow-ticket-title {
     margin: 0;
     font-size: 20px;
     line-height: 1.3;
 }
 
-.contentflow-ticket-subtitle {
+.editorialflow-ticket-subtitle {
     margin: 4px 0 0;
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.contentflow-record-ref {
+.editorialflow-record-ref {
     font-family: var(--typo3-font-family-monospace, monospace);
     font-size: 11px;
     opacity: 0.7;
 }
 
-.contentflow-ticket-facts {
+.editorialflow-ticket-facts {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 10px;
     margin: 16px 0;
 }
 
-.contentflow-ticket-fact {
+.editorialflow-ticket-fact {
     padding: 8px 12px;
     background: var(--typo3-surface-container-low, #f6f6f6);
     border: 1px solid var(--typo3-component-border-color, #e2e4e8);
-    border-radius: var(--contentflow-card-radius, 6px);
+    border-radius: var(--editorialflow-card-radius, 6px);
 }
 
-.contentflow-ticket-facts dt {
+.editorialflow-ticket-facts dt {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -910,7 +910,7 @@
     margin-bottom: 2px;
 }
 
-.contentflow-ticket-facts dd {
+.editorialflow-ticket-facts dd {
     margin: 0;
     font-size: 14px;
     display: flex;
@@ -918,12 +918,12 @@
     gap: 4px;
 }
 
-.contentflow-unassigned {
+.editorialflow-unassigned {
     font-style: italic;
     opacity: 0.7;
 }
 
-/* One color per GbWeb\ContentFlow\Domain\Model\TaskState value - core's own
+/* One color per GbWeb\EditorialFlow\Domain\Model\TaskState value - core's own
    .badge class has no opinion on state-specific colors, so without this every
    state badge (board card meta, ticket facts) rendered as the same flat gray. */
 .badge-backlog { background: var(--typo3-surface-container-low); color: var(--typo3-text-color-variant); }
@@ -933,11 +933,11 @@
 .badge-ready { background: var(--typo3-state-success-bg); color: var(--typo3-state-success-color); }
 .badge-done { background: var(--typo3-state-success-bg); color: var(--typo3-state-success-color); }
 
-.contentflow-ticket-section {
+.editorialflow-ticket-section {
     margin-top: 24px;
 }
 
-.contentflow-ticket-section > h3 {
+.editorialflow-ticket-section > h3 {
     font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -948,10 +948,10 @@
     gap: 8px;
 }
 
-.contentflow-member-list,
-.contentflow-activity,
-.contentflow-diff-list,
-.contentflow-comments {
+.editorialflow-member-list,
+.editorialflow-activity,
+.editorialflow-diff-list,
+.editorialflow-comments {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -960,52 +960,52 @@
     gap: 6px;
 }
 
-.contentflow-member {
+.editorialflow-member {
     display: flex;
     flex-direction: column;
     gap: 8px;
     padding: 10px 12px;
     border: 1px solid var(--typo3-component-border-color, #ddd);
-    border-radius: var(--contentflow-card-radius, 6px);
+    border-radius: var(--editorialflow-card-radius, 6px);
     background: var(--typo3-surface-container-low, #fafafa);
     font-size: 13px;
     transition: border-color 0.15s ease;
 }
 
-.contentflow-member:hover {
-    border-color: var(--contentflow-accent);
+.editorialflow-member:hover {
+    border-color: var(--editorialflow-accent);
 }
 
 /* Content reached through a shortcut, or reused elsewhere: changing it
    changes other pages too. That has to be visible, not buried. */
-.contentflow-member.needs-attention {
+.editorialflow-member.needs-attention {
     border-left: 3px solid var(--typo3-state-warning-color, #b8891a);
 }
 
-.contentflow-member-main {
+.editorialflow-member-main {
     display: flex;
     align-items: flex-start;
     gap: 8px;
 }
 
-.contentflow-member-icon {
+.editorialflow-member-icon {
     flex-shrink: 0;
     margin-top: 1px;
 }
 
-.contentflow-member-heading {
+.editorialflow-member-heading {
     display: flex;
     flex-direction: column;
     gap: 1px;
     min-width: 0;
 }
 
-.contentflow-member-title {
+.editorialflow-member-title {
     font-weight: 600;
     word-break: break-word;
 }
 
-.contentflow-member-footer {
+.editorialflow-member-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1013,13 +1013,13 @@
     flex-wrap: wrap;
 }
 
-.contentflow-member-badges {
+.editorialflow-member-badges {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
 }
 
-.contentflow-member-actions {
+.editorialflow-member-actions {
     display: flex;
     gap: 6px;
     margin-left: auto;
@@ -1030,16 +1030,16 @@
  * the Visual Editor, and all three render into the same top-level backend
  * document, so one set of rules covers every entry point.
  */
-.contentflow-membership-dialog .form-group {
+.editorialflow-membership-dialog .form-group {
     margin-bottom: 12px;
 }
 
-.contentflow-membership-current {
+.editorialflow-membership-current {
     font-size: 12px;
     opacity: 0.75;
 }
 
-.contentflow-membership-targets {
+.editorialflow-membership-targets {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -1048,7 +1048,7 @@
 }
 
 /* The whole row is the label, so the hit area is the row and not the radio. */
-.contentflow-membership-target {
+.editorialflow-membership-target {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1059,16 +1059,16 @@
     cursor: pointer;
 }
 
-.contentflow-membership-target:hover,
-.contentflow-membership-target:focus-within {
+.editorialflow-membership-target:hover,
+.editorialflow-membership-target:focus-within {
     background: var(--typo3-component-hover-bg, rgba(0, 0, 0, .04));
 }
 
-.contentflow-membership-target .badge {
+.editorialflow-membership-target .badge {
     margin-left: auto;
 }
 
-.contentflow-diff {
+.editorialflow-diff {
     border: 1px solid var(--typo3-component-border-color, #ddd);
     border-radius: 4px;
     overflow: hidden;
@@ -1077,18 +1077,18 @@
 
 /* Jumped to via a member's "Diff" button (task/member-actions.js) - briefly draws
    the eye to which entries belong to that member. */
-.contentflow-diff.is-highlighted {
-    border-color: var(--contentflow-accent);
-    background: var(--contentflow-drag-over-bg);
+.editorialflow-diff.is-highlighted {
+    border-color: var(--editorialflow-accent);
+    background: var(--editorialflow-drag-over-bg);
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .contentflow-diff {
+    .editorialflow-diff {
         transition: none !important;
     }
 }
 
-.contentflow-diff-head {
+.editorialflow-diff-head {
     display: flex;
     justify-content: space-between;
     gap: 12px;
@@ -1097,24 +1097,24 @@
     font-size: 12px;
 }
 
-.contentflow-diff-meta {
+.editorialflow-diff-meta {
     opacity: 0.7;
 }
 
-.contentflow-diff-body {
+.editorialflow-diff-body {
     padding: 8px 10px;
     font-size: 13px;
     overflow-x: auto;
 }
 
-.contentflow-activity li,
-.contentflow-comments li {
+.editorialflow-activity li,
+.editorialflow-comments li {
     padding: 6px 10px;
     border-left: 2px solid var(--typo3-component-border-color, #ddd);
     font-size: 13px;
 }
 
-.contentflow-activity-event {
+.editorialflow-activity-event {
     font-family: var(--typo3-font-family-monospace, monospace);
     font-size: 11px;
     padding: 1px 5px;
@@ -1123,13 +1123,13 @@
     margin-right: 6px;
 }
 
-.contentflow-comment-meta {
+.editorialflow-comment-meta {
     font-size: 11px;
     opacity: 0.65;
     margin-top: 2px;
 }
 
-.contentflow-empty {
+.editorialflow-empty {
     font-style: italic;
     opacity: 0.65;
     font-size: 13px;
@@ -1137,7 +1137,7 @@
 }
 
 /* Title doubles as the ticket trigger, but must not look like a form button. */
-.contentflow-card-title {
+.editorialflow-card-title {
     display: block;
     width: 100%;
     text-align: left;
@@ -1150,14 +1150,14 @@
     cursor: pointer;
 }
 
-.contentflow-card-title:hover,
-.contentflow-card-title:focus-visible {
+.editorialflow-card-title:hover,
+.editorialflow-card-title:focus-visible {
     text-decoration: underline;
 }
 
 /* ---- Unified timeline -------------------------------------------------- */
 
-.contentflow-timeline {
+.editorialflow-timeline {
     list-style: none;
     margin: 0;
     padding: 0 0 0 14px;
@@ -1167,11 +1167,11 @@
     gap: 14px;
 }
 
-.contentflow-timeline-entry {
+.editorialflow-timeline-entry {
     position: relative;
 }
 
-.contentflow-timeline-entry::before {
+.editorialflow-timeline-entry::before {
     content: '';
     position: absolute;
     left: -20px;
@@ -1182,30 +1182,30 @@
     background: var(--typo3-component-border-color, #bbb);
 }
 
-.contentflow-timeline-entry.is-comment::before {
+.editorialflow-timeline-entry.is-comment::before {
     background: var(--typo3-state-info-color, #0b78d1);
 }
 
-.contentflow-timeline-head {
+.editorialflow-timeline-head {
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
 }
 
-.contentflow-timeline-meta {
+.editorialflow-timeline-meta {
     font-size: 11px;
     opacity: 0.65;
 }
 
-.contentflow-timeline-transition {
+.editorialflow-timeline-transition {
     font-size: 12px;
     margin-top: 3px;
     font-family: var(--typo3-font-family-monospace, monospace);
 }
 
 /* The comment sits visually inside the action it explains. */
-.contentflow-timeline-comment {
+.editorialflow-timeline-comment {
     margin: 6px 0 0;
     padding: 6px 10px;
     border-left: 3px solid var(--typo3-state-info-color, #0b78d1);
@@ -1213,22 +1213,22 @@
     font-size: 13px;
 }
 
-.contentflow-comment-form {
+.editorialflow-comment-form {
     display: flex;
     flex-direction: column;
     gap: 8px;
     align-items: flex-start;
 }
 
-.contentflow-comment-form textarea {
+.editorialflow-comment-form textarea {
     width: 100%;
 }
 
-.contentflow-assignee-picker {
+.editorialflow-assignee-picker {
     position: relative;
 }
 
-.contentflow-assignee-options {
+.editorialflow-assignee-options {
     position: absolute;
     z-index: 1050;
     top: 100%;
@@ -1245,22 +1245,22 @@
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
-.contentflow-assignee-options[hidden] {
+.editorialflow-assignee-options[hidden] {
     display: none;
 }
 
-.contentflow-assignee-options li {
+.editorialflow-assignee-options li {
     padding: 4px 12px;
     cursor: pointer;
 }
 
-.contentflow-assignee-options li.is-highlighted,
-.contentflow-assignee-options li[aria-selected="true"],
-.contentflow-assignee-options li:hover {
+.editorialflow-assignee-options li.is-highlighted,
+.editorialflow-assignee-options li[aria-selected="true"],
+.editorialflow-assignee-options li:hover {
     background: var(--typo3-state-info-bg, #e3f2fd);
 }
 
-.contentflow-assignee-options-empty {
+.editorialflow-assignee-options-empty {
     opacity: 0.65;
     cursor: default !important;
 }

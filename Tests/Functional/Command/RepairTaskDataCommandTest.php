@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Command;
+namespace GbWeb\EditorialFlow\Tests\Functional\Command;
 
-use GbWeb\ContentFlow\Command\RepairTaskDataCommand;
-use GbWeb\ContentFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Command\RepairTaskDataCommand;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\Console\Tester\CommandTester;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -35,7 +35,7 @@ final class RepairTaskDataCommandTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void
@@ -59,8 +59,8 @@ final class RepairTaskDataCommandTest extends FunctionalTestCase
      */
     private function createTask(array $overrides = []): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
-        $connection->insert('tx_contentflow_task', array_merge([
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task');
+        $connection->insert('tx_editorialflow_task', array_merge([
             'title' => 'FAQs',
             'subject_table' => 'pages',
             'subject_uid' => 2,
@@ -78,8 +78,8 @@ final class RepairTaskDataCommandTest extends FunctionalTestCase
      */
     private function addMember(int $taskUid, int $recordUid, array $overrides = []): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task_item');
-        $connection->insert('tx_contentflow_task_item', array_merge([
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task_item');
+        $connection->insert('tx_editorialflow_task_item', array_merge([
             'task' => $taskUid,
             'record_table' => 'tt_content',
             'record_uid' => $recordUid,
@@ -98,8 +98,8 @@ final class RepairTaskDataCommandTest extends FunctionalTestCase
     private function findItem(int $itemUid): array|false
     {
         return $this->getConnectionPool()
-            ->getConnectionForTable('tx_contentflow_task_item')
-            ->select(['closed', 'deleted'], 'tx_contentflow_task_item', ['uid' => $itemUid])
+            ->getConnectionForTable('tx_editorialflow_task_item')
+            ->select(['closed', 'deleted'], 'tx_editorialflow_task_item', ['uid' => $itemUid])
             ->fetchAssociative();
     }
 
@@ -131,8 +131,8 @@ final class RepairTaskDataCommandTest extends FunctionalTestCase
         // Freeing the slot is only half of it: until an open task holds the
         // record, it still shows no marker anywhere.
         $reclaimed = $this->getConnectionPool()
-            ->getConnectionForTable('tx_contentflow_task_item')
-            ->count('uid', 'tx_contentflow_task_item', [
+            ->getConnectionForTable('tx_editorialflow_task_item')
+            ->count('uid', 'tx_editorialflow_task_item', [
                 'task' => $openTask,
                 'record_table' => 'tt_content',
                 'record_uid' => 10,

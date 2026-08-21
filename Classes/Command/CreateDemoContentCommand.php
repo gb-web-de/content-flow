@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Command;
+namespace GbWeb\EditorialFlow\Command;
 
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -44,7 +44,7 @@ use TYPO3\CMS\Core\Utility\StringUtility;
  * a record out of the default Editing stage (stage 0) - that part is not
  * role-specific. Only the workspace owner (approver) can act on records sitting
  * at "Ready to publish"/"Publish" or actually publish at all
- * (WorkspacePublishGate). None of this is a Content Flow rule - these demo
+ * (WorkspacePublishGate). None of this is a Editorial Flow rule - these demo
  * users exist to make core's own model visible on the board, not to route
  * around it.
  *
@@ -53,14 +53,14 @@ use TYPO3\CMS\Core\Utility\StringUtility;
  * so it is never done implicitly - `--force`, or an interactive confirmation.
  */
 #[AsCommand(
-    name: 'contentflow:democontent',
+    name: 'editorialflow:democontent',
     description: 'Ensure demo content, a workspace with review stages, and demo backend users exist for the board.',
 )]
 final class CreateDemoContentCommand extends Command
 {
     private const WORKSPACE_TITLE = 'Editorial';
     private const STAGE_TITLES = ['Review', 'Approval'];
-    private const GROUP_TITLE = 'Content Flow Editors';
+    private const GROUP_TITLE = 'Editorial Flow Editors';
     private const DEMO_PASSWORD = 'Password.1';
 
     /**
@@ -149,7 +149,7 @@ final class CreateDemoContentCommand extends Command
                 self::WORKSPACE_TITLE,
                 $workspaceUid,
             ));
-            $io->writeln('  To recreate it: <info>ddev contentflow-demo</info> (asks) or add <info>--force</info>.');
+            $io->writeln('  To recreate it: <info>ddev editorialflow-demo</info> (asks) or add <info>--force</info>.');
             return false;
         }
 
@@ -232,7 +232,7 @@ final class CreateDemoContentCommand extends Command
                 $workspacePlaceholder => [
                     'pid' => 0,
                     'title' => self::WORKSPACE_TITLE,
-                    'description' => 'Demo workspace created by content_flow',
+                    'description' => 'Demo workspace created by editorial_flow',
                 ],
             ],
         ], []);
@@ -394,9 +394,9 @@ final class CreateDemoContentCommand extends Command
         // top-level pages (pid = 0) - so the whole demo site is reachable.
         $values = [
             'title' => self::GROUP_TITLE,
-            // The content_flow module itself, plus the two core modules an
+            // The editorial_flow module itself, plus the two core modules an
             // editor needs to reach a page and edit its content at all.
-            'groupMods' => 'web_contentflow,web_layout,file_list',
+            'groupMods' => 'web_editorialflow,web_layout,file_list',
             'tables_select' => 'pages,tt_content,sys_file_reference,sys_category',
             'tables_modify' => 'pages,tt_content,sys_file_reference,sys_category',
             'db_mountpoints' => implode(',', $this->findRootPageUids()),

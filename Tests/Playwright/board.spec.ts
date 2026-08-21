@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test'
 import { openBoard, boardPageId } from './fixtures/board'
 
-test.describe('the Content Flow board module', () => {
+test.describe('the Editorial Flow board module', () => {
   test('renders the backlog columns it owns', async ({ page }) => {
     const board = await openBoard(page)
 
     for (const column of ['backlog', 'planned', 'done']) {
-      await expect(board.locator(`[data-contentflow-column="${column}"]`)).toBeVisible()
+      await expect(board.locator(`[data-editorialflow-column="${column}"]`)).toBeVisible()
     }
   })
 
@@ -38,10 +38,10 @@ test.describe('the board without a session', () => {
   test.use({ storageState: { cookies: [], origins: [] } })
 
   test('sends a signed-out visitor to the login form instead', async ({ page }) => {
-    await page.goto(`/typo3/module/web/contentflow?id=${boardPageId}`)
+    await page.goto(`/typo3/module/web/editorialflow?id=${boardPageId}`)
 
     await expect(page).toHaveURL(/\/typo3\/login/)
     await expect(page.locator('#t3-login-submit')).toBeVisible()
-    await expect(page.locator('[data-contentflow-column]')).toHaveCount(0)
+    await expect(page.locator('[data-editorialflow-column]')).toHaveCount(0)
   })
 })

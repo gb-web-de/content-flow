@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Localization;
+namespace GbWeb\EditorialFlow\Tests\Functional\Localization;
 
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
@@ -13,14 +13,14 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
  * failing, so a typo in one reaches the editor as a blank error message and no
  * other test notices. These assert the keys the wizard actually asks for.
  *
- * The wizard's JavaScript reads the same file as the `content_flow.messages`
+ * The wizard's JavaScript reads the same file as the `editorial_flow.messages`
  * translation domain, and there a missing key is worse than blank: core's
  * LabelProvider.get() throws, which rejects the dynamic step import and leaves
  * the editor an empty wizard. Those keys are scraped from the modules too.
  */
 final class WizardLabelsResolveTest extends FunctionalTestCase
 {
-    protected array $testExtensionsToLoad = ['content_flow'];
+    protected array $testExtensionsToLoad = ['editorial_flow'];
 
     protected array $coreExtensionsToLoad = ['workspaces', 'dashboard'];
 
@@ -31,7 +31,7 @@ final class WizardLabelsResolveTest extends FunctionalTestCase
 
         $missing = [];
         foreach ($this->wizardLabelKeys() as $key) {
-            if (trim($languageService->sL('content_flow.messages:' . $key)) === '') {
+            if (trim($languageService->sL('editorial_flow.messages:' . $key)) === '') {
                 $missing[] = $key;
             }
         }
@@ -53,7 +53,7 @@ final class WizardLabelsResolveTest extends FunctionalTestCase
                 continue;
             }
 
-            $label = $languageService->sL('content_flow.messages:' . $key);
+            $label = $languageService->sL('editorial_flow.messages:' . $key);
             self::assertMatchesRegularExpression(
                 '/\(CF-\d{4}\)$/',
                 $label,

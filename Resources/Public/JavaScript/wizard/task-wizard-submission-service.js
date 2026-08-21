@@ -21,7 +21,7 @@ export class TaskWizardSubmissionService {
     }
 
     const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.wizard_submit)
-      .withQueryArguments({ mode: 'contentflow_task_wizard' })
+      .withQueryArguments({ mode: 'editorialflow_task_wizard' })
       .post(body)
 
     return await response.resolve()

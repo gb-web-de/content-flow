@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Command;
+namespace GbWeb\EditorialFlow\Command;
 
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
-use GbWeb\ContentFlow\Domain\Model\TaskState;
-use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Service\TaskMemberSynchronizer;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,8 +19,8 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 
 /**
- * Finds and, with --fix, heals the ways tx_contentflow_task_item can drift away
- * from tx_contentflow_task.
+ * Finds and, with --fix, heals the ways tx_editorialflow_task_item can drift away
+ * from tx_editorialflow_task.
  *
  * The tables have no TCA and therefore no DataHandler management at all - a task
  * can currently only disappear via the race-loser cleanup in
@@ -36,13 +36,13 @@ use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
  * CreateDemoContentCommand takes with --force.
  */
 #[AsCommand(
-    name: 'contentflow:repair',
+    name: 'editorialflow:repair',
     description: 'Report (and, with --fix, heal) task_item rows that outlived their task.',
 )]
 final class RepairTaskDataCommand extends Command
 {
-    private const TABLE_TASK = 'tx_contentflow_task';
-    private const TABLE_ITEM = 'tx_contentflow_task_item';
+    private const TABLE_TASK = 'tx_editorialflow_task';
+    private const TABLE_ITEM = 'tx_editorialflow_task_item';
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,

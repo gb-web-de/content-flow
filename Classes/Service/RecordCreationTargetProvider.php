@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
 use TYPO3\CMS\Backend\Tree\Repository\PageTreeRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
@@ -29,7 +29,7 @@ final readonly class RecordCreationTargetProvider
      * chosen <typo3-backend-new-record-wizard> item - see
      * Resources/Public/JavaScript/task/create-wizard.js's openRecordTypePicker().
      */
-    private const RECORD_TYPE_CHOSEN_EVENT = 'contentflow:record-type-chosen';
+    private const RECORD_TYPE_CHOSEN_EVENT = 'editorialflow:record-type-chosen';
 
     public function __construct(
         private TcaSchemaFactory $tcaSchemaFactory,

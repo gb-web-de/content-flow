@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Service;
+namespace GbWeb\EditorialFlow\Tests\Functional\Service;
 
-use GbWeb\ContentFlow\Service\ActivityLogger;
+use GbWeb\EditorialFlow\Service\ActivityLogger;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -23,7 +23,7 @@ final class ActivityLoggerTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     private function subject(): ActivityLogger
@@ -33,8 +33,8 @@ final class ActivityLoggerTest extends FunctionalTestCase
 
     private function createTask(): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
-        $connection->insert('tx_contentflow_task', [
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task');
+        $connection->insert('tx_editorialflow_task', [
             'title' => 'About us',
             'subject_table' => 'pages',
             'subject_uid' => 2,
@@ -58,7 +58,7 @@ final class ActivityLoggerTest extends FunctionalTestCase
     }
 
     /**
-     * tx_contentflow_activity has no TCA, so DeletedRestriction is a silent no-op
+     * tx_editorialflow_activity has no TCA, so DeletedRestriction is a silent no-op
      * for it - findByTask() must filter `deleted` explicitly or a soft-deleted
      * entry keeps showing up in the ticket timeline.
      */
@@ -67,8 +67,8 @@ final class ActivityLoggerTest extends FunctionalTestCase
     {
         $taskUid = $this->createTask();
         $activityUid = $this->subject()->log($taskUid, ActivityLogger::EVENT_CLOSED, 1);
-        $this->getConnectionPool()->getConnectionForTable('tx_contentflow_activity')->update(
-            'tx_contentflow_activity',
+        $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_activity')->update(
+            'tx_editorialflow_activity',
             ['deleted' => 1],
             ['uid' => $activityUid],
         );

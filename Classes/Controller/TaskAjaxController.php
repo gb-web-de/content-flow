@@ -2,26 +2,26 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Controller;
+namespace GbWeb\EditorialFlow\Controller;
 
-use GbWeb\ContentFlow\Domain\Model\TaskPriority;
-use GbWeb\ContentFlow\Domain\Model\TaskState;
-use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
-use GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository;
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
-use GbWeb\ContentFlow\Notification\AssignmentNotificationService;
-use GbWeb\ContentFlow\Service\ActiveTaskSession;
-use GbWeb\ContentFlow\Service\ActivityLogger;
-use GbWeb\ContentFlow\Service\PendingPageHandoff;
-use GbWeb\ContentFlow\Service\PendingSubjectHandoff;
-use GbWeb\ContentFlow\Service\RecordCreationTargetProvider;
-use GbWeb\ContentFlow\Service\ReferenceInspector;
-use GbWeb\ContentFlow\Service\StageTransitionService;
-use GbWeb\ContentFlow\Service\TaskColor;
-use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
-use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
-use GbWeb\ContentFlow\Service\WorkspaceConflictDetector;
-use GbWeb\ContentFlow\Service\WorkspaceIntegrationService;
+use GbWeb\EditorialFlow\Domain\Model\TaskPriority;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Domain\Repository\CommentRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskChecklistRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Notification\AssignmentNotificationService;
+use GbWeb\EditorialFlow\Service\ActiveTaskSession;
+use GbWeb\EditorialFlow\Service\ActivityLogger;
+use GbWeb\EditorialFlow\Service\PendingPageHandoff;
+use GbWeb\EditorialFlow\Service\PendingSubjectHandoff;
+use GbWeb\EditorialFlow\Service\RecordCreationTargetProvider;
+use GbWeb\EditorialFlow\Service\ReferenceInspector;
+use GbWeb\EditorialFlow\Service\StageTransitionService;
+use GbWeb\EditorialFlow\Service\TaskColor;
+use GbWeb\EditorialFlow\Service\TaskMemberSynchronizer;
+use GbWeb\EditorialFlow\Service\TaskSubjectRegistry;
+use GbWeb\EditorialFlow\Service\WorkspaceConflictDetector;
+use GbWeb\EditorialFlow\Service\WorkspaceIntegrationService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
@@ -643,7 +643,7 @@ final class TaskAjaxController
 
         // A drop onto a core stage column is a workspace stage transition and must
         // go through core - permissions, sys_history and stage notifications all
-        // live there. Only Content Flow's own columns (Backlog / Planned), which
+        // live there. Only Editorial Flow's own columns (Backlog / Planned), which
         // exist precisely because core has no state for "not versioned yet", are
         // written directly.
         if ($state !== null && $state->hasVersion()) {
@@ -712,7 +712,7 @@ final class TaskAjaxController
             ? (string)$this->uriBuilder->buildUriFromRoute('web_layout', ['id' => $uid])
             : (string)$this->uriBuilder->buildUriFromRoute('record_edit', [
                 'edit' => [$table => [$uid => 'edit']],
-                'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_contentflow', [
+                'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_editorialflow', [
                     'id' => $this->derivePid($table, $uid),
                 ]),
             ]);
@@ -885,10 +885,10 @@ final class TaskAjaxController
 
         return match ($state) {
             TaskState::BACKLOG => $this->getLanguageService()->sL(
-                'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:column.backlog'
+                'LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:column.backlog'
             ) ?: 'Backlog',
             TaskState::PLANNED => $this->getLanguageService()->sL(
-                'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:column.planned'
+                'LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:column.planned'
             ) ?: 'Planned',
             default => ucfirst((string)$task['state']),
         };
@@ -1369,11 +1369,7 @@ final class TaskAjaxController
 
         $pairsByTable = $this->memberSynchronizer->findPendingVersionPairsByTable($taskUid, $workspaceUid);
         if ($pairsByTable === []) {
-            return $this->reject(
-                'no-pending-versions',
-                'There is nothing pending on this task to publish.',
-                ['taskUid' => $taskUid, 'workspaceUid' => $workspaceUid],
-            );
+            return $this->resolveEmptyPublish($taskUid, $workspaceUid);
         }
 
         $refusal = $this->askCoreToPublish($pairsByTable);
@@ -1400,6 +1396,50 @@ final class TaskAjaxController
             'success' => true,
             'closed' => $reloaded === null || (bool)$reloaded['closed'],
         ]);
+    }
+
+    /**
+     * Nothing pending in this task's own workspace at publishTaskAction()'s
+     * point. Most of the time that just means the task was created (or a
+     * member was manually attached, see task_item.origin) before anyone
+     * actually edited it here - "There is nothing pending on this task to
+     * publish" is then the honest answer, not an error to hide: the editor
+     * still has to make the change before there is anything to go live.
+     *
+     * The one distinction worth making explicit is whether the record is
+     * quietly waiting to be edited, or is *actively* pending review in a
+     * different workspace right now (see WorkspaceConflictDetector's docblock
+     * on how core allows the same live record to be versioned in more than
+     * one workspace at once, uncoordinated). The latter is not "nothing to
+     * publish", it is "the change exists, just not here" - worth saying, so
+     * an editor is not left wondering where their colleague's edit went.
+     */
+    private function resolveEmptyPublish(int $taskUid, int $workspaceUid): ResponseInterface
+    {
+        foreach ($this->taskRepository->findMembers($taskUid) as $member) {
+            $table = (string)$member['record_table'];
+            if (!$this->subjectRegistry->isTrackable($table)) {
+                continue;
+            }
+            $otherWorkspaces = array_values(array_diff(
+                $this->conflictDetector->findPendingWorkspaces($table, (int)$member['record_uid']),
+                [$workspaceUid],
+            ));
+            if ($otherWorkspaces !== []) {
+                $titles = $this->conflictDetector->resolveWorkspaceTitles($otherWorkspaces);
+                return $this->reject(
+                    'pending-in-other-workspace',
+                    sprintf('This record is still pending review in %s, not here yet.', implode(', ', $titles)),
+                    ['taskUid' => $taskUid, 'workspaceUid' => $workspaceUid, 'otherWorkspaces' => $otherWorkspaces],
+                );
+            }
+        }
+
+        return $this->reject(
+            'no-pending-versions',
+            'There is nothing pending on this task to publish.',
+            ['taskUid' => $taskUid, 'workspaceUid' => $workspaceUid],
+        );
     }
 
     /**
@@ -1443,7 +1483,7 @@ final class TaskAjaxController
      * becomes real through TYPO3's own page wizard, which this answer asks the
      * browser to open - prefilled with the parent the ticket was planned under.
      *
-     * Content Flow used to create the page itself here, with the ticket title
+     * Editorial Flow used to create the page itself here, with the ticket title
      * and nothing else. That skipped every decision core asks about: where the
      * page goes, which page type it is, and whatever that type declares
      * required. The wizard is where those belong, and it is the same dialog an
@@ -1604,7 +1644,7 @@ final class TaskAjaxController
         }
 
         $this->pendingSubjectHandoff->remember($this->getBackendUser(), $taskUid, $table, $pageUid);
-        $returnUrl = (string)$this->uriBuilder->buildUriFromRoute('contentflow_record_creation_return', [
+        $returnUrl = (string)$this->uriBuilder->buildUriFromRoute('editorialflow_record_creation_return', [
             'task' => $taskUid,
             'id' => $pageUid,
         ]);
@@ -1628,7 +1668,7 @@ final class TaskAjaxController
         $this->pendingSubjectHandoff->forget($this->getBackendUser(), $taskUid > 0 ? $taskUid : null);
 
         return new RedirectResponse(
-            $this->uriBuilder->buildUriFromRoute('web_contentflow', ['id' => $pageUid]),
+            $this->uriBuilder->buildUriFromRoute('web_editorialflow', ['id' => $pageUid]),
             303,
         );
     }
@@ -1868,7 +1908,7 @@ final class TaskAjaxController
             $subjectTitle,
             (string)$this->uriBuilder->buildUriFromRoute('record_edit', [
                 'edit' => [$subjectTable => [$subjectUid => 'edit']],
-                'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_contentflow', ['id' => $pageUid]),
+                'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_editorialflow', ['id' => $pageUid]),
             ]),
         );
     }
@@ -1979,14 +2019,14 @@ final class TaskAjaxController
     }
 
     /**
-     * An editor-facing text, through the same `content_flow.messages` domain the
+     * An editor-facing text, through the same `editorial_flow.messages` domain the
      * wizard uses (TaskWizardProvider::translate()). Only some actions are
      * covered so far - the rest of this controller still answers in English
      * literals, which is a separate job.
      */
     private function label(string $key): string
     {
-        return $this->getLanguageService()->sL('content_flow.messages:' . $key);
+        return $this->getLanguageService()->sL('editorial_flow.messages:' . $key);
     }
 
     /** The Visual Editor actions' own texts, from that same domain. */
@@ -2015,15 +2055,15 @@ final class TaskAjaxController
         $subjectUid = (int)$details['subject']['uid'];
 
         $view = $this->viewFactory->create(new ViewFactoryData(
-            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
-            partialRootPaths: ['EXT:content_flow/Resources/Private/Partials/'],
-            layoutRootPaths: ['EXT:content_flow/Resources/Private/Layouts/'],
+            templateRootPaths: ['EXT:editorial_flow/Resources/Private/Templates/'],
+            partialRootPaths: ['EXT:editorial_flow/Resources/Private/Partials/'],
+            layoutRootPaths: ['EXT:editorial_flow/Resources/Private/Layouts/'],
             request: $request,
         ));
         $view->assignMultiple($details + [
             'editUrl' => (string)$this->uriBuilder->buildUriFromRoute('record_edit', [
                 'edit' => [$subjectTable => [$subjectUid => 'edit']],
-                'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_contentflow', ['id' => (int)$details['task']['subject_pid']]),
+                'returnUrl' => (string)$this->uriBuilder->buildUriFromRoute('web_editorialflow', ['id' => (int)$details['task']['subject_pid']]),
             ]),
             // Lets Ticket.html tell "this task belongs to another workspace than
             // the one I'm currently in" apart from "not versioned yet" - Preview/
@@ -2031,7 +2071,7 @@ final class TaskAjaxController
             'activeWorkspaceUid' => (int)$this->getBackendUser()->workspace,
         ]);
 
-        return new HtmlResponse($view->render('ContentFlow/Ticket'));
+        return new HtmlResponse($view->render('EditorialFlow/Ticket'));
     }
 
     /**
@@ -2081,9 +2121,9 @@ final class TaskAjaxController
         $recordTitle = $this->recordTitleFor($table, $liveUid);
 
         $view = $this->viewFactory->create(new ViewFactoryData(
-            templateRootPaths: ['EXT:content_flow/Resources/Private/Templates/'],
-            partialRootPaths: ['EXT:content_flow/Resources/Private/Partials/'],
-            layoutRootPaths: ['EXT:content_flow/Resources/Private/Layouts/'],
+            templateRootPaths: ['EXT:editorial_flow/Resources/Private/Templates/'],
+            partialRootPaths: ['EXT:editorial_flow/Resources/Private/Partials/'],
+            layoutRootPaths: ['EXT:editorial_flow/Resources/Private/Layouts/'],
             request: $request,
         ));
         $view->assignMultiple([
@@ -2094,7 +2134,7 @@ final class TaskAjaxController
             'rows' => $rows,
         ]);
 
-        return new HtmlResponse($view->render('ContentFlow/ConflictDiff'));
+        return new HtmlResponse($view->render('EditorialFlow/ConflictDiff'));
     }
 
     private function recordTitleFor(string $table, int $uid): string
@@ -2114,9 +2154,9 @@ final class TaskAjaxController
     public function getPendingWizardAction(): ResponseInterface
     {
         $backendUser = $this->getBackendUser();
-        $pending = $backendUser->getSessionData('content_flow_pending_wizard');
+        $pending = $backendUser->getSessionData('editorial_flow_pending_wizard');
         if (is_array($pending)) {
-            $backendUser->setAndSaveSessionData('content_flow_pending_wizard', null);
+            $backendUser->setAndSaveSessionData('editorial_flow_pending_wizard', null);
             return new JsonResponse(['success' => true, 'pending' => $pending]);
         }
         return new JsonResponse(['success' => true, 'pending' => null]);
@@ -2229,7 +2269,7 @@ final class TaskAjaxController
     /**
      * Remove a checklist item from a stage's review policy.
      *
-     * Soft-deletes the definition only - existing tx_contentflow_task_checklist_state
+     * Soft-deletes the definition only - existing tx_editorialflow_task_checklist_state
      * rows for it are left alone, and simply become unreachable through
      * findItemsForStage()'s join. A task that already checked it off keeps no
      * visible trace, which is correct: the policy no longer asks for it.
@@ -2257,7 +2297,7 @@ final class TaskAjaxController
     }
 
     /**
-     * Same rule as GbWeb\ContentFlow\Service\BoardColumnRegistry::canManageChecklist()
+     * Same rule as GbWeb\EditorialFlow\Service\BoardColumnRegistry::canManageChecklist()
      * - configuring a stage's checklist is workspace policy, not editorial
      * work, so it is restricted the same way publishing is: workspace owner or
      * admin. Kept as its own three lines rather than shared with that class,

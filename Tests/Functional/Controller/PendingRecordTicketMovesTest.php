@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Controller;
+namespace GbWeb\EditorialFlow\Tests\Functional\Controller;
 
-use GbWeb\ContentFlow\Controller\TaskAjaxController;
-use GbWeb\ContentFlow\Domain\Model\TaskState;
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
-use GbWeb\ContentFlow\Service\PendingSubjectHandoff;
+use GbWeb\EditorialFlow\Controller\TaskAjaxController;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Service\PendingSubjectHandoff;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -34,7 +34,7 @@ final class PendingRecordTicketMovesTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void

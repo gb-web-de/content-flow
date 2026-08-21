@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 
 /**
@@ -13,7 +13,7 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
  * A ticket planned with "Neue Seite erstellen" has no page until it reaches
  * Editing, and the page is created by *core's* page wizard - the same dialog
  * the page tree opens, with its position step, doktype step and FormEngine
- * fields. Content Flow does not rebuild that wizard and does not wrap it: the
+ * fields. Editorial Flow does not rebuild that wizard and does not wrap it: the
  * host element `<typo3-backend-page-wizard>` submits to core's own
  * `page_wizard` provider, which is hardcoded in core's JavaScript, and a copy
  * of it here would drift out of date the moment core improves the original.
@@ -29,7 +29,7 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
  */
 final readonly class PendingPageHandoff
 {
-    private const SESSION_KEY = 'content_flow_pending_page_handoff';
+    private const SESSION_KEY = 'editorial_flow_pending_page_handoff';
 
     /**
      * Long enough to fill in a page form without hurrying, short enough that a

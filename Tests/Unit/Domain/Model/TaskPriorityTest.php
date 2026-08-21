@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Unit\Domain\Model;
+namespace GbWeb\EditorialFlow\Tests\Unit\Domain\Model;
 
-use GbWeb\ContentFlow\Domain\Model\TaskPriority;
+use GbWeb\EditorialFlow\Domain\Model\TaskPriority;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\TestingFramework\Core\Unit\UnitTestCase;

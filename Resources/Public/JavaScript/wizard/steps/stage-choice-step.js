@@ -4,7 +4,7 @@
  * route-choice-step.js.
  */
 import { html } from 'lit'
-import labels from '~labels/content_flow.messages'
+import labels from '~labels/editorial_flow.messages'
 
 export class StageChoiceStep {
   constructor(context) {
@@ -50,7 +50,7 @@ export class StageChoiceStep {
               <label>
                 <input
                   type="radio"
-                  name="contentflow-stage-choice"
+                  name="editorialflow-stage-choice"
                   .value=${value}
                   .checked=${this.value === value}
                   @change=${() => this._select(value)}

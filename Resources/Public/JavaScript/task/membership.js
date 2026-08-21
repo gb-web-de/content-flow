@@ -24,11 +24,11 @@ import AjaxRequest from '@typo3/core/ajax/ajax-request.js';
 import Notification from '@typo3/backend/notification.js';
 import Modal from '@typo3/backend/modal.js';
 import { SeverityEnum } from '@typo3/backend/enum/severity.js';
-import { topDocument } from '@gb-web/content-flow/dom-scope.js';
-import labels from '~labels/content_flow.messages';
-import '@gb-web/content-flow/components/assignee-picker.js';
+import { topDocument } from '@gb-web/editorial-flow/dom-scope.js';
+import labels from '~labels/editorial_flow.messages';
+import '@gb-web/editorial-flow/components/assignee-picker.js';
 
-const NOTIFICATION_TITLE = 'Content Flow';
+const NOTIFICATION_TITLE = 'Editorial Flow';
 
 /*
  * Reloading is the right default for the board, the ticket and the page module:
@@ -47,12 +47,12 @@ function reloadAfterChange() {
  * the chrome's copy rather than to an empty picker.
  */
 function assignableUsers() {
-  const own = TYPO3.settings?.ContentFlow?.assignableUsers;
+  const own = TYPO3.settings?.EditorialFlow?.assignableUsers;
   if (Array.isArray(own)) {
     return own;
   }
   try {
-    const outer = window.top?.TYPO3?.settings?.ContentFlow?.assignableUsers;
+    const outer = window.top?.TYPO3?.settings?.EditorialFlow?.assignableUsers;
     return Array.isArray(outer) ? outer : [];
   } catch {
     return [];
@@ -60,8 +60,8 @@ function assignableUsers() {
 }
 
 /**
- * Delegated triggers for markup that carries `data-contentflow-split` or
- * `data-contentflow-move` plus `data-table` / `data-uid` / `data-title`.
+ * Delegated triggers for markup that carries `data-editorialflow-split` or
+ * `data-editorialflow-move` plus `data-table` / `data-uid` / `data-title`.
  *
  * Bound to the TOP document for the same reason member-actions.js is: the
  * ticket arrives inside a Modal rendered into the backend chrome, while this
@@ -76,8 +76,8 @@ export function registerMembershipActions(options = {}) {
       return;
     }
 
-    const splitButton = target.closest('[data-contentflow-split]');
-    const moveButton = splitButton === null ? target.closest('[data-contentflow-move]') : null;
+    const splitButton = target.closest('[data-editorialflow-split]');
+    const moveButton = splitButton === null ? target.closest('[data-editorialflow-move]') : null;
     const button = splitButton ?? moveButton;
     if (button === null) {
       return;
@@ -123,7 +123,7 @@ export function openSplitDialog(table, uid, title, options = {}) {
   const doc = topDocument();
 
   const content = doc.createElement('div');
-  content.className = 'contentflow-membership-dialog';
+  content.className = 'editorialflow-membership-dialog';
 
   const intro = doc.createElement('p');
   intro.textContent = labels.get('membership.split.intro', [title]);
@@ -140,7 +140,7 @@ export function openSplitDialog(table, uid, title, options = {}) {
   descriptionField.rows = 3;
   content.appendChild(field(doc, labels.get('membership.split.field.description'), descriptionField));
 
-  const assigneePicker = doc.createElement('contentflow-assignee-picker');
+  const assigneePicker = doc.createElement('editorialflow-assignee-picker');
   assigneePicker.users = assignableUsers();
   assigneePicker.value = 'me';
   assigneePicker.addEventListener('change', (event) => {
@@ -190,7 +190,7 @@ export async function openMoveDialog(table, uid, title, options = {}) {
   const doc = topDocument();
 
   const result = await request(
-    () => new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_task_move_targets)
+    () => new AjaxRequest(TYPO3.settings.ajaxUrls.editorialflow_task_move_targets)
       .withQueryArguments({ table, uid })
       .get(),
   );
@@ -203,14 +203,14 @@ export async function openMoveDialog(table, uid, title, options = {}) {
   }
 
   const content = doc.createElement('div');
-  content.className = 'contentflow-membership-dialog';
+  content.className = 'editorialflow-membership-dialog';
 
   const intro = doc.createElement('p');
   intro.textContent = labels.get('membership.move.intro', [title]);
   content.appendChild(intro);
 
   const current = doc.createElement('p');
-  current.className = 'contentflow-membership-current';
+  current.className = 'editorialflow-membership-current';
   current.textContent = labels.get('membership.move.current', [result.currentTaskTitle || '#' + result.currentTask]);
   content.appendChild(current);
 
@@ -228,21 +228,21 @@ export async function openMoveDialog(table, uid, title, options = {}) {
     // A regular answer, not a failure: this record simply has nowhere else to
     // go yet, and the useful next step is the other operation.
     const empty = doc.createElement('p');
-    empty.className = 'contentflow-empty';
+    empty.className = 'editorialflow-empty';
     empty.textContent = labels.get('membership.move.empty');
     content.appendChild(empty);
   } else {
     const list = doc.createElement('div');
-    list.className = 'contentflow-membership-targets';
+    list.className = 'editorialflow-membership-targets';
     // A radio group rather than one button per task: picking is separate from
     // confirming, so a mis-click does not move content on its own.
     tasks.forEach((task, index) => {
       const option = doc.createElement('label');
-      option.className = 'contentflow-membership-target';
+      option.className = 'editorialflow-membership-target';
 
       const radio = doc.createElement('input');
       radio.type = 'radio';
-      radio.name = 'contentflow-move-target';
+      radio.name = 'editorialflow-move-target';
       radio.value = String(task.uid);
       if (index === 0) {
         radio.checked = true;
@@ -302,7 +302,7 @@ export async function moveToTask(table, uid, taskUid, options = {}) {
   const recordTitle = options.recordTitle ?? '';
   const taskTitle = options.taskTitle ?? '#' + taskUid;
 
-  const result = await post(TYPO3.settings.ajaxUrls.contentflow_task_attach, {
+  const result = await post(TYPO3.settings.ajaxUrls.editorialflow_task_attach, {
     task: taskUid,
     records: [{ table, uid }],
   });
@@ -332,7 +332,7 @@ export async function splitFromTask(table, uid, options = {}) {
   const onDone = options.onDone ?? reloadAfterChange;
   const recordTitle = options.recordTitle ?? options.title ?? '';
 
-  const result = await post(TYPO3.settings.ajaxUrls.contentflow_task_detach, {
+  const result = await post(TYPO3.settings.ajaxUrls.editorialflow_task_detach, {
     table,
     uid,
     title: options.title ?? '',

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Unit\Domain\Repository;
+namespace GbWeb\EditorialFlow\Tests\Unit\Domain\Repository;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -26,7 +26,7 @@ final class TaskRepositoryTest extends UnitTestCase
         $connection->expects(self::once())
             ->method('insert')
             ->with(
-                'tx_contentflow_task_item',
+                'tx_editorialflow_task_item',
                 self::callback(static function (array $data): bool {
                     self::assertSame(5, $data['pid']);
                     self::assertSame(5, $data['home_pid']);
@@ -53,7 +53,7 @@ final class TaskRepositoryTest extends UnitTestCase
         $connection->expects(self::once())
             ->method('insert')
             ->with(
-                'tx_contentflow_task_item',
+                'tx_editorialflow_task_item',
                 self::callback(static function (array $data): bool {
                     self::assertSame(0, $data['pid']);
                     self::assertSame(0, $data['home_pid']);

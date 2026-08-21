@@ -40,7 +40,7 @@ test.describe('the "New task" wizard', () => {
 
     // The custom element host has no layout box of its own, so visibility is
     // asserted on the controls it renders rather than on the host.
-    const wizard = page.locator('contentflow-task-wizard')
+    const wizard = page.locator('editorialflow-task-wizard')
     await expect(wizard.locator('input[type="text"]').first()).toBeVisible()
     await expect(wizard.locator('select')).toBeVisible()
     await expect(wizard.locator('input[type="date"]')).toHaveCount(2)
@@ -64,7 +64,7 @@ test.describe('the "New task" wizard', () => {
     const modal = await openTaskWizard(page, board)
     await modal.getByRole('button', { name: createANewPage }).click()
 
-    const wizard = page.locator('contentflow-task-wizard')
+    const wizard = page.locator('editorialflow-task-wizard')
     const field = wizard.locator('input[type="text"]').first()
     await expect(field).toBeVisible()
 
@@ -81,7 +81,7 @@ test.describe('the "New task" wizard', () => {
     const modal = await openTaskWizard(page, board)
     await modal.getByRole('button', { name: createANewPage }).click()
 
-    const wizard = page.locator('contentflow-task-wizard')
+    const wizard = page.locator('editorialflow-task-wizard')
     await wizard.locator('input[type="text"]').first().fill('A task Playwright planned')
     await wizard.getByRole('button', { name: /next/i }).click()
 
@@ -93,7 +93,7 @@ test.describe('the "New task" wizard', () => {
     const modal = await openTaskWizard(page, board)
     await modal.getByRole('button', { name: createANewPage }).click()
 
-    const wizard = page.locator('contentflow-task-wizard')
+    const wizard = page.locator('editorialflow-task-wizard')
     const next = wizard.getByRole('button', { name: /next/i })
 
     // Core's wizard marks the step invalid with a class rather than the
@@ -115,6 +115,6 @@ test.describe('the "New task" wizard', () => {
     // The modal animates out before it is removed, so waiting for it to be
     // gone from the layout is the stable signal - toHaveCount(0) races it.
     await expect(modal).toBeHidden()
-    await expect(page.locator('contentflow-task-wizard')).toHaveCount(0)
+    await expect(page.locator('editorialflow-task-wizard')).toHaveCount(0)
   })
 })

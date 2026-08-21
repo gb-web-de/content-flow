@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Database\Connection;
@@ -19,7 +19,7 @@ use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
  * Deliberately query-based rather than a maintained flag: core dispatches no
  * event for version creation, discard, publish, or "flush workspace", so a
  * cached flag would have no reliable way to invalidate itself and would go
- * stale on the one path (flush workspace) Content Flow does not intercept at
+ * stale on the one path (flush workspace) Editorial Flow does not intercept at
  * all. Reading t3ver_oid/t3ver_wsid fresh on every render can never be wrong.
  *
  * Modelled on TYPO3\CMS\Workspaces\Service\WorkspaceService::selectAllVersionsFromPages(),
@@ -81,7 +81,7 @@ final class WorkspaceConflictDetector
 
     /**
      * Workspace titles for a conflict badge's label - "also edited in
-     * <title>". Falls back to "#<uid>" the same way ContentFlowController's
+     * <title>". Falls back to "#<uid>" the same way EditorialFlowController's
      * existing foreign-workspace badge does, so a deleted/inaccessible
      * workspace still renders something rather than an empty label.
      *

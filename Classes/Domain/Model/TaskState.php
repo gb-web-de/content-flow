@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Domain\Model;
+namespace GbWeb\EditorialFlow\Domain\Model;
 
 use TYPO3\CMS\Workspaces\Service\StagesService;
 
 /**
- * The lifecycle of a Content Flow task.
+ * The lifecycle of a Editorial Flow task.
  *
- * Content Flow deliberately owns only the states that exist *outside* a workspace
+ * Editorial Flow deliberately owns only the states that exist *outside* a workspace
  * version's lifetime. Everything between IN_PROGRESS and READY is owned by the TYPO3
- * core workspace stage engine (`sys_workspace_stage`) - Content Flow does not
+ * core workspace stage engine (`sys_workspace_stage`) - Editorial Flow does not
  * reimplement approval steps, notifications or recipients, it renders them.
  *
  *   BACKLOG   own state    task exists, nothing versioned yet
@@ -21,7 +21,7 @@ use TYPO3\CMS\Workspaces\Service\StagesService;
  *   READY     stage -10    core "ready to publish"
  *   DONE      own state    version published, task closed
  *
- * @see \GbWeb\ContentFlow\Service\BoardColumnRegistry for how these become columns
+ * @see \GbWeb\EditorialFlow\Service\BoardColumnRegistry for how these become columns
  */
 enum TaskState: string
 {
@@ -34,10 +34,10 @@ enum TaskState: string
 
     /**
      * States that exist without a workspace version backing them. These are the only
-     * ones Content Flow may move a task into on its own authority; every other
+     * ones Editorial Flow may move a task into on its own authority; every other
      * transition has to go through the core stage engine.
      */
-    public function isOwnedByContentFlow(): bool
+    public function isOwnedByEditorialFlow(): bool
     {
         return match ($this) {
             self::BACKLOG, self::PLANNED, self::DONE => true,
@@ -50,7 +50,7 @@ enum TaskState: string
      */
     public function hasVersion(): bool
     {
-        return !$this->isOwnedByContentFlow();
+        return !$this->isOwnedByEditorialFlow();
     }
 
     /**

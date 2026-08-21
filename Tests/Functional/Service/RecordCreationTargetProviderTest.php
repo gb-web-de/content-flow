@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Service;
+namespace GbWeb\EditorialFlow\Tests\Functional\Service;
 
-use GbWeb\ContentFlow\Service\RecordCreationTargetProvider;
+use GbWeb\EditorialFlow\Service\RecordCreationTargetProvider;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -23,7 +23,7 @@ final class RecordCreationTargetProviderTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void

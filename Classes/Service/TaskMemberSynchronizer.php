@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -128,7 +128,7 @@ final class TaskMemberSynchronizer
         }
 
         // A placeholder-less new record (created directly inside the workspace,
-        // e.g. ContentFlow's own "materialize a pending page" flow on a ticket
+        // e.g. EditorialFlow's own "materialize a pending page" flow on a ticket
         // that had no subject yet) has no separate live counterpart to carry a
         // t3ver_oid pointing back here - the member row's own record_uid already
         // IS the pending version. Same distinction TaskAutoCreationService::

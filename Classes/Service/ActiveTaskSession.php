@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
-use GbWeb\ContentFlow\Domain\Model\TaskState;
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 
 /**
@@ -31,7 +31,7 @@ final readonly class ActiveTaskSession
      * Session key, single-sourced here: a second literal elsewhere would be a
      * silent no-op rather than an error.
      */
-    private const SESSION_KEY = 'content_flow_active_task';
+    private const SESSION_KEY = 'editorial_flow_active_task';
 
     public function __construct(
         private TaskRepository $taskRepository,

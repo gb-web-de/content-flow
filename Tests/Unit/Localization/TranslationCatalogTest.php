@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Unit\Localization;
+namespace GbWeb\EditorialFlow\Tests\Unit\Localization;
 
 use DOMDocument;
 use DOMElement;

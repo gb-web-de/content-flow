@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Hooks;
+namespace GbWeb\EditorialFlow\Hooks;
 
-use GbWeb\ContentFlow\Service\PendingPageClaimService;
-use GbWeb\ContentFlow\Service\PendingSubjectClaimService;
-use GbWeb\ContentFlow\Service\TaskAutoCreationService;
+use GbWeb\EditorialFlow\Service\PendingPageClaimService;
+use GbWeb\EditorialFlow\Service\PendingSubjectClaimService;
+use GbWeb\EditorialFlow\Service\TaskAutoCreationService;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 
 final class TaskAutoCreationDataHandlerHook

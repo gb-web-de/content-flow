@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional;
+namespace GbWeb\EditorialFlow\Tests\Functional;
 
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
@@ -22,22 +22,22 @@ final class ExtensionLoadedTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     #[Test]
     public function extensionIsLoaded(): void
     {
-        self::assertTrue(ExtensionManagementUtility::isLoaded('content_flow'));
+        self::assertTrue(ExtensionManagementUtility::isLoaded('editorial_flow'));
     }
 
     #[Test]
     public function taskTableExists(): void
     {
         $schemaManager = $this->getConnectionPool()
-            ->getConnectionForTable('tx_contentflow_task')
+            ->getConnectionForTable('tx_editorialflow_task')
             ->createSchemaManager();
 
-        self::assertTrue($schemaManager->tablesExist(['tx_contentflow_task']));
+        self::assertTrue($schemaManager->tablesExist(['tx_editorialflow_task']));
     }
 }

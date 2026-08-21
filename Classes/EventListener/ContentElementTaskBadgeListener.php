@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\EventListener;
+namespace GbWeb\EditorialFlow\EventListener;
 
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
-use GbWeb\ContentFlow\Service\ActiveTaskSession;
-use GbWeb\ContentFlow\Service\TaskColor;
-use GbWeb\ContentFlow\Service\WorkspaceConflictDetector;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Service\ActiveTaskSession;
+use GbWeb\EditorialFlow\Service\TaskColor;
+use GbWeb\EditorialFlow\Service\WorkspaceConflictDetector;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Backend\View\Event\AfterPageContentPreviewRenderedEvent;
 use TYPO3\CMS\Core\Attribute\AsEventListener;
@@ -49,7 +49,7 @@ final class ContentElementTaskBadgeListener
     ) {
     }
 
-    #[AsEventListener(identifier: 'content-flow/content-element-task-badge')]
+    #[AsEventListener(identifier: 'editorial-flow/content-element-task-badge')]
     public function __invoke(AfterPageContentPreviewRenderedEvent $event): void
     {
         $record = $event->getRecord();
@@ -88,9 +88,9 @@ final class ContentElementTaskBadgeListener
             : 'This element already belongs to this task';
 
         return sprintf(
-            '<div class="contentflow-element-badge%s" style="--contentflow-task-hue: %s" title="%s">'
-                . '<span class="contentflow-task-dot"></span>%s%s</div>%s',
-            $claim['isActive'] ? ' contentflow-element-badge--active' : '',
+            '<div class="editorialflow-element-badge%s" style="--editorialflow-task-hue: %s" title="%s">'
+                . '<span class="editorialflow-task-dot"></span>%s%s</div>%s',
+            $claim['isActive'] ? ' editorialflow-element-badge--active' : '',
             (string)$claim['hue'],
             htmlspecialchars($title, ENT_QUOTES | ENT_HTML5),
             $label,
@@ -111,8 +111,8 @@ final class ContentElementTaskBadgeListener
     private function renderConflictBadge(array $claim, string $table, int $recordUid): string
     {
         return sprintf(
-            '<span class="contentflow-element-conflict" title="%s">%s %s</span>'
-                . '<button type="button" class="contentflow-element-action" data-contentflow-open-conflict-diff="%s:%d">%s</button>',
+            '<span class="editorialflow-element-conflict" title="%s">%s %s</span>'
+                . '<button type="button" class="editorialflow-element-action" data-editorialflow-open-conflict-diff="%s:%d">%s</button>',
             htmlspecialchars(
                 sprintf('Also edited in %s - compare before publishing either side.', $claim['conflictLabel']),
                 ENT_QUOTES | ENT_HTML5,
@@ -150,24 +150,24 @@ final class ContentElementTaskBadgeListener
         $buttons = '';
         if (!$claim['isSubject']) {
             $buttons .= sprintf(
-                '<button type="button" class="contentflow-element-action" data-contentflow-split="1" %s>%s</button>',
+                '<button type="button" class="editorialflow-element-action" data-editorialflow-split="1" %s>%s</button>',
                 $data,
                 htmlspecialchars($this->label('membership.split.button', 'Split off'), ENT_QUOTES | ENT_HTML5),
             );
         }
         $buttons .= sprintf(
-            '<button type="button" class="contentflow-element-action" data-contentflow-move="1" %s>%s</button>',
+            '<button type="button" class="editorialflow-element-action" data-editorialflow-move="1" %s>%s</button>',
             $data,
             htmlspecialchars($this->label('membership.move.button', 'Move to task'), ENT_QUOTES | ENT_HTML5),
         );
 
-        return '<span class="contentflow-element-actions">' . $buttons . '</span>';
+        return '<span class="editorialflow-element-actions">' . $buttons . '</span>';
     }
 
     private function label(string $key, string $fallback): string
     {
         $label = $GLOBALS['LANG']?->sL(
-            'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:' . $key
+            'LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:' . $key
         ) ?? '';
 
         return $label !== '' ? $label : $fallback;

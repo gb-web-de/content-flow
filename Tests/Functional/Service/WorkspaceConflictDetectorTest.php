@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Service;
+namespace GbWeb\EditorialFlow\Tests\Functional\Service;
 
-use GbWeb\ContentFlow\Service\WorkspaceConflictDetector;
+use GbWeb\EditorialFlow\Service\WorkspaceConflictDetector;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -16,7 +16,7 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
  * the top of that method), regardless of which workspace that task's own
  * pending version lives in. A second workspace independently versioning the
  * same live record is therefore accepted by core but never surfaces anywhere in
- * Content Flow's own bookkeeping - these tests reproduce exactly that path and
+ * Editorial Flow's own bookkeeping - these tests reproduce exactly that path and
  * prove WorkspaceConflictDetector still finds it, because it reads
  * t3ver_oid/t3ver_wsid directly rather than trusting task membership.
  */
@@ -34,7 +34,7 @@ final class WorkspaceConflictDetectorTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void
@@ -100,10 +100,10 @@ final class WorkspaceConflictDetectorTest extends FunctionalTestCase
         self::assertSame([1, 2], $this->subject()->findPendingWorkspaces('pages', 2));
         self::assertSame(['pages' => [2 => [1, 2]]], $this->subject()->findConflicts(['pages' => [2]]));
 
-        $taskQueryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tx_contentflow_task');
+        $taskQueryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tx_editorialflow_task');
         $taskQueryBuilder->getRestrictions()->removeAll();
         $tasks = $taskQueryBuilder
-            ->select('*')->from('tx_contentflow_task')->executeQuery()->fetchAllAssociative();
+            ->select('*')->from('tx_editorialflow_task')->executeQuery()->fetchAllAssociative();
         self::assertCount(1, $tasks, 'the pre-existing bug this feature works around: workspace 2 gets no task of its own');
         self::assertSame(1, (int)$tasks[0]['workspace_uid'], 'the one task that exists still only knows about workspace 1');
     }
@@ -136,16 +136,16 @@ final class WorkspaceConflictDetectorTest extends FunctionalTestCase
         $this->editInWorkspace('pages', 2, ['title' => 'About us (Editorial draft)'], 1);
         $this->editInWorkspace('pages', 2, ['title' => 'About us (Legal draft)'], 2);
 
-        $taskQueryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tx_contentflow_task');
+        $taskQueryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tx_editorialflow_task');
         $taskQueryBuilder->getRestrictions()->removeAll();
         $task = $taskQueryBuilder
-            ->select('*')->from('tx_contentflow_task')->executeQuery()->fetchAssociative();
+            ->select('*')->from('tx_editorialflow_task')->executeQuery()->fetchAssociative();
         $taskUid = (int)$task['uid'];
 
-        $memberQueryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tx_contentflow_task_item');
+        $memberQueryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tx_editorialflow_task_item');
         $memberQueryBuilder->getRestrictions()->removeAll();
         $members = $memberQueryBuilder
-            ->select('*')->from('tx_contentflow_task_item')
+            ->select('*')->from('tx_editorialflow_task_item')
             ->where($memberQueryBuilder->expr()->eq('task', $memberQueryBuilder->createNamedParameter($taskUid)))
             ->executeQuery()->fetchAllAssociative();
 

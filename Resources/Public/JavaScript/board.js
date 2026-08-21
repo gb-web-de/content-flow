@@ -1,5 +1,5 @@
 /*
- * Content Flow board - entry point.
+ * Editorial Flow board - entry point.
  *
  * This file only wires things together. Each behaviour lives in its own small
  * module under board/ and task/, so a reader looking for "how does splitting a
@@ -22,20 +22,20 @@ import Modal from '@typo3/backend/modal.js';
 import { SeverityEnum } from '@typo3/backend/enum/severity.js';
 import Workspaces from '@typo3/workspaces/workspaces.js';
 import { topLevelModuleImport } from '@typo3/backend/utility/top-level-module-import.js';
-import labels from '~labels/content_flow.messages';
+import labels from '~labels/editorial_flow.messages';
 import workspacesLabels from '~labels/workspaces.messages';
 
-import { registerFilters } from '@gb-web/content-flow/board/filters.js';
-import { registerDragAndDrop } from '@gb-web/content-flow/board/drag-drop.js';
-import { registerAssignButtons } from '@gb-web/content-flow/task/assign.js';
-import { registerTicketButtons } from '@gb-web/content-flow/task/ticket.js';
-import { registerCreateButton } from '@gb-web/content-flow/task/create-wizard.js';
-import { registerCommentForm } from '@gb-web/content-flow/task/comment.js';
-import { registerPublishButtons } from '@gb-web/content-flow/task/publish.js';
-import { registerMemberActions } from '@gb-web/content-flow/task/member-actions.js';
-import { registerMembershipActions } from '@gb-web/content-flow/task/membership.js';
-import { registerConflictDiffButtons } from '@gb-web/content-flow/task/conflict-diff.js';
-import { registerChecklistManagement, registerChecklistManageActions, registerChecklistToggle } from '@gb-web/content-flow/board/checklist.js';
+import { registerFilters } from '@gb-web/editorial-flow/board/filters.js';
+import { registerDragAndDrop } from '@gb-web/editorial-flow/board/drag-drop.js';
+import { registerAssignButtons } from '@gb-web/editorial-flow/task/assign.js';
+import { registerTicketButtons } from '@gb-web/editorial-flow/task/ticket.js';
+import { registerCreateButton } from '@gb-web/editorial-flow/task/create-wizard.js';
+import { registerCommentForm } from '@gb-web/editorial-flow/task/comment.js';
+import { registerPublishButtons } from '@gb-web/editorial-flow/task/publish.js';
+import { registerMemberActions } from '@gb-web/editorial-flow/task/member-actions.js';
+import { registerMembershipActions } from '@gb-web/editorial-flow/task/membership.js';
+import { registerConflictDiffButtons } from '@gb-web/editorial-flow/task/conflict-diff.js';
+import { registerChecklistManagement, registerChecklistManageActions, registerChecklistToggle } from '@gb-web/editorial-flow/board/checklist.js';
 
 /*
  * Core's own "Editing" stage (StagesService::STAGE_EDIT_ID), the one a record
@@ -45,11 +45,11 @@ const EDITING_STAGE_UID = 0;
 
 /*
  * A ticket planned with "Neue Seite erstellen" carries no subject yet, which
- * the card spells as `pages:0` (Index.html's data-contentflow-record).
+ * the card spells as `pages:0` (Index.html's data-editorialflow-record).
  */
 const PENDING_PAGE_RECORD = 'pages:0';
 
-class ContentFlowBoard {
+class EditorialFlowBoard {
   constructor() {
     this.selection = new Set();
     this.workspaceUi = new Workspaces();
@@ -57,7 +57,7 @@ class ContentFlowBoard {
   }
 
   initialize() {
-    this.announcer = document.querySelector('.contentflow-announcer');
+    this.announcer = document.querySelector('.editorialflow-announcer');
 
     // Registered before the board check on purpose: these actions also appear in
     // the page module banner, where there is no board element at all.
@@ -77,7 +77,7 @@ class ContentFlowBoard {
     registerChecklistToggle();
     registerChecklistManageActions();
 
-    this.board = document.querySelector('.contentflow-board');
+    this.board = document.querySelector('.editorialflow-board');
     if (this.board === null) {
       return;
     }
@@ -100,7 +100,7 @@ class ContentFlowBoard {
   }
 
   registerCardEvents() {
-    this.board.querySelectorAll('.contentflow-card').forEach((card) => {
+    this.board.querySelectorAll('.editorialflow-card').forEach((card) => {
       card.addEventListener('click', () => this.toggleSelection(card));
       card.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -112,7 +112,7 @@ class ContentFlowBoard {
   }
 
   toggleSelection(card) {
-    const id = card.dataset.contentflowRecord;
+    const id = card.dataset.editorialflowRecord;
     if (!id) {
       return;
     }
@@ -124,27 +124,27 @@ class ContentFlowBoard {
     }
     card.classList.toggle('is-selected', !wasSelected);
     card.setAttribute('aria-selected', wasSelected ? 'false' : 'true');
-    this.announce((wasSelected ? 'Deselected ' : 'Selected ') + (card.dataset.contentflowTitle || 'task'));
+    this.announce((wasSelected ? 'Deselected ' : 'Selected ') + (card.dataset.editorialflowTitle || 'task'));
   }
 
   canDropCardIntoColumn(card, column) {
-    if (column.dataset.contentflowAcceptsDrop === 'false') {
+    if (column.dataset.editorialflowAcceptsDrop === 'false') {
       return false;
     }
     // Gates the DRAGGED card, not the target column: core's own stage
     // permission is about who may act on whatever currently sits in a stage,
     // never about who may move things into one (see WORKSPACE-STAGES.md).
-    // ContentFlowController::buildBoard() stamps this from the card's own
+    // EditorialFlowController::buildBoard() stamps this from the card's own
     // current stage_uid.
-    if (card.dataset.contentflowCanAct === 'false') {
+    if (card.dataset.editorialflowCanAct === 'false') {
       return false;
     }
 
-    const currentState = card.dataset.contentflowState || '';
-    const currentStage = this.parseStageUid(card.dataset.contentflowStage);
-    const currentWorkspaceUid = parseInt(card.dataset.contentflowWorkspace || '0', 10);
-    const targetState = column.dataset.contentflowState || '';
-    const targetStage = this.parseStageUid(column.dataset.contentflowStage);
+    const currentState = card.dataset.editorialflowState || '';
+    const currentStage = this.parseStageUid(card.dataset.editorialflowStage);
+    const currentWorkspaceUid = parseInt(card.dataset.editorialflowWorkspace || '0', 10);
+    const targetState = column.dataset.editorialflowState || '';
+    const targetStage = this.parseStageUid(column.dataset.editorialflowStage);
 
     if (targetStage !== null) {
       if (currentWorkspaceUid < 1) {
@@ -163,22 +163,22 @@ class ContentFlowBoard {
   }
 
   isPendingPageCard(card) {
-    return (card?.dataset.contentflowRecord || '') === PENDING_PAGE_RECORD;
+    return (card?.dataset.editorialflowRecord || '') === PENDING_PAGE_RECORD;
   }
 
   getDropRejectionMessage(card, column) {
-    if (column.dataset.contentflowAcceptsDrop === 'false') {
+    if (column.dataset.editorialflowAcceptsDrop === 'false') {
       return 'This column does not accept manual card drops. Going live is an explicit action.';
     }
-    if (card.dataset.contentflowCanAct === 'false') {
+    if (card.dataset.editorialflowCanAct === 'false') {
       return 'You are not responsible for the stage this task currently sits in, so you cannot move it. '
         + 'An administrator can add you (or your group) as a responsible person for that stage in the workspace settings.';
     }
 
-    const currentState = card.dataset.contentflowState || '';
-    const currentWorkspaceUid = parseInt(card.dataset.contentflowWorkspace || '0', 10);
-    const targetState = column.dataset.contentflowState || '';
-    const targetStage = this.parseStageUid(column.dataset.contentflowStage);
+    const currentState = card.dataset.editorialflowState || '';
+    const currentWorkspaceUid = parseInt(card.dataset.editorialflowWorkspace || '0', 10);
+    const targetState = column.dataset.editorialflowState || '';
+    const targetStage = this.parseStageUid(column.dataset.editorialflowStage);
 
     if (targetStage !== null && currentWorkspaceUid < 1) {
       return 'This planned task has to enter Editing before it can move to a review stage.';
@@ -189,7 +189,7 @@ class ContentFlowBoard {
     if (targetStage === null && currentState === targetState) {
       return 'This task is already in that column.';
     }
-    if (targetStage !== null && this.parseStageUid(card.dataset.contentflowStage) === targetStage) {
+    if (targetStage !== null && this.parseStageUid(card.dataset.editorialflowStage) === targetStage) {
       return 'This task is already in that review column.';
     }
 
@@ -197,17 +197,17 @@ class ContentFlowBoard {
   }
 
   async handleCardDrop(taskUid, column, card = null) {
-    const targetState = column.dataset.contentflowState || 'backlog';
-    const targetStageUid = this.parseStageUid(column.dataset.contentflowStage);
-    const columnTitle = column.querySelector('.contentflow-column-title')?.textContent?.trim() || targetState;
-    const cardTitle = card?.dataset.contentflowTitle || 'Task';
+    const targetState = column.dataset.editorialflowState || 'backlog';
+    const targetStageUid = this.parseStageUid(column.dataset.editorialflowStage);
+    const columnTitle = column.querySelector('.editorialflow-column-title')?.textContent?.trim() || targetState;
+    const cardTitle = card?.dataset.editorialflowTitle || 'Task';
 
     if (targetStageUid !== null) {
       // A ticket that has no page yet cannot change a stage - there is nothing
       // versioned to move. Its drop into Editing means "create the page now",
       // and the server answers that with the page wizard rather than a
       // transition (TaskAjaxController::requestPageWizard()).
-      const currentWorkspaceUid = parseInt(card?.dataset.contentflowWorkspace || '0', 10);
+      const currentWorkspaceUid = parseInt(card?.dataset.editorialflowWorkspace || '0', 10);
       if (this.isPendingPageCard(card) || (currentWorkspaceUid < 1 && targetStageUid === EDITING_STAGE_UID)) {
         await this.moveTaskToColumn(taskUid, targetState, targetStageUid, columnTitle, cardTitle);
         return;
@@ -221,7 +221,7 @@ class ContentFlowBoard {
       // opening a dialog that cannot succeed.
       if (await this.hasNothingPendingForStageTransition(taskUid)) {
         const message = `${cardTitle} has nothing pending in this workspace yet, so it cannot be sent to a review stage.`;
-        Notification.warning('Content Flow', message);
+        Notification.warning('Editorial Flow', message);
         this.announce(message);
         return;
       }
@@ -231,7 +231,7 @@ class ContentFlowBoard {
         targetStageUid,
         columnTitle,
         cardTitle,
-        card?.dataset.contentflowActive === 'true' && targetStageUid !== EDITING_STAGE_UID,
+        card?.dataset.editorialflowActive === 'true' && targetStageUid !== EDITING_STAGE_UID,
       );
       return;
     }
@@ -246,7 +246,7 @@ class ContentFlowBoard {
    * own, more specific error, rather than silently swallowing the drop here.
    */
   async hasNothingPendingForStageTransition(taskUid) {
-    const url = TYPO3.settings.ajaxUrls.contentflow_task_check_stage_transition;
+    const url = TYPO3.settings.ajaxUrls.editorialflow_task_check_stage_transition;
     if (!url) {
       return false;
     }
@@ -259,9 +259,9 @@ class ContentFlowBoard {
   }
 
   async moveTaskToColumn(taskUid, targetState, targetStageUid, columnTitle, cardTitle) {
-    const url = TYPO3.settings.ajaxUrls.contentflow_task_move_stage;
+    const url = TYPO3.settings.ajaxUrls.editorialflow_task_move_stage;
     if (!url) {
-      Notification.error('Content Flow', 'Board move is not configured.');
+      Notification.error('Editorial Flow', 'Board move is not configured.');
       return;
     }
 
@@ -272,7 +272,7 @@ class ContentFlowBoard {
         stageUid: targetStageUid,
       });
       if (result.success !== true) {
-        Notification.error('Content Flow', result.message || 'Could not move the task.');
+        Notification.error('Editorial Flow', result.message || 'Could not move the task.');
         return;
       }
 
@@ -295,16 +295,16 @@ class ContentFlowBoard {
       }
 
       this.announce(`Moved ${cardTitle} to ${columnTitle}.`);
-      Notification.success('Content Flow', `${cardTitle} moved to ${columnTitle}.`);
+      Notification.success('Editorial Flow', `${cardTitle} moved to ${columnTitle}.`);
       window.location.reload();
     } catch (error) {
-      Notification.error('Content Flow', await this.extractErrorMessage(error, 'Could not move the task.'));
+      Notification.error('Editorial Flow', await this.extractErrorMessage(error, 'Could not move the task.'));
     }
   }
 
   /*
    * TYPO3's own page-creation dialog, the same one the page tree opens - not a
-   * Content Flow rebuild of it. Core owns the position step, the page-type step
+   * Editorial Flow rebuild of it. Core owns the position step, the page-type step
    * and whatever fields that type requires, and its provider creates the page;
    * this extension only says where to start and then waits for the DataHandler
    * hook to link the result to the ticket.
@@ -319,33 +319,33 @@ class ContentFlowBoard {
       const { openPageWizardModal } = await import('@typo3/backend/page-wizard/helper/wizard-helper.js');
 
       // Core auto-advances from Step 1 (Position) to Step 2 (Type) when
-      // configuration.positionData is present. Content Flow must *start* at
+      // configuration.positionData is present. Editorial Flow must *start* at
       // Step 1 and must not preselect the position.
       await openPageWizardModal({});
       this.announce(`Creating the page for ${cardTitle}.`);
       this.dropPageWizardClaimWhenClosed();
     } catch (error) {
-      Notification.error('Content Flow', 'Could not open TYPO3\'s page wizard.');
+      Notification.error('Editorial Flow', 'Could not open TYPO3\'s page wizard.');
       await this.cancelPageWizard();
     }
   }
 
   async openRecordTargetModal(result, cardTitle) {
     try {
-      const targetUrl = TYPO3.settings.ajaxUrls.contentflow_task_record_creation_targets;
-      const startUrl = TYPO3.settings.ajaxUrls.contentflow_task_start_record_creation;
+      const targetUrl = TYPO3.settings.ajaxUrls.editorialflow_task_record_creation_targets;
+      const startUrl = TYPO3.settings.ajaxUrls.editorialflow_task_start_record_creation;
       if (!targetUrl || !startUrl) {
-        Notification.error('Content Flow', labels.get('recordTarget.error.unavailable'));
+        Notification.error('Editorial Flow', labels.get('recordTarget.error.unavailable'));
         return;
       }
 
       const targets = await this.postJson(targetUrl, { task: result.taskUid });
       if (targets.success !== true) {
-        Notification.error('Content Flow', targets.message || labels.get('recordTarget.error.load'));
+        Notification.error('Editorial Flow', targets.message || labels.get('recordTarget.error.load'));
         return;
       }
       if (!Array.isArray(targets.pages) || targets.pages.length === 0) {
-        Notification.warning('Content Flow', labels.get('recordTarget.empty'));
+        Notification.warning('Editorial Flow', labels.get('recordTarget.empty'));
         return;
       }
 
@@ -354,10 +354,10 @@ class ContentFlowBoard {
       description.textContent = labels.get('recordTarget.description', [targets.recordTypeLabel || targets.recordTable]);
       const label = document.createElement('label');
       label.className = 'form-label';
-      label.htmlFor = 'contentflow-record-target-page';
+      label.htmlFor = 'editorialflow-record-target-page';
       label.textContent = labels.get('recordTarget.page');
       const select = document.createElement('select');
-      select.id = 'contentflow-record-target-page';
+      select.id = 'editorialflow-record-target-page';
       select.className = 'form-select';
       targets.pages.forEach((page) => {
         const option = document.createElement('option');
@@ -391,13 +391,13 @@ class ContentFlowBoard {
                   page: parseInt(select.value, 10),
                 });
                 if (started.success !== true || !started.redirectUrl) {
-                  Notification.error('Content Flow', started.message || labels.get('recordTarget.error.start'));
+                  Notification.error('Editorial Flow', started.message || labels.get('recordTarget.error.start'));
                   return;
                 }
                 modal.hideModal();
                 window.location.href = started.redirectUrl;
               } catch (error) {
-                Notification.error('Content Flow', await this.extractErrorMessage(error, labels.get('recordTarget.error.start')));
+                Notification.error('Editorial Flow', await this.extractErrorMessage(error, labels.get('recordTarget.error.start')));
               } finally {
                 event.target.disabled = false;
               }
@@ -406,7 +406,7 @@ class ContentFlowBoard {
         ],
       });
     } catch (error) {
-      Notification.error('Content Flow', await this.extractErrorMessage(error, labels.get('recordTarget.error.load')));
+      Notification.error('Editorial Flow', await this.extractErrorMessage(error, labels.get('recordTarget.error.load')));
     }
   }
 
@@ -425,7 +425,7 @@ class ContentFlowBoard {
   }
 
   async cancelPageWizard() {
-    const url = TYPO3.settings.ajaxUrls.contentflow_task_cancel_page_wizard;
+    const url = TYPO3.settings.ajaxUrls.editorialflow_task_cancel_page_wizard;
     if (!url) {
       return;
     }
@@ -440,13 +440,13 @@ class ContentFlowBoard {
     try {
       const response = await this.workspaceUi.sendRemoteRequest(
         this.workspaceUi.generateRemotePayloadBody('sendToSpecificStageWindow', [targetStageUid]),
-        '.contentflow-board',
+        '.editorialflow-board',
       );
       const payload = await response.resolve();
 
       const stageDialogData = payload?.[0]?.result;
       if (!stageDialogData || stageDialogData.success === false) {
-        Notification.error('Content Flow', 'TYPO3 refused to open the workspace stage dialog.');
+        Notification.error('Editorial Flow', 'TYPO3 refused to open the workspace stage dialog.');
         return;
       }
 
@@ -470,22 +470,22 @@ class ContentFlowBoard {
             btnClass: 'btn-primary',
             name: 'ok',
             trigger: async (event, currentModal) => {
-              if (currentModal.dataset.contentflowSubmitting === '1') {
+              if (currentModal.dataset.editorialflowSubmitting === '1') {
                 return;
               }
 
               const currentForm = currentModal.querySelector('form');
               if (currentForm === null || currentForm.tagName !== 'FORM') {
-                Notification.error('Content Flow', 'The workspace stage dialog could not be rendered.');
+                Notification.error('Editorial Flow', 'The workspace stage dialog could not be rendered.');
                 return;
               }
 
-              currentModal.dataset.contentflowSubmitting = '1';
+              currentModal.dataset.editorialflowSubmitting = '1';
               event.target.disabled = true;
 
               try {
                 const dialogValues = this.readStageTransitionForm(currentForm);
-                const result = await this.postJson(TYPO3.settings.ajaxUrls.contentflow_task_execute_stage, {
+                const result = await this.postJson(TYPO3.settings.ajaxUrls.editorialflow_task_execute_stage, {
                   task: taskUid,
                   stageUid: targetStageUid,
                   comment: dialogValues.comment,
@@ -494,19 +494,19 @@ class ContentFlowBoard {
                   deactivateActiveTask: dialogValues.deactivateActiveTask,
                 });
                 if (result.success !== true) {
-                  Notification.error('Content Flow', result.message || 'Could not move the task to that stage.');
+                  Notification.error('Editorial Flow', result.message || 'Could not move the task to that stage.');
                   return;
                 }
 
                 currentModal.hideModal();
                 this.announce(`Moved ${cardTitle} to ${columnTitle}.`);
-                Notification.success('Content Flow', `${cardTitle} moved to ${columnTitle}.`);
+                Notification.success('Editorial Flow', `${cardTitle} moved to ${columnTitle}.`);
                 // Soft warning, never a block: core already decided the move itself
                 // is allowed, this only flags that the stage being left had unchecked
                 // review items.
                 if (result.incompleteChecklistItems > 0) {
                   Notification.warning(
-                    'Content Flow',
+                    'Editorial Flow',
                     `${result.incompleteChecklistItems} checklist item(s) were left unchecked in the previous stage.`,
                   );
                 }
@@ -520,11 +520,11 @@ class ContentFlowBoard {
                 // the same error toast again.
                 currentModal.hideModal();
                 Notification.error(
-                  'Content Flow',
+                  'Editorial Flow',
                   await this.extractErrorMessage(error, 'Could not move the task to that stage.'),
                 );
               } finally {
-                delete currentModal.dataset.contentflowSubmitting;
+                delete currentModal.dataset.editorialflowSubmitting;
                 event.target.disabled = false;
               }
             },
@@ -540,16 +540,16 @@ class ContentFlowBoard {
       }, { once: true });
     } catch (error) {
       Notification.error(
-        'Content Flow',
+        'Editorial Flow',
         await this.extractErrorMessage(error, 'Could not open the TYPO3 workspace dialog.'),
       );
     }
   }
 
   openTicket(taskUid, title) {
-    const url = TYPO3.settings.ajaxUrls.contentflow_task_ticket;
+    const url = TYPO3.settings.ajaxUrls.editorialflow_task_ticket;
     if (!url) {
-      Notification.error('Content Flow', 'Ticket view is not available.');
+      Notification.error('Editorial Flow', 'Ticket view is not available.');
       return;
     }
 
@@ -605,14 +605,14 @@ class ContentFlowBoard {
 
   appendActiveTaskChoice(form) {
     const section = form.ownerDocument.createElement('fieldset');
-    section.className = 'contentflow-stage-active-choice';
+    section.className = 'editorialflow-stage-active-choice';
 
     const wrapper = form.ownerDocument.createElement('div');
     wrapper.className = 'form-check';
     const checkbox = form.ownerDocument.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.className = 'form-check-input';
-    checkbox.id = 'contentflow-deactivate-active-task';
+    checkbox.id = 'editorialflow-deactivate-active-task';
     checkbox.name = 'deactivateActiveTask';
     checkbox.value = '1';
     checkbox.checked = true;
@@ -633,19 +633,19 @@ class ContentFlowBoard {
     const wrapper = document.createElement('div');
 
     const form = document.createElement('form');
-    form.className = 'contentflow-stage-dialog';
+    form.className = 'editorialflow-stage-dialog';
     wrapper.append(form);
 
     if (Array.isArray(stageDialogData.sendMailTo) && stageDialogData.sendMailTo.length > 0) {
       const details = document.createElement('details');
-      details.className = 'contentflow-stage-notify';
+      details.className = 'editorialflow-stage-notify';
 
       const summary = document.createElement('summary');
-      summary.className = 'contentflow-stage-notify-summary';
+      summary.className = 'editorialflow-stage-notify-summary';
       details.append(summary);
 
       const recipientSection = document.createElement('div');
-      recipientSection.className = 'contentflow-stage-notify-body';
+      recipientSection.className = 'editorialflow-stage-notify-body';
 
       const controls = document.createElement('div');
       controls.className = 'form-group';
@@ -793,4 +793,4 @@ class ContentFlowBoard {
   }
 }
 
-export default new ContentFlowBoard();
+export default new EditorialFlowBoard();

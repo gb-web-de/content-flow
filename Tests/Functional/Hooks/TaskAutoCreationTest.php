@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Hooks;
+namespace GbWeb\EditorialFlow\Tests\Functional\Hooks;
 
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
@@ -30,7 +30,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void
@@ -77,8 +77,8 @@ final class TaskAutoCreationTest extends FunctionalTestCase
      */
     private function createOpenTask(array $overrides = []): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
-        $connection->insert('tx_contentflow_task', array_merge([
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task');
+        $connection->insert('tx_editorialflow_task', array_merge([
             'title' => 'About us',
             'subject_table' => 'pages',
             'subject_uid' => 2,
@@ -107,7 +107,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
     {
         $this->editInWorkspace('pages', 2, ['title' => 'About us (revised)']);
 
-        $tasks = $this->selectAll('tx_contentflow_task');
+        $tasks = $this->selectAll('tx_editorialflow_task');
         self::assertCount(1, $tasks, 'exactly one task should have been created');
         self::assertSame('pages', $tasks[0]['subject_table']);
         self::assertSame(2, (int)$tasks[0]['subject_uid']);
@@ -120,7 +120,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
     {
         $this->editInWorkspace('pages', 2, ['title' => 'About us (revised)']);
 
-        $pending = $GLOBALS['BE_USER']->getSessionData('content_flow_pending_wizard');
+        $pending = $GLOBALS['BE_USER']->getSessionData('editorial_flow_pending_wizard');
         self::assertIsArray($pending);
         self::assertSame('configure_auto_task', $pending['mode']);
         self::assertSame('pages', $pending['subjectTable']);
@@ -133,7 +133,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
     {
         $this->editInWorkspace('pages', 2, ['title' => 'Live edit'], workspaceUid: 0);
 
-        self::assertSame([], $this->selectAll('tx_contentflow_task'));
+        self::assertSame([], $this->selectAll('tx_editorialflow_task'));
     }
 
     #[Test]
@@ -141,7 +141,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
     {
         $this->editInWorkspace('pages', 2, ['title' => 'About us (revised)']);
 
-        $members = $this->selectAll('tx_contentflow_task_item');
+        $members = $this->selectAll('tx_editorialflow_task_item');
         $claimed = array_map(
             static fn (array $row): string => $row['record_table'] . ':' . $row['record_uid'],
             $members,
@@ -159,7 +159,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
     {
         $this->editInWorkspace('tt_content', 10, ['header' => 'Intro text (revised)']);
 
-        $tasks = $this->selectAll('tx_contentflow_task');
+        $tasks = $this->selectAll('tx_editorialflow_task');
         self::assertCount(1, $tasks, 'a content element must not get a card of its own');
         self::assertSame('pages', $tasks[0]['subject_table']);
         self::assertSame(2, (int)$tasks[0]['subject_uid'], 'it should belong to the page it sits on');
@@ -173,7 +173,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
 
         self::assertCount(
             1,
-            $this->selectAll('tx_contentflow_task'),
+            $this->selectAll('tx_editorialflow_task'),
             'the board must not flood with a card per content element',
         );
     }
@@ -185,7 +185,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
 
         $this->editInWorkspace('tt_content', 10, ['header' => 'Intro text (revised)']);
 
-        $task = $this->selectAll('tx_contentflow_task')[0];
+        $task = $this->selectAll('tx_editorialflow_task')[0];
         self::assertSame($taskUid, (int)$task['uid']);
         self::assertSame('in_progress', $task['state']);
         self::assertSame(1, (int)$task['workspace_uid']);
@@ -196,10 +196,10 @@ final class TaskAutoCreationTest extends FunctionalTestCase
     {
         $this->editInWorkspace('pages', 2, ['title' => 'About us (revised)']);
 
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task_item');
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task_item');
         $duplicates = $connection->executeQuery(
             'SELECT record_table, record_uid, COUNT(*) AS amount'
-            . ' FROM tx_contentflow_task_item WHERE closed = 0 AND deleted = 0'
+            . ' FROM tx_editorialflow_task_item WHERE closed = 0 AND deleted = 0'
             . ' GROUP BY record_table, record_uid HAVING amount > 1',
         )->fetchAllAssociative();
 
@@ -211,7 +211,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
     {
         $this->editInWorkspace('pages', 2, ['title' => 'About us (revised)']);
 
-        $tasks = $this->selectAll('tx_contentflow_task');
+        $tasks = $this->selectAll('tx_editorialflow_task');
         self::assertSame('in_progress', $tasks[0]['state']);
         self::assertSame(1, (int)$tasks[0]['workspace_uid']);
         self::assertSame(0, (int)$tasks[0]['stage_uid'], 'stage 0 is the workspace edit stage, not Live');
@@ -222,7 +222,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
     {
         $this->editInWorkspace('pages', 2, ['title' => 'About us (revised)']);
 
-        $events = array_column($this->selectAll('tx_contentflow_activity'), 'event');
+        $events = array_column($this->selectAll('tx_editorialflow_activity'), 'event');
 
         self::assertContains('task_created', $events);
         self::assertContains('work_started', $events);
@@ -255,7 +255,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
         // First edit ever on this element - genuinely unclaimed until now.
         $this->editInWorkspace('tt_content', $newContentUid, ['header' => 'edited right after creation']);
 
-        $members = $this->selectAll('tx_contentflow_task_item');
+        $members = $this->selectAll('tx_editorialflow_task_item');
         $claimed = array_map(
             static fn (array $row): string => $row['record_table'] . ':' . $row['record_uid'],
             $members,
@@ -266,9 +266,9 @@ final class TaskAutoCreationTest extends FunctionalTestCase
             $claimed,
             'the element must be claimed onto the page task even before the routing wizard is answered',
         );
-        self::assertCount(1, $this->selectAll('tx_contentflow_task'));
+        self::assertCount(1, $this->selectAll('tx_editorialflow_task'));
 
-        $pending = $GLOBALS['BE_USER']->getSessionData('content_flow_pending_wizard');
+        $pending = $GLOBALS['BE_USER']->getSessionData('editorial_flow_pending_wizard');
         self::assertIsArray($pending, 'the routing choice must still be offered');
         self::assertSame('route_member', $pending['mode']);
         self::assertSame($newContentUid, $pending['uid']);
@@ -279,7 +279,7 @@ final class TaskAutoCreationTest extends FunctionalTestCase
     {
         $this->editInWorkspace('tt_content', 10, ['header' => 'first edit on an untouched page']);
 
-        $pending = $GLOBALS['BE_USER']->getSessionData('content_flow_pending_wizard');
+        $pending = $GLOBALS['BE_USER']->getSessionData('editorial_flow_pending_wizard');
         self::assertIsArray($pending);
         self::assertSame('configure_auto_task', $pending['mode']);
         self::assertSame('tt_content', $pending['table']);

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Schema\Capability\TcaSchemaCapability;
@@ -11,7 +11,7 @@ use TYPO3\CMS\Core\Schema\TcaSchemaFactory;
 /**
  * Decides what a task is about.
  *
- * Content Flow distinguishes two roles a versionable record can have:
+ * Editorial Flow distinguishes two roles a versionable record can have:
  *
  * - a SUBJECT is page-like: it stands on its own and deserves its own card.
  *   `pages` obviously. But not only - a news record is technically a record while
@@ -24,7 +24,7 @@ use TYPO3\CMS\Core\Schema\TcaSchemaFactory;
  *
  * Registration happens in ext_localconf.php and is open to other extensions:
  *
- *   $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['subjectTables'][]
+ *   $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['editorial_flow']['subjectTables'][]
  *       = 'tx_news_domain_model_news';
  */
 final class TaskSubjectRegistry
@@ -42,7 +42,7 @@ final class TaskSubjectRegistry
      */
     public function getSubjectTables(): array
     {
-        $configured = $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['subjectTables'] ?? [];
+        $configured = $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['editorial_flow']['subjectTables'] ?? [];
         $tables = array_values(array_unique(array_merge(['pages'], array_filter((array)$configured, 'is_string'))));
 
         return array_values(array_filter($tables, fn (string $table): bool => $this->isTrackable($table)));

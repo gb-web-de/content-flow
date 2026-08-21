@@ -1,6 +1,6 @@
-# Content Flow — Architecture
+# Editorial Flow — Architecture
 
-Content Flow is a **standalone** TYPO3 v14 extension. It depends on TYPO3 core only
+Editorial Flow is a **standalone** TYPO3 v14 extension. It depends on TYPO3 core only
 (`typo3/cms-workspaces`), and deliberately **not** on
 `web-vision/kanban-workspaces` or `xima/xima-typo3-content-planner`. Those two were
 studied as prior art; neither is installed, and none of their tables are read or written.
@@ -10,11 +10,11 @@ studied as prior art; neither is installed, and none of their tables are read or
 TYPO3 workspaces already contain a complete approval engine: stages, permissions,
 notifications, diffs, publishing. What they lack is a **before** and an **after** — there is
 no way to say "this page needs work" until somebody actually edits it, and no trace left once
-it goes live. Content Flow adds a **task** on either side of the version's lifetime, and gets
+it goes live. Editorial Flow adds a **task** on either side of the version's lifetime, and gets
 out of the way in the middle. Editors do not learn a workflow; the workflow follows them.
 
 ```
-    ┌── Content Flow ──┐   ┌────── TYPO3 core workspace stages ──────┐   ┌ Content Flow ┐
+    ┌── Editorial Flow ──┐   ┌────── TYPO3 core workspace stages ──────┐   ┌ Editorial Flow ┐
     │                  │   │                                        │   │              │
     │ Backlog  Planned │   │ In Progress   Review 1..n   Ready       │   │ Done         │
     │                  │   │                                        │   │              │
@@ -25,7 +25,7 @@ out of the way in the middle. Editors do not learn a workflow; the workflow foll
 
 The middle section is read from `sys_workspace_stage`. An integrator defines review steps
 where TYPO3 already expects them (Workspace record → Stages) and the board picks them up —
-Content Flow has no stage configuration of its own to keep in sync.
+Editorial Flow has no stage configuration of its own to keep in sync.
 
 This also answers, natively, what
 [kanban-workspaces#31](https://github.com/web-vision/kanban-workspaces/issues/31) asked for
@@ -35,13 +35,13 @@ This also answers, natively, what
 ## What a task is about
 
 Every **versionable** record can be tracked — if a table has no workspace support it never
-produces a version, so there is nothing for the workflow to move. Among those, Content Flow
+produces a version, so there is nothing for the workflow to move. Among those, Editorial Flow
 distinguishes two roles:
 
 - A **subject** is page-like: it stands on its own and gets its own card. `pages`, obviously.
   But not only: a *news* record is technically a record while behaving like a page, because it
   has its own detail view. To an editor it *is* a page. Which tables count is configuration
-  (`$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['subjectTables']`), because only the
+  (`$GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['editorial_flow']['subjectTables']`), because only the
   integrator knows their content model.
 - Everything else is **page-bound**: a content element belongs to the page it sits on.
 
@@ -120,7 +120,7 @@ itself when page-like, else the page it sits on.
 
 **3. The version walks the stages.** Core does this entirely. Dragging a card is translated
 into a normal core stage transition, so permissions, recipients and stage comments behave
-exactly as they do in the Workspaces module. Content Flow mirrors the resulting
+exactly as they do in the Workspaces module. Editorial Flow mirrors the resulting
 `t3ver_stage` onto the task as a read cache for sorting; core stays the source of truth.
 
 **4. It goes live.** `CloseTaskAfterPublishListener` closes the task on
@@ -149,8 +149,8 @@ therefore not a second truth; it is the only durable one:
 
 | | Stored where | Why |
 |---|---|---|
-| **Comments** | own table `tx_contentflow_comment` | must be queryable (@mentions, "unresolved" filters, dashboards) and concurrently writable. A JSON blob on the task means read-modify-write races and no indexes. |
-| **Decisions** (assigned, moved from stage X to Y, with comment) | own table `tx_contentflow_activity`, append-only, written **when it happens** | these must outlive the 30-day GC. Kept small: who, when, from/to, comment. |
+| **Comments** | own table `tx_editorialflow_comment` | must be queryable (@mentions, "unresolved" filters, dashboards) and concurrently writable. A JSON blob on the task means read-modify-write races and no indexes. |
+| **Decisions** (assigned, moved from stage X to Y, with comment) | own table `tx_editorialflow_activity`, append-only, written **when it happens** | these must outlive the 30-day GC. Kept small: who, when, from/to, comment. |
 | **Field-level before/after values** | **not copied** — `activity.history_uid` points at the `sys_history` row | bulky, and for the common case (one edit, straight to live) the row is still there. |
 
 One correction found while adding the membership entries: `ActivityLogger::log()` used to
@@ -201,7 +201,7 @@ editors already are, not from one module: a **context menu item provider** puts 
 assignee on right-click in the page tree and record lists, plus badges in the page tree, and
 four **dashboard widgets** (status overview, content status, updates, comments).
 
-**What that means for Content Flow.** The card content list above is essentially a
+**What that means for Editorial Flow.** The card content list above is essentially a
 requirements list — we have title and subject, and still owe: type icon, assignee, comment
 count, due date, language, and the cross-page warning. The two lessons worth copying are
 kanban-workspaces' *drop proposes, core confirms* (never write a stage directly) and xima's
@@ -307,9 +307,9 @@ controllers use for the same check today.
 
 Two operations on the same invariant — *a record belongs to at most one open task*:
 
-- **Select to task** (`contentflow_task_attach`): the selected records are moved onto a task.
+- **Select to task** (`editorialflow_task_attach`): the selected records are moved onto a task.
   Already-claimed records are *moved*, not duplicated.
-- **Split from task** (`contentflow_task_detach`): one record is pulled out into a task of its
+- **Split from task** (`editorialflow_task_detach`): one record is pulled out into a task of its
   own. Confirmed first, and never a side effect of a drag — see below.
 
 Both endpoints re-derive permissions server-side: the workspace comes from the backend user
@@ -335,7 +335,7 @@ and red.
 Reachable from three surfaces, all of them driven by `task/membership.js` - the ticket's member
 list, the Page module's element badge (`ContentElementTaskBadgeListener`), and a menu on the
 Visual Editor's task bubble, which also offers "move to the active task" in one click. The
-badge and the ticket only carry `data-contentflow-split` / `data-contentflow-move` attributes;
+badge and the ticket only carry `data-editorialflow-split` / `data-editorialflow-move` attributes;
 the Visual Editor calls the module directly, because its bubbles live inside the rendered
 frontend iframe where a delegated listener never sees a click. Both tasks involved get an
 activity entry (`member_moved` / `member_split`) - without one on the source, a task's trail
@@ -403,17 +403,17 @@ Checked against core sources rather than assumed — worth re-checking on core u
 
 xima/xima-typo3-content-planner ships four: `ContentStatusWidget`/
 `ConfigurableContentStatusWidget` (status counts), `ContentUpdateWidget` (recently
-changed records), `ContentCommentWidget` (recent comments). Content Flow ships
+changed records), `ContentCommentWidget` (recent comments). Editorial Flow ships
 four too, but not the same four:
 
 - `TaskOverviewWidget` covers the status-count case. xima's version is
   configurable because xima's status list is open-ended and user-defined;
-  Content Flow's states are a fixed, small set (backlog/planned/in_progress/
+  Editorial Flow's states are a fixed, small set (backlog/planned/in_progress/
   review/ready/done), so a "which statuses to show" control would configure
   nothing meaningful.
 - `RecentActivityWidget` covers "recently changed" - and more, since it reads
   the durable activity trail rather than a raw changed-records list.
-- `MyTasksWidget` has no xima equivalent; it is Content Flow's own "what should
+- `MyTasksWidget` has no xima equivalent; it is Editorial Flow's own "what should
   I work on" view, which follows directly from tasks having assignees.
 - `RecentCommentsWidget` is the one genuine gap this comparison found: none of
   the other three surfaced comments as their own feed. Added once the ticket
@@ -429,7 +429,7 @@ Audited against the code on 2026-08-07, not written from memory.
 
 - Data model: subject + members, with the single unique key that prevents duplicate
   tasks, makes detaching permanent and keeps aggregation idempotent.
-- State machine, column registry (core stages + Content Flow's own columns), subject
+- State machine, column registry (core stages + Editorial Flow's own columns), subject
   registry (configurable page-like tables), page aggregation, cross-page/reuse
   detection via `sys_refindex`.
 - Auto-creation on edit (`TaskAutoCreationDataHandlerHook`) and publish/close
@@ -478,7 +478,7 @@ Audited against the code on 2026-08-07, not written from memory.
   then opens core's page-creation dialog (`openPageWizardModal()`, the same one
   the page tree uses) prefilled with the planned parent, and core's own
   `PageWizardProvider` creates the page with its position, page type and
-  required fields. Content Flow neither rebuilds nor wraps that wizard: core's
+  required fields. Editorial Flow neither rebuilds nor wraps that wizard: core's
   provider identifier is fixed in core's JavaScript and it reports success as a
   redirect, handing no uid back. The two halves are joined at the other end
   instead - `PendingPageHandoff` notes which ticket is waiting, and the
@@ -488,7 +488,7 @@ Audited against the code on 2026-08-07, not written from memory.
 
 **Not implemented**
 
-- **TCA for `tx_contentflow_task` / `_task_item` / `_comment` / `_activity`.** Only
+- **TCA for `tx_editorialflow_task` / `_task_item` / `_comment` / `_activity`.** Only
   `Configuration/TCA/Overrides` exists. The tables are therefore not editable in the
   backend, and every base column is declared by hand in `ext_tables.sql` because the
   schema analyzer has no TCA to derive them from.

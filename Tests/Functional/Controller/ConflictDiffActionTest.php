@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Controller;
+namespace GbWeb\EditorialFlow\Tests\Functional\Controller;
 
-use GbWeb\ContentFlow\Controller\TaskAjaxController;
+use GbWeb\EditorialFlow\Controller\TaskAjaxController;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Message\ServerRequestInterface;
-use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Core\SystemEnvironmentBuilder;
+use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -35,7 +35,7 @@ final class ConflictDiffActionTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void
@@ -88,8 +88,8 @@ final class ConflictDiffActionTest extends FunctionalTestCase
         self::assertSame(200, $response->getStatusCode());
         self::assertStringContainsString('Editorial', $body, 'workspace 1\'s title must appear as a column header');
         self::assertStringContainsString('Legal', $body, 'workspace 2\'s title must appear as a column header');
-        self::assertStringContainsString('contentflow-conflict-diff-row--conflict', $body, 'the title row is a true conflict - both sides disagree');
-        self::assertStringContainsString('contentflow-conflict-diff-unchanged', $body, 'nav_title was only touched on one side, so the other cell renders as unchanged');
+        self::assertStringContainsString('editorialflow-conflict-diff-row--conflict', $body, 'the title row is a true conflict - both sides disagree');
+        self::assertStringContainsString('editorialflow-conflict-diff-unchanged', $body, 'nav_title was only touched on one side, so the other cell renders as unchanged');
     }
 
     #[Test]

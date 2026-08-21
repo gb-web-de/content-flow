@@ -6,7 +6,7 @@
  * screen.
  */
 import { html } from 'lit'
-import labels from '~labels/content_flow.messages'
+import labels from '~labels/editorial_flow.messages'
 
 export class ErrorStep {
   constructor(context, configurationData = {}) {

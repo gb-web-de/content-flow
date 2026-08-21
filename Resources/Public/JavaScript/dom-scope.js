@@ -1,5 +1,5 @@
 /*
- * Content Flow's board runs inside the backend's classic "list frame" iframe, but
+ * Editorial Flow's board runs inside the backend's classic "list frame" iframe, but
  * TYPO3's own Modal.advanced()/Modal.types.ajax always render into the TOP-level
  * backend document (so a dialog is never clipped by the iframe's viewport). Any
  * listener delegated on this module's own `document` therefore never sees clicks

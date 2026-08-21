@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Controller;
+namespace GbWeb\EditorialFlow\Tests\Functional\Controller;
 
-use GbWeb\ContentFlow\Domain\Model\TaskState;
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
-use GbWeb\ContentFlow\Service\ActiveTaskSession;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Service\ActiveTaskSession;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -40,7 +40,7 @@ final class VisualEditorTaskSelectTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void
@@ -56,9 +56,9 @@ final class VisualEditorTaskSelectTest extends FunctionalTestCase
             ->createFromUserPreferences($GLOBALS['BE_USER']);
     }
 
-    private function subject(): \GbWeb\ContentFlow\Controller\TaskAjaxController
+    private function subject(): \GbWeb\EditorialFlow\Controller\TaskAjaxController
     {
-        return $this->get(\GbWeb\ContentFlow\Controller\TaskAjaxController::class);
+        return $this->get(\GbWeb\EditorialFlow\Controller\TaskAjaxController::class);
     }
 
     private function getRequest(array $query): ServerRequestInterface
@@ -87,8 +87,8 @@ final class VisualEditorTaskSelectTest extends FunctionalTestCase
      */
     private function createTask(array $overrides = []): int
     {
-        $connection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
-        $connection->insert('tx_contentflow_task', array_merge([
+        $connection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task');
+        $connection->insert('tx_editorialflow_task', array_merge([
             'title' => 'About us',
             'subject_table' => 'pages',
             'subject_uid' => 2,
@@ -103,8 +103,8 @@ final class VisualEditorTaskSelectTest extends FunctionalTestCase
 
     private function addMember(int $taskUid, string $table, int $recordUid): void
     {
-        $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task_item')->insert(
-            'tx_contentflow_task_item',
+        $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task_item')->insert(
+            'tx_editorialflow_task_item',
             [
                 'task' => $taskUid,
                 'record_table' => $table,
@@ -227,8 +227,8 @@ final class VisualEditorTaskSelectTest extends FunctionalTestCase
         self::assertGreaterThan(0, $versionUid);
 
         // Send it to a review stage first, the situation an editor comes back to.
-        $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task')->update(
-            'tx_contentflow_task',
+        $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task')->update(
+            'tx_editorialflow_task',
             ['state' => TaskState::REVIEW->value, 'workspace_uid' => 1, 'stage_uid' => 1],
             ['uid' => $taskUid],
         );
@@ -271,8 +271,8 @@ final class VisualEditorTaskSelectTest extends FunctionalTestCase
         $this->subject()->setActiveTaskForPageAction($this->postRequest(['pageUid' => 2, 'taskUid' => $taskUid]));
 
         // Somebody else moves it on while the editor still holds the choice.
-        $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task')->update(
-            'tx_contentflow_task',
+        $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task')->update(
+            'tx_editorialflow_task',
             ['state' => TaskState::REVIEW->value, 'workspace_uid' => 1, 'stage_uid' => 1],
             ['uid' => $taskUid],
         );

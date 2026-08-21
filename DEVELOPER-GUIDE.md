@@ -1,7 +1,7 @@
-# Content Flow — Entwickler-Dokumentation: Board, Visual Editor, Layout
+# Editorial Flow — Entwickler-Dokumentation: Board, Visual Editor, Layout
 
 Diese Doku beschreibt für drei Oberflächen der Extension — **Board** (Modul
-`web_contentflow`), **Visual Editor** (`EXT:visual_editor`-Integration) und
+`web_editorialflow`), **Visual Editor** (`EXT:visual_editor`-Integration) und
 **Layout** (TYPO3 Seite/Layout-Modul, `web_layout`) — wie PHP und JavaScript
 zusammenspielen, welche Datei bei welchem Klick welche andere Datei aufruft,
 und an welcher Stelle man Styling anpasst.
@@ -51,8 +51,8 @@ Zwei Event-Listener sorgen dafür, dass JS-Modul und CSS-Datei der Extension
 ```
 Classes/EventListener/LoadWizardModuleEventListener.php
   #[AsEventListener(event: AfterBackendPageRenderEvent::class)]
-  → pageRenderer->loadJavaScriptModule('@gb-web/content-flow/wizard.js')
-  → pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css')
+  → pageRenderer->loadJavaScriptModule('@gb-web/editorial-flow/wizard.js')
+  → pageRenderer->addCssFile('EXT:editorial_flow/Resources/Public/Css/Styles.css')
 ```
 
 `AfterBackendPageRenderEvent` feuert einmal pro Rendern der äußeren Backend-
@@ -66,34 +66,34 @@ wurden.
 
 ---
 
-## 1. Board (Backend-Modul `web_contentflow`)
+## 1. Board (Backend-Modul `web_editorialflow`)
 
 ### 1.1 Registrierung
 
 ```
 Configuration/Backend/Modules.php
-  'web_contentflow' => [
+  'web_editorialflow' => [
       'parent' => 'content',
       'position' => ['after' => 'records'],
       'navigationComponent' => '@typo3/backend/tree/page-tree-element',
-      'controllerActions' => [ ContentFlowController::class => ['index'] ],
+      'controllerActions' => [ EditorialFlowController::class => ['index'] ],
   ]
 ```
 
-Ein Klick auf den Menüpunkt „Content Flow" im Content-Modulbereich zeigt den
+Ein Klick auf den Menüpunkt „Editorial Flow" im Content-Modulbereich zeigt den
 TYPO3-PageTree links und ruft weiterhin über die Modulkennung
-`web_contentflow` `GET /module/web/contentflow?id=<pageUid>` auf, was auf
-[Classes/Controller/ContentFlowController.php](Classes/Controller/ContentFlowController.php):`indexAction()`
+`web_editorialflow` `GET /module/web/editorialflow?id=<pageUid>` auf, was auf
+[Classes/Controller/EditorialFlowController.php](Classes/Controller/EditorialFlowController.php):`indexAction()`
 (Zeile 48) routet.
 
-### 1.2 PHP-Seite: `ContentFlowController::indexAction()`
+### 1.2 PHP-Seite: `EditorialFlowController::indexAction()`
 
 Ablauf beim Öffnen/Neuladen des Boards, Zeile für Zeile:
 
 1. `moduleTemplateFactory->create()` — TYPO3s Standard-Modulrahmen (DocHeader,
    Breadcrumb, Shortcut-Button). Es gibt bewusst **kein eigenes Fluid-Layout**
    dafür — `Index.html` beginnt mit `<f:comment>` genau das begründend
-   ([Index.html:6-16](Resources/Private/Templates/ContentFlow/Index.html)).
+   ([Index.html:6-16](Resources/Private/Templates/EditorialFlow/Index.html)).
 2. `$pageUid`, `$workspaceUid`, `$depth`, `$fromWorkspaceRoot` werden aus
    Query-Parametern gelesen (`id`, `depth`, `wsroot`).
 3. `buildBoard()` (Zeile 198) — der eigentliche Kern:
@@ -108,16 +108,16 @@ Ablauf beim Öffnen/Neuladen des Boards, Zeile für Zeile:
      Spalte: `stageUid !== null` → Core-Stage-Vergleich, sonst → Content-
      Flow-`state`-Vergleich, foreign-Workspace-Tasks → Sentinel-Spalte
      `other-workspaces`.
-4. Diverse `pageRenderer->addInlineSetting('ContentFlow', …)` — das sind die
-   Werte, die im Browser unter `TYPO3.settings.ContentFlow.*` auftauchen und
+4. Diverse `pageRenderer->addInlineSetting('EditorialFlow', …)` — das sind die
+   Werte, die im Browser unter `TYPO3.settings.EditorialFlow.*` auftauchen und
    von `board.js` gelesen werden (`elementBrowserUrl`, `currentUserId`,
    `createTargetTables`, `assignableUsers`,
    `currentPageId`, `canPublish`, `depth`, `fromWorkspaceRoot`).
 5. `pageRenderer->addCssFile(…Styles.css)` und
-   `pageRenderer->loadJavaScriptModule('@gb-web/content-flow/board.js')` —
+   `pageRenderer->loadJavaScriptModule('@gb-web/editorial-flow/board.js')` —
    **nur** für dieses Iframe-Dokument (wichtig für Abschnitt 1.7).
-6. `renderResponse('ContentFlow/Index')` rendert
-   [Index.html](Resources/Private/Templates/ContentFlow/Index.html) mit den
+6. `renderResponse('EditorialFlow/Index')` rendert
+   [Index.html](Resources/Private/Templates/EditorialFlow/Index.html) mit den
    zusammengebauten `columns`.
 
 #### 1.2.1 `BoardColumnRegistry::getColumns()`
@@ -131,24 +131,24 @@ zieht sie automatisch nach, ohne eigene Konfiguration
 Jede Stage-Spalte trägt zusätzlich `checklistItemsJson` (vorkodiertes JSON,
 weil Fluid v14 keinen JSON-ViewHelper hat) für die Review-Checkliste.
 
-### 1.3 Vom PHP zum DOM: `Index.html` → `data-contentflow-*`
+### 1.3 Vom PHP zum DOM: `Index.html` → `data-editorialflow-*`
 
-`Index.html` rendert pro Spalte ein `<section class="contentflow-column"
-data-contentflow-column="{column.key}" data-contentflow-state="{column.state}"
-data-contentflow-stage="{column.stageUid}" data-contentflow-accepts-drop="…">`
-und pro Karte ein `<li class="contentflow-card" data-contentflow-task="{card.uid}"
-data-contentflow-state="…" data-contentflow-stage="…" data-contentflow-workspace="…"
-data-contentflow-can-act="…">` usw.
+`Index.html` rendert pro Spalte ein `<section class="editorialflow-column"
+data-editorialflow-column="{column.key}" data-editorialflow-state="{column.state}"
+data-editorialflow-stage="{column.stageUid}" data-editorialflow-accepts-drop="…">`
+und pro Karte ein `<li class="editorialflow-card" data-editorialflow-task="{card.uid}"
+data-editorialflow-state="…" data-editorialflow-stage="…" data-editorialflow-workspace="…"
+data-editorialflow-can-act="…">` usw.
 
 Diese `data-*`-Attribute sind die **einzige** Schnittstelle zwischen PHP und
 JS auf dem Board — es gibt keine zweite AJAX-Anfrage beim Laden, die
 Kartendaten stecken bereits im gerenderten HTML. JS liest sie nur noch aus
-(`card.dataset.contentflowTask` etc.) und macht daraus Verhalten.
+(`card.dataset.editorialflowTask` etc.) und macht daraus Verhalten.
 
 ### 1.4 JS-Einstieg: `board.js`
 
 [Resources/Public/JavaScript/board.js](Resources/Public/JavaScript/board.js)
-ist reine Verdrahtung (`class ContentFlowBoard`), Verhalten steckt in
+ist reine Verdrahtung (`class EditorialFlowBoard`), Verhalten steckt in
 Unterdateien:
 
 ```
@@ -171,7 +171,7 @@ registriert `create-wizard.js`, `ticket.js`, `assign.js` und die auf
 `checklist.js`'s `registerChecklistToggle()`) **immer** — auch ohne Board-
 Element im DOM, weil dieselben Buttons im Layout-Modul-Banner auftauchen
 (Abschnitt 4). Erst danach folgt `this.board = document.querySelector(
-'.contentflow-board')`; ist das `null` (z. B. im Layout-Modul), bricht
+'.editorialflow-board')`; ist das `null` (z. B. im Layout-Modul), bricht
 `initialize()` ab, bevor Drag&Drop/Filter/Scope/Publish/Checklist-Verwaltung
 registriert werden — die gibt es nur, wenn ein echtes Board im DOM steht.
 
@@ -189,11 +189,11 @@ einem Ticket-/Checklisten-Modal reagiert, delegiert deshalb auf
 
 ```
 Klick auf Seite im Seitenbaum
- → GET /module/web/contentflow?id=<uid>
- → ContentFlowController::indexAction()
- → ContentFlowController::buildBoard()
- → Index.html rendert Spalten + Karten mit data-contentflow-*
- → board.js: new ContentFlowBoard() (Modul-Import) 
+ → GET /module/web/editorialflow?id=<uid>
+ → EditorialFlowController::indexAction()
+ → EditorialFlowController::buildBoard()
+ → Index.html rendert Spalten + Karten mit data-editorialflow-*
+ → board.js: new EditorialFlowBoard() (Modul-Import) 
      → DocumentService.ready() → initialize()
      → registerCardEvents(), registerDragAndDrop(), registerFilters(),
        registerScopeControls(), registerPublishButtons(),
@@ -202,18 +202,18 @@ Klick auf Seite im Seitenbaum
 
 Kein AJAX-Request beim ersten Laden — alles kommt server-gerendert.
 
-#### b) Karte in eine Content-Flow-Spalte ziehen (Backlog ↔ Planned)
+#### b) Karte in eine Editorial-Flow-Spalte ziehen (Backlog ↔ Planned)
 
 ```
-dragstart auf .contentflow-card
+dragstart auf .editorialflow-card
  → drag-drop.js: draggedCard merken, updateDropTargetStyles()
      → board.canDropCardIntoColumn(card, column)  [board.js:120]
         prüft: acceptsDrop, canAct, targetStage vs. currentStage/State
- → drop auf .contentflow-column
+ → drop auf .editorialflow-column
  → board.handleCardDrop(taskUid, column, card)     [board.js:193]
-     targetStageUid === null (Content-Flow-Spalte)
+     targetStageUid === null (Editorial-Flow-Spalte)
      → board.moveTaskToColumn(taskUid, targetState, 0, …)  [board.js:216]
-        → POST TYPO3.settings.ajaxUrls.contentflow_task_move_stage
+        → POST TYPO3.settings.ajaxUrls.editorialflow_task_move_stage
           { task, state, stageUid: 0 }
         → TaskAjaxController::moveStageAction()  [TaskAjaxController.php:402]
            targetState hat keine Version (Backlog/Planned)
@@ -230,14 +230,14 @@ Gleicher Start wie b), aber `targetStageUid !== null`:
 ```
 board.handleCardDrop() → board.openStageTransitionModal()   [board.js:301]
  → Workspaces.sendRemoteRequest('sendToSpecificStageWindow', …)  (Core-API)
- → Content Flow baut daraus einen schlanken TYPO3-Modal-Dialog:
+ → Editorial Flow baut daraus einen schlanken TYPO3-Modal-Dialog:
     Kommentar, Benachrichtigungen als aufklappbarer Bereich, zusätzliche
     Empfänger und dieselben Core-Labels wie EXT:workspaces
  → ist der Task aktiv und verlässt Editing: der Dialog ergänzt die
    vorausgewählte Option „aktive Bearbeitung beenden" samt Lifecycle-Hinweis
  → Klick auf "OK" im Dialog
  → readStageTransitionForm(form) liest comment/recipients/additional/deactivateActiveTask
- → POST contentflow_task_execute_stage { task, stageUid, comment, recipients,
+ → POST editorialflow_task_execute_stage { task, stageUid, comment, recipients,
    additional, deactivateActiveTask }
  → TaskAjaxController::executeStageAction()  [TaskAjaxController.php:860]
     → StageTransitionService::transition() — echter Core-Stage-Wechsel
@@ -260,12 +260,12 @@ TaskAjaxController::moveStageAction() → requestPageWizard($task)
  → board.openPageWizard(result, cardTitle)   [board.js:261]
     → topLevelModuleImport('@typo3/backend/page-wizard/page-wizard.js')
     → openPageWizardModal({})   — Core-Seitenassistent startet in Step 1
-      "Position"; Content Flow übergibt bewusst keine `positionData`, damit
+      "Position"; Editorial Flow übergibt bewusst keine `positionData`, damit
       keine Position vorselektiert wird und Core nicht direkt zu Step 2
       "Seitentyp" springt
     → Editor legt Seite an (oder bricht ab)
     → modal 'typo3-modal-hidden' → dropPageWizardClaimWhenClosed()
-       → falls abgebrochen: POST contentflow_task_cancel_page_wizard
+       → falls abgebrochen: POST editorialflow_task_cancel_page_wizard
          → TaskAjaxController::cancelPageWizardAction()  [Zeile 1131]
        → falls Seite erstellt: DataHandler-Save der neuen Seite triggert
          TaskAutoCreationDataHandlerHook → PendingPageClaimService::
@@ -274,9 +274,9 @@ TaskAjaxController::moveStageAction() → requestPageWizard($task)
 
 Pending Record (`subject_table !== 'pages'`):
 TaskAjaxController::moveStageAction() → requestRecordTarget($task)
- → board.openRecordTargetModal() lädt contentflow_task_record_creation_targets
+ → board.openRecordTargetModal() lädt editorialflow_task_record_creation_targets
  → Editor wählt eine zulässige Zielseite
- → contentflow_task_start_record_creation speichert PendingSubjectHandoff
+ → editorialflow_task_start_record_creation speichert PendingSubjectHandoff
    und öffnet Core-FormEngine (record_edit, command=new)
  → DataHandler-Save triggert PendingSubjectClaimService::claimCreatedSubject()
    → Subject + Membership werden gesetzt, Task wechselt nach Editing
@@ -286,12 +286,12 @@ TaskAjaxController::moveStageAction() → requestRecordTarget($task)
 #### e) „+ New task" klicken
 
 ```
-Klick auf [data-contentflow-action="create-task"] (ohne data-contentflow-page)
+Klick auf [data-editorialflow-action="create-task"] (ohne data-editorialflow-page)
  → create-wizard.js: registerCreateButton() → openEntryChoiceWizard()  [Zeile 169]
     Auswahl-Dialog mit 3 Gruppen und 5 Optionen:
       Gruppe „Page"
       1. „Neue Seite" → openPendingPageWizard()
-           → <contentflow-task-wizard .pending={mode:'create_pending_page', parentPid}>
+           → <editorialflow-task-wizard .pending={mode:'create_pending_page', parentPid}>
       2. „Bestehende Seite" → openRecordPicker(['pages'])
 
       Gruppe „Content element"
@@ -303,13 +303,13 @@ Klick auf [data-contentflow-action="create-task"] (ohne data-contentflow-page)
            → Core Element-Browser (Modal.types.iframe, elementBrowserUrl)
            → Event 'typo3:element-browser:message' → openNewTaskWizard(table, uid, label)
       5. „Neuen Datensatz anlegen" → openPendingRecordWizard()
-           → <contentflow-task-wizard .pending={mode:'create_pending_record', parentPid}>
+           → <editorialflow-task-wizard .pending={mode:'create_pending_record', parentPid}>
            → Record-Typ + Task-Details werden gesammelt; der echte Record
              entsteht erst beim Wechsel des Tickets nach Editing (Abschnitt d).
              `pages` und `tt_content` sind hier ausgeschlossen: Pages laufen
              über den Page-Wizard, Content-Elemente über die eigene
              Content-Element-Auswahl.
- → <contentflow-task-wizard> ist Core-eigene Wizard-Shell
+ → <editorialflow-task-wizard> ist Core-eigene Wizard-Shell
    (@typo3/backend/wizard/wizard.js), Schritte in wizard/steps/*.js,
    siehe Classes/Wizard/TaskWizardProvider.php für die Server-Logik.
  → Abschluss für `create_from_picker`, `create_pending_page` oder
@@ -320,43 +320,43 @@ Klick auf [data-contentflow-action="create-task"] (ohne data-contentflow-page)
 #### f) Ticket öffnen (Klick auf Kartentitel)
 
 ```
-Klick auf [data-contentflow-open-ticket]
+Klick auf [data-editorialflow-open-ticket]
  → ticket.js: registerTicketButtons() → event.stopPropagation()
    (verhindert, dass die Karte gleichzeitig (de-)selektiert wird)
  → board.openTicket(taskUid, title)   [board.js:397]
     → Modal.advanced({ type: Modal.types.ajax,
-                        content: ajaxUrls.contentflow_task_ticket + '&task=' + taskUid })
- → GET contentflow_task_ticket?task=<uid>
+                        content: ajaxUrls.editorialflow_task_ticket + '&task=' + taskUid })
+ → GET editorialflow_task_ticket?task=<uid>
  → TaskAjaxController::ticketAction()   [Zeile 1489]
     → WorkspaceIntegrationService::getTaskDetails()  (Diffs, Mitglieder, Aktivität, Kommentare)
-    → rendert Fluid-Template ContentFlow/Ticket.html serverseitig zu HTML
+    → rendert Fluid-Template EditorialFlow/Ticket.html serverseitig zu HTML
  → HtmlResponse wird 1:1 in das Modal (top.document) eingesetzt
 ```
 
-Innerhalb des Ticket-Modals (`Resources/Private/Templates/ContentFlow/
+Innerhalb des Ticket-Modals (`Resources/Private/Templates/EditorialFlow/
 Ticket.html`), alle Handler auf `topDocument()`:
 
-- **Kommentar absenden** → `task/comment.js` → `POST contentflow_task_comment`
+- **Kommentar absenden** → `task/comment.js` → `POST editorialflow_task_comment`
   → `TaskAjaxController::commentAction()` → `window.location.reload()`.
-- **Mitglied „Vorschau"** (`.contentflow-member-preview`) → `task/member-actions.js`
-  `previewMember()` → `POST contentflow_task_preview_member` →
+- **Mitglied „Vorschau"** (`.editorialflow-member-preview`) → `task/member-actions.js`
+  `previewMember()` → `POST editorialflow_task_preview_member` →
   `TaskAjaxController::previewMemberAction()` → `window.open(result.url, …)`.
-- **Mitglied „Diff"** (`.contentflow-member-diff`) → rein clientseitig,
-  `jumpToDiff()` scrollt zu `.contentflow-diff[data-table][data-uid]`, kein
+- **Mitglied „Diff"** (`.editorialflow-member-diff`) → rein clientseitig,
+  `jumpToDiff()` scrollt zu `.editorialflow-diff[data-table][data-uid]`, kein
   Server-Roundtrip.
-- **Mitglied „Verwerfen"** (`.contentflow-member-discard`) → `discardMember()`
-  → `Modal.confirm()` → `POST contentflow_task_discard_member` →
+- **Mitglied „Verwerfen"** (`.editorialflow-member-discard`) → `discardMember()`
+  → `Modal.confirm()` → `POST editorialflow_task_discard_member` →
   `TaskAjaxController::discardMemberAction()` → Reload.
 - **Checkliste abhaken** → `board/checklist.js` `registerChecklistToggle()`
-  → `POST contentflow_checklist_toggle` →
+  → `POST editorialflow_checklist_toggle` →
   `TaskAjaxController::checklistToggleAction()`.
 
 #### g) „Assign me"
 
 ```
-Klick auf .contentflow-action-assign
+Klick auf .editorialflow-action-assign
  → task/assign.js: registerAssignButtons()
- → POST contentflow_task_assign_me { task }
+ → POST editorialflow_task_assign_me { task }
  → TaskAjaxController::assignMeAction()  [Zeile 496]
     → TaskRepository::assignTo()
     → ActivityLogger::log(EVENT_ASSIGNED)
@@ -365,17 +365,17 @@ Klick auf .contentflow-action-assign
 
 #### h) „Publish"
 
-Nur sichtbar/aktiv, wenn `TYPO3.settings.ContentFlow.canPublish === true`
+Nur sichtbar/aktiv, wenn `TYPO3.settings.EditorialFlow.canPublish === true`
 (serverseitig via `WorkspacePublishGate::isGranted()` gesetzt,
-[ContentFlowController.php:162-166](Classes/Controller/ContentFlowController.php)).
+[EditorialFlowController.php:162-166](Classes/Controller/EditorialFlowController.php)).
 Ist die Berechtigung nicht gegeben, bleibt der Button sichtbar aber
 `disabled` — nie einfach versteckt (siehe `publish.js:18-24`, folgt der im
 Code mehrfach zitierten Regel „immer Icon + Label, nie nur Farbe/Silence").
 
 ```
-Klick auf .contentflow-action-publish
+Klick auf .editorialflow-action-publish
  → task/publish.js: Modal.confirm(„Publish …?“)
- → POST contentflow_task_publish { task }
+ → POST editorialflow_task_publish { task }
  → TaskAjaxController::publishTaskAction()  [Zeile 964]
     → askCoreToPublish() — echter Core-Publish-Vorgang
     → schließt den Task, falls nichts mehr offen ist
@@ -388,13 +388,13 @@ Nur gerendert, wenn `column.canManageChecklist` true ist
 (`BoardColumnRegistry::canManageChecklist()` — Workspace-Owner oder Admin).
 
 ```
-Klick auf .contentflow-column-checklist-manage
+Klick auf .editorialflow-column-checklist-manage
  → board/checklist.js: openManageModal(column)
-    liest column.dataset.contentflowChecklistItems (vorkodiertes JSON)
+    liest column.dataset.editorialflowChecklistItems (vorkodiertes JSON)
     baut Modal.advanced() mit Liste + „Entfernen"-Buttons + Add-Formular
- → „Entfernen" → POST contentflow_checklist_remove { workspaceUid, itemUid }
+ → „Entfernen" → POST editorialflow_checklist_remove { workspaceUid, itemUid }
     → TaskAjaxController::checklistRemoveAction()
- → Add-Formular submit → POST contentflow_checklist_add { workspaceUid, stageUid, title }
+ → Add-Formular submit → POST editorialflow_checklist_add { workspaceUid, stageUid, title }
     → TaskAjaxController::checklistAddAction()
  → Modal schließen → window.location.reload() (callback der Modal.advanced())
 ```
@@ -404,7 +404,7 @@ Klick auf .contentflow-column-checklist-manage
 ```
 Eingabe in #cf-search-input / Änderung an #cf-filter-assignee/-status/-workspace
  → board/filters.js: filterCards()
-    blendet .contentflow-card per style.display ein/aus, aktualisiert
+    blendet .editorialflow-card per style.display ein/aus, aktualisiert
     Spalten-Badges, ruft board.announce() für Screenreader
 ```
 
@@ -414,50 +414,50 @@ Eingabe in #cf-search-input / Änderung an #cf-filter-assignee/-status/-workspac
 Änderung an #cf-depth oder #cf-wsroot
  → board/scope.js: reloadWithScope()
     setzt URL-Parameter depth=… bzw. wsroot=1 und lädt die Seite neu
-    → wieder bei ContentFlowController::indexAction() (Abschnitt 1.2)
+    → wieder bei EditorialFlowController::indexAction() (Abschnitt 1.2)
 ```
 
 ### 1.6 AJAX-Routen des Boards
 
 Registriert in
 [Configuration/Backend/AjaxRoutes.php](Configuration/Backend/AjaxRoutes.php),
-alle unter `/contentflow/...`, alle auf `TaskAjaxController`:
+alle unter `/editorialflow/...`, alle auf `TaskAjaxController`:
 
 | Route | PHP-Methode | Aufgerufen von |
 |---|---|---|
-| `contentflow_task_create` | `createAction()` | create-wizard.js, VE-Select „+ Create" |
-| `contentflow_task_create_pending_page` | `createPendingPageAction()` | create-wizard.js |
-| `contentflow_task_cancel_page_wizard` | `cancelPageWizardAction()` | board.js (Seitenassistent abgebrochen) |
-| `contentflow_task_record_creation_targets` | `recordCreationTargetsAction()` | board.js (Zielseite für Pending Record) |
-| `contentflow_task_start_record_creation` | `startRecordCreationAction()` | board.js (Core-FormEngine öffnen) |
-| `contentflow_task_attach` | `attachAction()` | „Select to task" (Element-Browser-Fluss) |
-| `contentflow_task_detach` | `detachAction()` | Split-from-task-Aktion im Ticket |
-| `contentflow_task_preview_member` | `previewMemberAction()` | task/member-actions.js |
-| `contentflow_task_discard_member` | `discardMemberAction()` | task/member-actions.js |
-| `contentflow_task_move_stage` | `moveStageAction()` | board/drag-drop.js → board.js |
-| `contentflow_task_assign_me` | `assignMeAction()` | task/assign.js |
-| `contentflow_task_details` | `detailsAction()` | (Inspector-Detaildaten) |
-| `contentflow_task_list_open_for_page` | `listOpenTasksForPageAction()` | **VE**: task-select.js `reloadTasks()` |
-| `contentflow_task_set_active_for_page` | `setActiveTaskForPageAction()` | **VE**: task-select.js `onChange()` |
-| `contentflow_task_active_context` | `activeTaskContextAction()` | globales DocHeader-Control |
-| `contentflow_task_set_active_context` | `setActiveTaskForContextAction()` | Board/Layout/Record-Formular |
-| `contentflow_task_list_member_markers` | `listMemberTaskMarkersForPageAction()` | **VE**: task-select.js `reloadMarkers()` |
-| `contentflow_task_comment` | `commentAction()` | task/comment.js |
-| `contentflow_task_ticket` | `ticketAction()` | board.js/visual-editor-markers.js `openTicket()` |
-| `contentflow_task_execute_stage` | `executeStageAction()` | board.js Stage-Dialog |
-| `contentflow_task_publish` | `publishTaskAction()` | task/publish.js |
-| `contentflow_task_wizard_pending` | `getPendingWizardAction()` | wizard.js `checkPendingWizard()` |
-| `contentflow_checklist_toggle` | `checklistToggleAction()` | board/checklist.js |
-| `contentflow_checklist_add` | `checklistAddAction()` | board/checklist.js |
-| `contentflow_checklist_remove` | `checklistRemoveAction()` | board/checklist.js |
+| `editorialflow_task_create` | `createAction()` | create-wizard.js, VE-Select „+ Create" |
+| `editorialflow_task_create_pending_page` | `createPendingPageAction()` | create-wizard.js |
+| `editorialflow_task_cancel_page_wizard` | `cancelPageWizardAction()` | board.js (Seitenassistent abgebrochen) |
+| `editorialflow_task_record_creation_targets` | `recordCreationTargetsAction()` | board.js (Zielseite für Pending Record) |
+| `editorialflow_task_start_record_creation` | `startRecordCreationAction()` | board.js (Core-FormEngine öffnen) |
+| `editorialflow_task_attach` | `attachAction()` | „Select to task" (Element-Browser-Fluss) |
+| `editorialflow_task_detach` | `detachAction()` | Split-from-task-Aktion im Ticket |
+| `editorialflow_task_preview_member` | `previewMemberAction()` | task/member-actions.js |
+| `editorialflow_task_discard_member` | `discardMemberAction()` | task/member-actions.js |
+| `editorialflow_task_move_stage` | `moveStageAction()` | board/drag-drop.js → board.js |
+| `editorialflow_task_assign_me` | `assignMeAction()` | task/assign.js |
+| `editorialflow_task_details` | `detailsAction()` | (Inspector-Detaildaten) |
+| `editorialflow_task_list_open_for_page` | `listOpenTasksForPageAction()` | **VE**: task-select.js `reloadTasks()` |
+| `editorialflow_task_set_active_for_page` | `setActiveTaskForPageAction()` | **VE**: task-select.js `onChange()` |
+| `editorialflow_task_active_context` | `activeTaskContextAction()` | globales DocHeader-Control |
+| `editorialflow_task_set_active_context` | `setActiveTaskForContextAction()` | Board/Layout/Record-Formular |
+| `editorialflow_task_list_member_markers` | `listMemberTaskMarkersForPageAction()` | **VE**: task-select.js `reloadMarkers()` |
+| `editorialflow_task_comment` | `commentAction()` | task/comment.js |
+| `editorialflow_task_ticket` | `ticketAction()` | board.js/visual-editor-markers.js `openTicket()` |
+| `editorialflow_task_execute_stage` | `executeStageAction()` | board.js Stage-Dialog |
+| `editorialflow_task_publish` | `publishTaskAction()` | task/publish.js |
+| `editorialflow_task_wizard_pending` | `getPendingWizardAction()` | wizard.js `checkPendingWizard()` |
+| `editorialflow_checklist_toggle` | `checklistToggleAction()` | board/checklist.js |
+| `editorialflow_checklist_add` | `checklistAddAction()` | board/checklist.js |
+| `editorialflow_checklist_remove` | `checklistRemoveAction()` | board/checklist.js |
 
 ### 1.7 Styling anpassen (Board)
 
 **Wo CSS geladen wird:**
 
-- Für das Board-Iframe selbst: `ContentFlowController::indexAction()` →
-  `pageRenderer->addCssFile('EXT:content_flow/Resources/Public/Css/Styles.css')`
-  ([ContentFlowController.php:97](Classes/Controller/ContentFlowController.php)).
+- Für das Board-Iframe selbst: `EditorialFlowController::indexAction()` →
+  `pageRenderer->addCssFile('EXT:editorial_flow/Resources/Public/Css/Styles.css')`
+  ([EditorialFlowController.php:97](Classes/Controller/EditorialFlowController.php)).
 - Für alle Modals (Ticket, Checkliste), egal aus welchem Modul geöffnet:
   `LoadWizardModuleEventListener` lädt dieselbe Datei zusätzlich in die
   äußere Backend-Chrome (siehe Abschnitt 0). **Das ist derselbe Dateipfad**,
@@ -472,26 +472,26 @@ Cache leeren reicht).
 `:root`, die meisten mit Fallback auf TYPO3s eigene `--typo3-*`-Tokens:
 
 ```css
---contentflow-gap: 16px;              /* Abstand zwischen Spalten/Karten */
---contentflow-col-width: 310px;       /* Spaltenbreite */
---contentflow-card-bg: var(--typo3-surface-base, #fff);
---contentflow-accent: var(--typo3-component-primary-color, #0078d4);
+--editorialflow-gap: 16px;              /* Abstand zwischen Spalten/Karten */
+--editorialflow-col-width: 310px;       /* Spaltenbreite */
+--editorialflow-card-bg: var(--typo3-surface-base, #fff);
+--editorialflow-accent: var(--typo3-component-primary-color, #0078d4);
 ```
 
-Willst du z. B. die Spaltenbreite ändern: `--contentflow-col-width` in
-`Styles.css:6` anpassen — wirkt sofort auf `.contentflow-column`
+Willst du z. B. die Spaltenbreite ändern: `--editorialflow-col-width` in
+`Styles.css:6` anpassen — wirkt sofort auf `.editorialflow-column`
 ([Styles.css:166](Resources/Public/Css/Styles.css)), keine JS-Änderung
 nötig.
 
-**Fälligkeitsfarben** (`--contentflow-due-soon`, `--contentflow-overdue`)
+**Fälligkeitsfarben** (`--editorialflow-due-soon`, `--editorialflow-overdue`)
 werden **nicht** in `Styles.css` gesetzt, sondern zur Laufzeit aus der
 Extension-Konfiguration injiziert:
 
 ```
-ContentFlowController::dueDateColorCss()  [Zeile 428]
- → liest $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['content_flow']['dueDateThresholds']
- → pageRenderer->addCssInlineBlock('content-flow-due-date-colors', …, csp: true)
- → erzeugt :root { --contentflow-due-soon: …; --contentflow-overdue: …; }
+EditorialFlowController::dueDateColorCss()  [Zeile 428]
+ → liest $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['editorial_flow']['dueDateThresholds']
+ → pageRenderer->addCssInlineBlock('editorial-flow-due-date-colors', …, csp: true)
+ → erzeugt :root { --editorialflow-due-soon: …; --editorialflow-overdue: …; }
 ```
 
 Diese Werte also **nicht** in `Styles.css`, sondern in der
@@ -499,7 +499,7 @@ Diese Werte also **nicht** in `Styles.css`, sondern in der
 
 **Statusfarben je Spalte/Badge** (`.badge-backlog`, `.badge-planned`, …,
 [Styles.css:689-694](Resources/Public/Css/Styles.css)) sind an
-`GbWeb\ContentFlow\Domain\Model\TaskState`-Werte gekoppelt (Klassenname =
+`GbWeb\EditorialFlow\Domain\Model\TaskState`-Werte gekoppelt (Klassenname =
 `badge-` + State-Value) und nutzen selbst wieder TYPO3-Design-Tokens
 (`--typo3-state-*`).
 
@@ -515,13 +515,13 @@ sonst zeigt derselbe Task auf zwei Oberflächen unterschiedliche Farben.
 
 | Bereich | Klassen-Präfix | Zeilen (ca.) |
 |---|---|---|
-| Toolbar/Filter/Scope | `.contentflow-toolbar`, `.contentflow-filters`, `.contentflow-scope` | 27-118 |
-| Board-Grid & Spalten | `.contentflow-board`, `.contentflow-column*` | 157-201 |
-| Karten | `.contentflow-card*` | 203-376 |
+| Toolbar/Filter/Scope | `.editorialflow-toolbar`, `.editorialflow-filters`, `.editorialflow-scope` | 27-118 |
+| Board-Grid & Spalten | `.editorialflow-board`, `.editorialflow-column*` | 157-201 |
+| Karten | `.editorialflow-card*` | 203-376 |
 | Drag&Drop-Zustände | `.is-dragged`, `.is-drop-target-valid/-invalid` | 293-312 |
-| Seiten-Banner (Layout-Modul) | `.contentflow-page-banner*` | 391-498 |
-| Element-Badge (Layout-Modul) | `.contentflow-element-badge*` | 504-521 |
-| Ticket-Ansicht | `.contentflow-ticket*`, `.contentflow-diff*`, `.contentflow-timeline*` | 619-925 |
+| Seiten-Banner (Layout-Modul) | `.editorialflow-page-banner*` | 391-498 |
+| Element-Badge (Layout-Modul) | `.editorialflow-element-badge*` | 504-521 |
+| Ticket-Ansicht | `.editorialflow-ticket*`, `.editorialflow-diff*`, `.editorialflow-timeline*` | 619-925 |
 
 Drag&Drop-Rückmeldung ändern (z. B. andere Farbe für „gültiges Ziel"): nicht
 in `drag-drop.js` — dort wird nur die Klasse `is-drop-target-valid`
@@ -556,7 +556,7 @@ Drittanbieter — die Integration hängt sich rein clientseitig über
 
 ```
 LoadWizardModuleEventListener (jedes Backend-Rendering)
- → loadJavaScriptModule('@gb-web/content-flow/wizard.js')
+ → loadJavaScriptModule('@gb-web/editorial-flow/wizard.js')
  → wizard.js: DocumentService.ready()
     → checkPendingWizard()
     → observeVisualEditorTaskSelect()   [visual-editor-task-select.js:560]
@@ -583,33 +583,33 @@ Navigationen in und aus dem Visual Editor heraus.
 VisualEditorTaskSelect.mount()   [visual-editor-task-select.js:174]
  → insertToolbar()   [Zeile 189]
     sucht <ve-auto-save-toggle>, hängt einen eigenen Slot
-    (.contentflow-ve-toolbar-slot, margin-left:auto → rechtsbündig)
+    (.editorialflow-ve-toolbar-slot, margin-left:auto → rechtsbündig)
     NACH dem umgebenden .btn-toolbar ein (nicht in dessen .btn-group!)
-    injiziert TOOLBAR_STYLES als <style id="contentflow-ve-toolbar">
-    baut <select class="contentflow-ve-task-select"> + Legende
-       (<span class="contentflow-ve-legend">, an TaskMarkers.mountLegend() übergeben)
+    injiziert TOOLBAR_STYLES als <style id="editorialflow-ve-toolbar">
+    baut <select class="editorialflow-ve-task-select"> + Legende
+       (<span class="editorialflow-ve-legend">, an TaskMarkers.mountLegend() übergeben)
  → watchToolbar()   [Zeile 268]
     MutationObserver: EXT:visual_editor ersetzt bei jedem Sprachwechsel/jeder
     Navigation den kompletten Toolbar-Container (updateModuleState() in
     Backend/page-changed.js). Verschwindet unser <select> aus dem DOM
     (this.select.isConnected === false), wird insertToolbar() erneut
     aufgerufen — das ist das einzige Signal, es gibt kein eigenes Event dafür.
- → reloadTasks()   [Zeile 287] → GET contentflow_task_list_open_for_page?pageUid=…
- → reloadMarkers() [Zeile 501] → GET contentflow_task_list_member_markers?pageUid=…
+ → reloadTasks()   [Zeile 287] → GET editorialflow_task_list_open_for_page?pageUid=…
+ → reloadMarkers() [Zeile 501] → GET editorialflow_task_list_member_markers?pageUid=…
 ```
 
 ### 2.4 Marker: `visual-editor-markers.js` + `task-markers.js`
 
 `TaskMarkers` (visual-editor-markers.js) verwaltet:
 
-- Eine `<style id="contentflow-ve-markers">`, injiziert **in jedes
+- Eine `<style id="editorialflow-ve-markers">`, injiziert **in jedes
   `iframe.visual-editor-iframe`-Dokument** (nicht in `Styles.css`! — dieses
   Dokument ist die gerenderte Frontend-Seite, die `Styles.css` nie erreicht,
   siehe Kommentarblock `visual-editor-markers.js:40-56`). `EXT:visual_editor`
   lockert dafür im Edit-Modus CSP `style-src` auf `unsafe-inline`.
 - Pro `<ve-content-element>`: eine farbige `outline` (Klasse
-  `contentflow-task-claimed`) + eine kleine runde „Bubble" oben rechts
-  (`.contentflow-task-bubble`) als Button, der bei Klick
+  `editorialflow-task-claimed`) + eine kleine runde „Bubble" oben rechts
+  (`.editorialflow-task-bubble`) als Button, der bei Klick
   `openTicket(taskUid)` aufruft — derselbe Modal-Call wie in `board.js`.
 - `observeMutations()` — ein `MutationObserver` pro Frame-Dokument, weil
   `EXT:visual_editor` Content-Elemente bei Save/Move/Sprachsynchronisation
@@ -618,7 +618,7 @@ VisualEditorTaskSelect.mount()   [visual-editor-task-select.js:174]
   eingefügten Zeichen einen kompletten Re-Scan auslöst.
 
 **Identitätsproblem** (warum `task-markers.js` als reine Funktionsbibliothek
-existiert, ohne DOM-Zugriff, separat testbar): Eine `tx_contentflow_task_member`-
+existiert, ohne DOM-Zugriff, separat testbar): Eine `tx_editorialflow_task_member`-
 Zeile hält die **LIVE**-UID eines Datensatzes. Der Visual Editor rendert die
 Seite jedoch Workspace-overlaid und schreibt auf jedes `ve-content-element`
 `uid = localizedUid ?: versionedUid ?: uid` — `versionedUid` ist dabei die
@@ -656,7 +656,7 @@ change-Event auf <select>
     Wert === CREATE_VALUE → createTask() (siehe c)
     Wert === NONE_VALUE → taskUid = 0 (Deklaration zurücknehmen)
     sonst → taskUid = parseInt(value)
- → POST contentflow_task_set_active_for_page { pageUid, taskUid }
+ → POST editorialflow_task_set_active_for_page { pageUid, taskUid }
  → TaskAjaxController::setActiveTaskForPageAction()  [Zeile 649]
     taskUid === 0 → ActiveTaskSession::forget()  → JsonResponse (nichts weiter)
     sonst:
@@ -674,7 +674,7 @@ change-Event auf <select>
  → falls transitioned: Notification.success(„taskActive")
  → falls comment vorhanden: offerCommentEdit() öffnet Popover zum Bearbeiten
    des Auto-Kommentars → Speichern-Button
-     → POST ajaxUrls.wizard_submit?mode=contentflow_task_wizard
+     → POST ajaxUrls.wizard_submit?mode=editorialflow_task_wizard
        { mode:'regression_comment', taskUid, commentUid, content }
        (generische Core-Route, siehe Classes/Wizard/TaskWizardProvider.php)
  → reloadMarkers() — Marker/Legende sofort aktualisiert, damit die eigenen
@@ -691,7 +691,7 @@ wäre unbenutzbar.
 
 ```
 onChange() erkennt CREATE_VALUE → createTask()   [Zeile 388]
- → POST contentflow_task_create { table:'pages', uid: pageUid, title:'' }
+ → POST editorialflow_task_create { table:'pages', uid: pageUid, title:'' }
  → TaskAjaxController::createAction()  (Titel leer → deriveTitle() nimmt
    den Seitentitel als Default)
  → reloadTasks() → neuen Task im Select vorauswählen
@@ -701,9 +701,9 @@ onChange() erkennt CREATE_VALUE → createTask()   [Zeile 388]
 #### d) Auf eine Marker-Bubble oder einen Legenden-Punkt klicken
 
 ```
-Klick auf .contentflow-task-bubble  ODER  .contentflow-ve-legend-swatch
+Klick auf .editorialflow-task-bubble  ODER  .editorialflow-ve-legend-swatch
  → TaskMarkers.openTicket(taskUid)   [visual-editor-markers.js:379]
- → Modal.advanced({ type: Modal.types.ajax, content: ajaxUrls.contentflow_task_ticket + '&task=' + taskUid })
+ → Modal.advanced({ type: Modal.types.ajax, content: ajaxUrls.editorialflow_task_ticket + '&task=' + taskUid })
 ```
 Läuft in der **Backend-Chrome** (top-Dokument), weil `TaskMarkers` selbst
 dort instanziiert wird (`moduleDoc` = `#typo3-contentIframe`-Dokument, das
@@ -726,11 +726,11 @@ Task-Auswahl (`onChange()` → `reloadMarkers()`).
 ### 2.6 AJAX-Routen des Visual Editor
 
 Bereits in der Tabelle in Abschnitt 1.6 enthalten (VE-spezifische Zeilen
-sind dort markiert): `contentflow_task_list_open_for_page`,
-`contentflow_task_set_active_for_page`, `contentflow_task_list_member_markers`,
-sowie `contentflow_task_create` (VE „+ Create") und `contentflow_task_ticket`
+sind dort markiert): `editorialflow_task_list_open_for_page`,
+`editorialflow_task_set_active_for_page`, `editorialflow_task_list_member_markers`,
+sowie `editorialflow_task_create` (VE „+ Create") und `editorialflow_task_ticket`
 (Bubble-/Legenden-Klick). Zusätzlich die generische Core-Route
-`wizard_submit?mode=contentflow_task_wizard` für den Regressions-Kommentar
+`wizard_submit?mode=editorialflow_task_wizard` für den Regressions-Kommentar
 (nicht in `AjaxRoutes.php`, sondern über `Classes/Wizard/
 TaskWizardProvider.php` an Core angebunden).
 
@@ -744,13 +744,13 @@ Zwei getrennte, **inline injizierte** Style-Blöcke — bewusst **nicht** in
 | Toolbar-Select + Legende | `TOOLBAR_STYLES` | `#typo3-contentIframe`-Dokument | [visual-editor-task-select.js:53-138](Resources/Public/JavaScript/task/visual-editor-task-select.js) |
 | Content-Element-Marker (Outline, Bubble) | `MARKER_STYLES` | jedes `iframe.visual-editor-iframe`-Dokument | [visual-editor-markers.js:57-125](Resources/Public/JavaScript/task/visual-editor-markers.js) |
 
-Um z. B. die Bubble-Größe oder Position zu ändern: `.contentflow-task-bubble`
+Um z. B. die Bubble-Größe oder Position zu ändern: `.editorialflow-task-bubble`
 in `MARKER_STYLES` (visual-editor-markers.js, `top`/`right`/`width`/`height`)
 bearbeiten — **nicht** in `Styles.css` suchen, dort existiert diese Klasse
 nicht.
 
 Die Farbe selbst kommt in beiden Blöcken über die CSS-Custom-Property
-`--contentflow-task-hue` (pro Element per `element.style.setProperty(...)`
+`--editorialflow-task-hue` (pro Element per `element.style.setProperty(...)`
 gesetzt, siehe `markElements()`), berechnet aus `hueForTaskUid()`
 (`task-markers.js:20`) — dieselbe Formel wie `TaskColor::hueFor()` in PHP
 (Abschnitt 1.7). Eine Änderung der Formel muss **in beiden Sprachen
@@ -758,7 +758,7 @@ gleichzeitig** erfolgen, sonst weichen Board/Layout-Farbe und VE-Farbe für
 denselben Task auseinander.
 
 Labels im Toolbar/Marker (`labels.get('ve.marker.unassigned')` etc.) kommen
-aus `~labels/content_flow.messages` — das ist die XLF-Datei unter
+aus `~labels/editorial_flow.messages` — das ist die XLF-Datei unter
 `Resources/Private/Language/locallang.xlf` mit Schlüsseln unter `ve.*`.
 
 ---
@@ -807,7 +807,7 @@ Seite im Layout-Modul öffnen
 (zusätzlich zu `wizard.js` aus `LoadWizardModuleEventListener`) — das ist
 kein Duplikat-Bug: `initialize()` in `board.js` registriert
 `registerCreateButton`/`registerTicketButtons`/`registerAssignButtons` immer,
-unabhängig davon, ob `.contentflow-board` existiert (siehe Abschnitt 1.4) —
+unabhängig davon, ob `.editorialflow-board` existiert (siehe Abschnitt 1.4) —
 genau diese drei braucht das Banner.
 
 ### 3.2 `ContentElementTaskBadgeListener` → Element-Badge
@@ -819,7 +819,7 @@ Core rendert die Vorschau eines Content-Elements im Seite-Modul
     claimsFor($pageUid) — einmal pro Request pro Seite berechnet (nicht pro
     Element!), sonst würde jede Vorschau eine eigene DB-Abfrage auslösen
     → schaut nach, ob {table}:{uid} des Elements zu einem offenen Task gehört
-    → falls ja: renderBadge() setzt ein <div class="contentflow-element-badge">
+    → falls ja: renderBadge() setzt ein <div class="editorialflow-element-badge">
       VOR den bestehenden Vorschau-Inhalt ($event->setPreviewContent())
 ```
 
@@ -841,36 +841,36 @@ page"-Button.
 #### b) „Plan task for this page" (nur wenn noch kein Task existiert)
 
 ```
-Klick auf [data-contentflow-action="create-task"][data-contentflow-page]
+Klick auf [data-editorialflow-action="create-task"][data-editorialflow-page]
  → create-wizard.js: registerCreateButton()
-    bannerPageId = button.dataset.contentflowPage  (> 0, da im Banner immer gesetzt)
+    bannerPageId = button.dataset.editorialflowPage  (> 0, da im Banner immer gesetzt)
     → openNewTaskWizard('pages', bannerPageId, pageTitle)   [Abschnitt 1.5e, Variante mit Vorauswahl]
-    → <contentflow-task-wizard .pending={mode:'create_from_picker', table:'pages', uid, recordTitle}>
-    → Wizard-Abschluss → POST contentflow_task_create → createAction()
+    → <editorialflow-task-wizard .pending={mode:'create_from_picker', table:'pages', uid, recordTitle}>
+    → Wizard-Abschluss → POST editorialflow_task_create → createAction()
 ```
 
 Das ist derselbe `registerCreateButton()`-Code wie im Board — der einzige
-Unterschied ist, dass hier `data-contentflow-page` bereits gesetzt ist und
+Unterschied ist, dass hier `data-editorialflow-page` bereits gesetzt ist und
 deshalb der Auswahl-Dialog (4 Optionen) übersprungen wird.
 
 #### c) „Open in Board" (wenn mindestens ein Task existiert)
 
 Reiner Link (`<a href="{boardUrl}">`), kein JS — `boardUrl` wurde
-serverseitig mit `UriBuilder::buildUriFromRoute('web_contentflow', ['id' =>
+serverseitig mit `UriBuilder::buildUriFromRoute('web_editorialflow', ['id' =>
 pageUid])` gebaut. Führt direkt zu Abschnitt 1.
 
 #### d) „Assign to me" im Banner
 
 ```
-Klick auf .contentflow-action-assign (im Banner, gleiche Klasse wie auf der Karte)
+Klick auf .editorialflow-action-assign (im Banner, gleiche Klasse wie auf der Karte)
  → task/assign.js: registerAssignButtons()   (bereits registriert, s. 3.1)
- → POST contentflow_task_assign_me → assignMeAction()  [identisch zu Abschnitt 1.5g]
+ → POST editorialflow_task_assign_me → assignMeAction()  [identisch zu Abschnitt 1.5g]
 ```
 
 #### e) Auf einen Task-Titel im Banner klicken
 
 ```
-Klick auf [data-contentflow-open-ticket] (im Banner)
+Klick auf [data-editorialflow-open-ticket] (im Banner)
  → ticket.js: registerTicketButtons()  → board.openTicket()  [identisch zu Abschnitt 1.5f]
 ```
 
@@ -887,7 +887,7 @@ Klick auf ein Content-Element → Core öffnet Bearbeitungsformular
    DocumentService.ready() für diesen Save nicht erneut feuert (kein
    vollständiger Seiten-Reload) → checkPendingWizard() wird manuell erneut
    aufgerufen
- → GET contentflow_task_wizard_pending → getPendingWizardAction()
+ → GET editorialflow_task_wizard_pending → getPendingWizardAction()
    liefert ggf. den Post-Save-Wizard (z. B. „Route member" oder
    „Reopened"-Kommentar-Schritt) → wizard.js: openWizard(pending)
 ```
@@ -905,12 +905,12 @@ Content-Iframe läuft, das dieselbe `Styles.css` zieht):
 
 | Bereich | Klassen | Datei/Zeilen |
 |---|---|---|
-| Banner-Rahmen/Layout | `.contentflow-page-banner`, `-info`, `-actions` | [Styles.css:391-419](Resources/Public/Css/Styles.css) |
-| Task-Zähler-Badge | `.contentflow-page-banner-count` | Styles.css:427-438 |
-| Task-Zeile im Banner | `.contentflow-page-banner-task`, `--active` | Styles.css:449-471 |
-| Farbpunkt | `.contentflow-task-dot` (gemeinsam mit VE-Legende) | Styles.css:457-471 |
-| „aktiv"-Badge in Worten | `.contentflow-badge-active` | Styles.css:490-494 |
-| Element-Badge im Seiteninhalt | `.contentflow-element-badge`, `--active` | Styles.css:504-521 |
+| Banner-Rahmen/Layout | `.editorialflow-page-banner`, `-info`, `-actions` | [Styles.css:391-419](Resources/Public/Css/Styles.css) |
+| Task-Zähler-Badge | `.editorialflow-page-banner-count` | Styles.css:427-438 |
+| Task-Zeile im Banner | `.editorialflow-page-banner-task`, `--active` | Styles.css:449-471 |
+| Farbpunkt | `.editorialflow-task-dot` (gemeinsam mit VE-Legende) | Styles.css:457-471 |
+| „aktiv"-Badge in Worten | `.editorialflow-badge-active` | Styles.css:490-494 |
+| Element-Badge im Seiteninhalt | `.editorialflow-element-badge`, `--active` | Styles.css:504-521 |
 
 Markup-Änderungen am Banner selbst (z. B. zusätzliche Info anzeigen) gehören
 in [Resources/Private/Templates/PageModule/Banner.html](Resources/Private/Templates/PageModule/Banner.html)
@@ -934,7 +934,7 @@ Escaping vorhanden, da kein Template beteiligt ist).
 
 | Oberfläche | PHP-Einstieg | JS-Modul geladen von | CSS geladen von |
 |---|---|---|---|
-| Board | `ContentFlowController::indexAction()` | `board.js` (direkt) | `ContentFlowController` + `LoadWizardModuleEventListener` |
+| Board | `EditorialFlowController::indexAction()` | `board.js` (direkt) | `EditorialFlowController` + `LoadWizardModuleEventListener` |
 | Visual Editor | (kein eigener Controller — reine Backend-Chrome) | `wizard.js` → `visual-editor-task-select.js` (dynamischer Import) | injizierte `<style>`-Blöcke, **nicht** `Styles.css` |
 | Layout-Modul | `PageModuleEventListener::__invoke()` | `board.js` (erneut, für Banner-Buttons) + `wizard.js` | `PageModuleEventListener` + `LoadWizardModuleEventListener` |
 | Record-/sonstiges Modul | `ActiveTaskButtonBarEventListener::__invoke()` | `active-task-control.js` | `ActiveTaskButtonBarEventListener` |
@@ -943,18 +943,18 @@ Escaping vorhanden, da kein Template beteiligt ist).
 ### 4.2 Vorgehen, um zu einem Klick den Code zu finden
 
 1. Im Browser DevTools das angeklickte Element inspizieren → nach
-   `data-contentflow-*`-Attribut oder Klassenname suchen
-   (z. B. `data-contentflow-action="create-task"`).
-2. `grep -rn "data-contentflow-action" Resources/Public/JavaScript` bzw. den
+   `data-editorialflow-*`-Attribut oder Klassenname suchen
+   (z. B. `data-editorialflow-action="create-task"`).
+2. `grep -rn "data-editorialflow-action" Resources/Public/JavaScript` bzw. den
    konkreten Attributnamen — führt zur registrierenden JS-Datei.
 3. In dieser Datei den `AjaxRequest(...)`-Aufruf suchen → Name unter
-   `TYPO3.settings.ajaxUrls.contentflow_*`.
+   `TYPO3.settings.ajaxUrls.editorialflow_*`.
 4. Diesen Routennamen in
    [Configuration/Backend/AjaxRoutes.php](Configuration/Backend/AjaxRoutes.php)
    nachschlagen → Ziel-Methode in `TaskAjaxController`.
 5. In der Methode nachsehen, welche Repository-/Service-Aufrufe folgen.
 
-Umgekehrt (PHP → UI): `grep -rn "ajaxUrls.contentflow_<route>"
+Umgekehrt (PHP → UI): `grep -rn "ajaxUrls.editorialflow_<route>"
 Resources/Public/JavaScript` findet alle Aufrufer einer Route.
 
 ### 4.3 Drei konkrete Styling-Rezepte
@@ -962,7 +962,7 @@ Resources/Public/JavaScript` findet alle Aufrufer einer Route.
 **„Ich will die Kartenfarbe bei Fälligkeit anpassen."**
 → Farbwerte in `ext_localconf.php`/EXTCONF (`dueDateThresholds.warningColor`/
 `overdueColor`), **nicht** in `Styles.css` — die Datei liest die Werte nur
-über `var(--contentflow-due-soon, …)`. Siehe Abschnitt 1.7.
+über `var(--editorialflow-due-soon, …)`. Siehe Abschnitt 1.7.
 
 **„Ich will die Bubble-Größe im Visual Editor ändern."**
 → `MARKER_STYLES`-Konstante in
@@ -971,5 +971,5 @@ Resources/Public/JavaScript` findet alle Aufrufer einer Route.
 Abschnitt 2.7.
 
 **„Ich will die Spaltenbreite/den Kartenabstand im Board ändern."**
-→ `--contentflow-col-width` bzw. `--contentflow-gap` in
+→ `--editorialflow-col-width` bzw. `--editorialflow-gap` in
 [Styles.css:4-25](Resources/Public/Css/Styles.css). Siehe Abschnitt 1.7.

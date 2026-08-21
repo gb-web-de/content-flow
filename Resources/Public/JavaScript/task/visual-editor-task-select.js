@@ -34,11 +34,11 @@
  */
 import AjaxRequest from '@typo3/core/ajax/ajax-request.js'
 import Notification from '@typo3/backend/notification.js'
-import labels from '~labels/content_flow.messages'
-import { claimsByIdentifier } from '@gb-web/content-flow/task/task-markers.js'
-import { TaskMarkers } from '@gb-web/content-flow/task/visual-editor-markers.js'
+import labels from '~labels/editorial_flow.messages'
+import { claimsByIdentifier } from '@gb-web/editorial-flow/task/task-markers.js'
+import { TaskMarkers } from '@gb-web/editorial-flow/task/visual-editor-markers.js'
 
-const TOOLBAR_STYLE_ID = 'contentflow-ve-toolbar'
+const TOOLBAR_STYLE_ID = 'editorialflow-ve-toolbar'
 const CREATE_VALUE = '__create__'
 const NONE_VALUE = '__none__'
 
@@ -56,25 +56,25 @@ const TOOLBAR_STYLES = `
  * its own controls leave empty - see insertToolbar() for why it is not in the
  * button group any more.
  */
-.contentflow-ve-toolbar-slot {
+.editorialflow-ve-toolbar-slot {
   display: inline-flex;
   align-items: center;
   gap: .5em;
   margin-left: auto;
 }
-.contentflow-ve-task-select {
+.editorialflow-ve-task-select {
   display: inline-flex;
   align-items: center;
 }
-.contentflow-ve-task-select select {
+.editorialflow-ve-task-select select {
   width: auto;
 }
-.contentflow-ve-legend {
+.editorialflow-ve-legend {
   display: inline-flex;
   align-items: center;
   gap: 3px;
 }
-.contentflow-ve-legend:empty {
+.editorialflow-ve-legend:empty {
   display: none;
 }
 /*
@@ -83,7 +83,7 @@ const TOOLBAR_STYLES = `
  * The title is clipped rather than allowed to push the toolbar apart - the
  * full one, with stage and assignee, stays in the tooltip.
  */
-.contentflow-ve-legend-swatch {
+.editorialflow-ve-legend-swatch {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -97,28 +97,28 @@ const TOOLBAR_STYLES = `
   line-height: 1.7;
   cursor: pointer;
 }
-.contentflow-ve-legend-swatch:hover,
-.contentflow-ve-legend-swatch:focus-visible {
-  border-color: hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+.editorialflow-ve-legend-swatch:hover,
+.editorialflow-ve-legend-swatch:focus-visible {
+  border-color: hsl(var(--editorialflow-task-hue, 0), 70%, 45%);
 }
-.contentflow-ve-legend-dot {
+.editorialflow-ve-legend-dot {
   flex: none;
   width: 12px;
   height: 12px;
-  border: 2px solid hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+  border: 2px solid hsl(var(--editorialflow-task-hue, 0), 70%, 45%);
   border-radius: 50%;
-  background: hsl(var(--contentflow-task-hue, 0), 70%, 45%);
+  background: hsl(var(--editorialflow-task-hue, 0), 70%, 45%);
 }
 /* The editor's own task reads as a ring, the same way its bubbles do. */
-.contentflow-ve-legend-swatch.contentflow-task-claimed-active .contentflow-ve-legend-dot {
+.editorialflow-ve-legend-swatch.editorialflow-task-claimed-active .editorialflow-ve-legend-dot {
   background: transparent;
 }
-.contentflow-ve-legend-title {
+.editorialflow-ve-legend-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.contentflow-ve-comment-popover {
+.editorialflow-ve-comment-popover {
   position: absolute;
   z-index: 1000;
   width: 280px;
@@ -128,11 +128,11 @@ const TOOLBAR_STYLES = `
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
 }
-.contentflow-ve-comment-popover-label {
+.editorialflow-ve-comment-popover-label {
   margin-bottom: .25em;
   font-size: .85em;
 }
-.contentflow-ve-comment-popover button {
+.editorialflow-ve-comment-popover button {
   margin-top: .35em;
 }
 `
@@ -180,7 +180,7 @@ class VisualEditorTaskSelect {
     }
     this.watchToolbar()
 
-    window.top.document.addEventListener('contentflow:active-task-changed', async () => {
+    window.top.document.addEventListener('editorialflow:active-task-changed', async () => {
       await this.reloadTasks()
       await this.reloadMarkers()
     })
@@ -217,11 +217,11 @@ class VisualEditorTaskSelect {
      */
     // A re-render leaves the previous slot behind detached from our select;
     // clearing first keeps a remount from stacking two of them.
-    this.doc.querySelectorAll('.contentflow-ve-toolbar-slot').forEach((stale) => stale.remove())
+    this.doc.querySelectorAll('.editorialflow-ve-toolbar-slot').forEach((stale) => stale.remove())
 
     const toolbar = anchor.closest('.btn-toolbar')
     const slot = this.doc.createElement('div')
-    slot.className = 'contentflow-ve-toolbar-slot'
+    slot.className = 'editorialflow-ve-toolbar-slot'
     if (toolbar) {
       toolbar.append(slot)
     } else {
@@ -231,7 +231,7 @@ class VisualEditorTaskSelect {
     }
 
     const wrapper = this.doc.createElement('span')
-    wrapper.className = 'contentflow-ve-task-select'
+    wrapper.className = 'editorialflow-ve-task-select'
 
     const select = this.doc.createElement('select')
     select.className = 'form-select form-select-sm'
@@ -249,7 +249,7 @@ class VisualEditorTaskSelect {
     this.select = select
 
     const legend = this.doc.createElement('span')
-    legend.className = 'contentflow-ve-legend'
+    legend.className = 'editorialflow-ve-legend'
     slot.append(legend)
     this.markers.mountLegend(legend)
 
@@ -293,11 +293,11 @@ class VisualEditorTaskSelect {
   }
 
   async reloadTasks() {
-    if (!TYPO3.settings?.ajaxUrls?.contentflow_task_list_open_for_page) {
+    if (!TYPO3.settings?.ajaxUrls?.editorialflow_task_list_open_for_page) {
       return
     }
     try {
-      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_task_list_open_for_page)
+      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.editorialflow_task_list_open_for_page)
         .withQueryArguments({ pageUid: this.pageUid })
         .get()
       const result = await response.resolve()
@@ -362,7 +362,7 @@ class VisualEditorTaskSelect {
 
     this.select.disabled = true
     try {
-      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_task_set_active_for_page).post({
+      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.editorialflow_task_set_active_for_page).post({
         pageUid: this.pageUid,
         taskUid,
       })
@@ -374,7 +374,7 @@ class VisualEditorTaskSelect {
 
       this.activeTaskUid = taskUid
       const eventDocument = window.top.document
-      eventDocument.dispatchEvent(new eventDocument.defaultView.CustomEvent('contentflow:active-task-changed', {
+      eventDocument.dispatchEvent(new eventDocument.defaultView.CustomEvent('editorialflow:active-task-changed', {
         detail: { activeTask: result.activeTask || null },
       }))
       const selectedOption = this.select.querySelector('option[value="' + taskUid + '"]')
@@ -398,12 +398,12 @@ class VisualEditorTaskSelect {
   }
 
   async createTask() {
-    if (!TYPO3.settings?.ajaxUrls?.contentflow_task_create) {
+    if (!TYPO3.settings?.ajaxUrls?.editorialflow_task_create) {
       return
     }
     this.select.disabled = true
     try {
-      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_task_create).post({
+      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.editorialflow_task_create).post({
         table: 'pages',
         uid: this.pageUid,
         // Left blank on purpose - createAction() falls back to the page's
@@ -436,10 +436,10 @@ class VisualEditorTaskSelect {
     this.closeCommentPopover()
 
     const popover = this.doc.createElement('div')
-    popover.className = 'contentflow-ve-comment-popover'
+    popover.className = 'editorialflow-ve-comment-popover'
 
     const label = this.doc.createElement('div')
-    label.className = 'contentflow-ve-comment-popover-label'
+    label.className = 'editorialflow-ve-comment-popover-label'
     label.textContent = labels.get('ve.comment.prompt')
 
     const textarea = this.doc.createElement('textarea')
@@ -453,12 +453,12 @@ class VisualEditorTaskSelect {
     saveButton.textContent = labels.get('ve.comment.save')
     saveButton.addEventListener('click', async () => {
       try {
-        // Generic core wizard_submit route (mode=contentflow_task_wizard),
-        // not a content_flow-specific one - see Classes/Wizard/
+        // Generic core wizard_submit route (mode=editorialflow_task_wizard),
+        // not a editorial_flow-specific one - see Classes/Wizard/
         // TaskWizardProvider.php's regression_comment mode, the same one the
         // post-save wizard's comment step submits to.
         const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.wizard_submit)
-          .withQueryArguments({ mode: 'contentflow_task_wizard' })
+          .withQueryArguments({ mode: 'editorialflow_task_wizard' })
           .post({
             mode: 'regression_comment',
             taskUid,
@@ -503,7 +503,7 @@ class VisualEditorTaskSelect {
    * detach a handler that was no longer attached and left the real one behind.
    */
   closeCommentPopover() {
-    this.doc.querySelector('.contentflow-ve-comment-popover')?.remove()
+    this.doc.querySelector('.editorialflow-ve-comment-popover')?.remove()
     if (this.dismissCommentPopover) {
       this.doc.removeEventListener('click', this.dismissCommentPopover, true)
       this.dismissCommentPopover = null
@@ -511,11 +511,11 @@ class VisualEditorTaskSelect {
   }
 
   async reloadMarkers() {
-    if (!TYPO3.settings?.ajaxUrls?.contentflow_task_list_member_markers) {
+    if (!TYPO3.settings?.ajaxUrls?.editorialflow_task_list_member_markers) {
       return
     }
     try {
-      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_task_list_member_markers)
+      const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.editorialflow_task_list_member_markers)
         .withQueryArguments({ pageUid: this.pageUid })
         .get()
       const result = await response.resolve()
@@ -534,7 +534,7 @@ const IFRAME_SELECTOR = 'iframe#typo3-contentIframe'
 
 function tryMount(iframe) {
   const doc = iframe.contentDocument
-  if (!isVisualEditorDocument(doc) || doc.querySelector('.contentflow-ve-task-select')) {
+  if (!isVisualEditorDocument(doc) || doc.querySelector('.editorialflow-ve-task-select')) {
     return
   }
   const pageUid = pageUidFromIframe(iframe)
@@ -559,10 +559,10 @@ function tryMount(iframe) {
  * second pass. Hence: wait for the element rather than assume it.
  */
 function attach(iframe) {
-  if (iframe.dataset.contentflowVeObserved === '1') {
+  if (iframe.dataset.editorialflowVeObserved === '1') {
     return
   }
-  iframe.dataset.contentflowVeObserved = '1'
+  iframe.dataset.editorialflowVeObserved = '1'
   iframe.addEventListener('load', () => tryMount(iframe))
   // The iframe may already have finished loading by the time we get here, in
   // which case no further `load` event is coming.

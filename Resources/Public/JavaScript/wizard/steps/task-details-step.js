@@ -10,9 +10,9 @@
  * mutating a plain object gives Lit nothing to react to on its own.
  */
 import { html } from 'lit'
-import labels from '~labels/content_flow.messages'
+import labels from '~labels/editorial_flow.messages'
 
-import '@gb-web/content-flow/components/assignee-picker.js'
+import '@gb-web/editorial-flow/components/assignee-picker.js'
 
 const PRIORITY_CHOICES = [
   ['1', labels.get('step.taskDetails.priority.high')],
@@ -51,8 +51,8 @@ export class TaskDetailsStep {
   }
 
   getSummaryData() {
-    const assignableUsers = Array.isArray(TYPO3.settings.ContentFlow?.assignableUsers)
-      ? TYPO3.settings.ContentFlow.assignableUsers
+    const assignableUsers = Array.isArray(TYPO3.settings.EditorialFlow?.assignableUsers)
+      ? TYPO3.settings.EditorialFlow.assignableUsers
       : []
     const assigneeLabel = this.assignee === 'me'
       ? labels.get('assignee.me')
@@ -67,8 +67,8 @@ export class TaskDetailsStep {
   }
 
   render() {
-    const assignableUsers = Array.isArray(TYPO3.settings.ContentFlow?.assignableUsers)
-      ? TYPO3.settings.ContentFlow.assignableUsers
+    const assignableUsers = Array.isArray(TYPO3.settings.EditorialFlow?.assignableUsers)
+      ? TYPO3.settings.EditorialFlow.assignableUsers
       : []
 
     return html`
@@ -96,11 +96,11 @@ export class TaskDetailsStep {
       </div>
       <div class="form-group">
         <label class="form-label">${labels.get('step.taskDetails.field.assignment')}</label>
-        <contentflow-assignee-picker
+        <editorialflow-assignee-picker
           .users=${assignableUsers}
           .value=${this.assignee}
           @change=${(event) => { this.assignee = event.target.value }}
-        ></contentflow-assignee-picker>
+        ></editorialflow-assignee-picker>
       </div>
       ${this.showExtraFields ? this.renderExtraFields() : ''}
     `
@@ -120,7 +120,7 @@ export class TaskDetailsStep {
           )}
         </select>
       </div>
-      <div class="form-row contentflow-date-fields">
+      <div class="form-row editorialflow-date-fields">
         <div class="form-group">
           <label class="form-label">${labels.get('step.taskDetails.field.startDate')}</label>
           <input

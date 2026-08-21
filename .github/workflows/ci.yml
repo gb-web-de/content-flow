@@ -70,7 +70,7 @@ jobs:
           TYPO3_SETUP_ADMIN_USERNAME: admin
           TYPO3_SETUP_ADMIN_PASSWORD: Password.1
           TYPO3_SETUP_ADMIN_EMAIL: admin@example.com
-          TYPO3_PROJECT_NAME: Content Flow
+          TYPO3_PROJECT_NAME: Editorial Flow
         run: |
           .Build/bin/typo3 setup --no-interaction --force --server-type=other
           .Build/bin/typo3 extension:setup
@@ -84,7 +84,7 @@ jobs:
       # Pages and content come from the step above; this adds the workspace
       # with review stages, which no distribution can carry.
       - name: Seed the editorial workspace
-        run: .Build/bin/typo3 contentflow:democontent --no-interaction
+        run: .Build/bin/typo3 editorialflow:democontent --no-interaction
 
       - name: Serve the installation
         env:
@@ -107,9 +107,9 @@ jobs:
 
       - name: Run the browser tests
         env:
-          CONTENTFLOW_BASE_URL: http://127.0.0.1:8080
-          CONTENTFLOW_BE_USER: admin
-          CONTENTFLOW_BE_PASSWORD: Password.1
+          EDITORIALFLOW_BASE_URL: http://127.0.0.1:8080
+          EDITORIALFLOW_BE_USER: admin
+          EDITORIALFLOW_BE_PASSWORD: Password.1
         run: npm run test:e2e
 
       - uses: actions/upload-artifact@v4

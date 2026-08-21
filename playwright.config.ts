@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test'
  * real, DDEV-served backend. Nothing here builds or bundles the extension's
  * own JavaScript - it stays plain ES modules loaded via TYPO3's importmap.
  *
- * Point CONTENTFLOW_BASE_URL at whichever DDEV instance is running for the
+ * Point EDITORIALFLOW_BASE_URL at whichever DDEV instance is running for the
  * checkout under test (`ddev describe` prints its URL) - the project name in
  * .ddev/config.yaml isn't unique across worktrees, so no fixed default is
  * assumed here.
@@ -20,7 +20,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: process.env.CONTENTFLOW_BASE_URL ?? 'https://content-flow.ddev.site',
+    baseURL: process.env.EDITORIALFLOW_BASE_URL ?? 'https://editorial-flow.ddev.site',
     trace: 'retain-on-failure',
     ignoreHTTPSErrors: true,
   },

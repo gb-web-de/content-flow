@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Updates;
+namespace GbWeb\EditorialFlow\Tests\Functional\Updates;
 
-use GbWeb\ContentFlow\Updates\MigrateExistingWorkspaceChangesToTasksUpdate;
+use GbWeb\EditorialFlow\Updates\MigrateExistingWorkspaceChangesToTasksUpdate;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -12,7 +12,7 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 /**
  * "Bring existing workspace changes to task as an initial import - everything on
  * one page in one task." Covers the upgrade wizard that backfills tasks for
- * workspace changes made before Content Flow was installed.
+ * workspace changes made before Editorial Flow was installed.
  */
 final class MigrateExistingWorkspaceChangesToTasksUpdateTest extends FunctionalTestCase
 {
@@ -28,7 +28,7 @@ final class MigrateExistingWorkspaceChangesToTasksUpdateTest extends FunctionalT
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void
@@ -45,9 +45,9 @@ final class MigrateExistingWorkspaceChangesToTasksUpdateTest extends FunctionalT
 
     /**
      * Directly inserts an offline version row, bypassing DataHandler and
-     * therefore Content Flow's own capture hook - exactly the state a
+     * therefore Editorial Flow's own capture hook - exactly the state a
      * pre-existing workspace change is in: real to core, invisible to
-     * Content Flow until this wizard runs.
+     * Editorial Flow until this wizard runs.
      *
      * @param array<string, mixed> $fields
      */
@@ -96,7 +96,7 @@ final class MigrateExistingWorkspaceChangesToTasksUpdateTest extends FunctionalT
 
         self::assertTrue($this->subject()->executeUpdate());
 
-        $tasks = $this->selectAll('tx_contentflow_task');
+        $tasks = $this->selectAll('tx_editorialflow_task');
         self::assertCount(1, $tasks, 'one page task should cover both pre-existing changes');
         self::assertSame('pages', $tasks[0]['subject_table']);
         self::assertSame(2, (int)$tasks[0]['subject_uid']);
@@ -105,7 +105,7 @@ final class MigrateExistingWorkspaceChangesToTasksUpdateTest extends FunctionalT
 
         $claimed = array_map(
             static fn (array $row): string => $row['record_table'] . ':' . $row['record_uid'],
-            $this->selectAll('tx_contentflow_task_item'),
+            $this->selectAll('tx_editorialflow_task_item'),
         );
         // The page, both content elements it aggregates automatically, and the
         // element whose own version triggered the task in the first place.
@@ -121,7 +121,7 @@ final class MigrateExistingWorkspaceChangesToTasksUpdateTest extends FunctionalT
 
         self::assertTrue($this->subject()->executeUpdate());
 
-        $tasks = $this->selectAll('tx_contentflow_task');
+        $tasks = $this->selectAll('tx_editorialflow_task');
         self::assertCount(1, $tasks);
         self::assertSame('pages', $tasks[0]['subject_table']);
         self::assertSame(2, (int)$tasks[0]['subject_uid']);
@@ -137,7 +137,7 @@ final class MigrateExistingWorkspaceChangesToTasksUpdateTest extends FunctionalT
 
         self::assertTrue($this->subject()->executeUpdate());
 
-        self::assertSame('review', $this->selectAll('tx_contentflow_task')[0]['state']);
+        self::assertSame('review', $this->selectAll('tx_editorialflow_task')[0]['state']);
     }
 
     #[Test]
@@ -148,7 +148,7 @@ final class MigrateExistingWorkspaceChangesToTasksUpdateTest extends FunctionalT
         self::assertTrue($this->subject()->executeUpdate());
         self::assertTrue($this->subject()->executeUpdate());
 
-        self::assertCount(1, $this->selectAll('tx_contentflow_task'));
+        self::assertCount(1, $this->selectAll('tx_editorialflow_task'));
     }
 
     #[Test]
@@ -164,11 +164,11 @@ final class MigrateExistingWorkspaceChangesToTasksUpdateTest extends FunctionalT
     #[Test]
     public function aVersionAlreadyCapturedByAnEarlierLiveEditIsNotMigratedAgain(): void
     {
-        // An edit made after Content Flow was already installed - the live
+        // An edit made after Editorial Flow was already installed - the live
         // capture hook already created a task for it, so the wizard must leave
         // it alone rather than opening a second one.
-        $taskConnection = $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task');
-        $taskConnection->insert('tx_contentflow_task', [
+        $taskConnection = $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task');
+        $taskConnection->insert('tx_editorialflow_task', [
             'title' => 'About us',
             'subject_table' => 'pages',
             'subject_uid' => 2,
@@ -178,7 +178,7 @@ final class MigrateExistingWorkspaceChangesToTasksUpdateTest extends FunctionalT
             'closed' => 0,
         ]);
         $taskUid = (int)$taskConnection->lastInsertId();
-        $this->getConnectionPool()->getConnectionForTable('tx_contentflow_task_item')->insert('tx_contentflow_task_item', [
+        $this->getConnectionPool()->getConnectionForTable('tx_editorialflow_task_item')->insert('tx_editorialflow_task_item', [
             'task' => $taskUid,
             'record_table' => 'pages',
             'record_uid' => 2,
@@ -190,6 +190,6 @@ final class MigrateExistingWorkspaceChangesToTasksUpdateTest extends FunctionalT
 
         self::assertFalse($this->subject()->updateNecessary());
         self::assertTrue($this->subject()->executeUpdate());
-        self::assertCount(1, $this->selectAll('tx_contentflow_task'), 'no second task should appear');
+        self::assertCount(1, $this->selectAll('tx_editorialflow_task'), 'no second task should appear');
     }
 }

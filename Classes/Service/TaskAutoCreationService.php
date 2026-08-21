@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
-use GbWeb\ContentFlow\Domain\Model\TaskState;
-use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Domain\Repository\CommentRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Localization\LanguageService;
@@ -30,7 +30,7 @@ use TYPO3\CMS\Workspaces\Service\StagesService;
  * Hooks/ for why the trigger is still a DataHandler hook.
  *
  * The capture itself stays invisible and non-blocking - the save already succeeded
- * before any follow-up wizard appears. Editors type first; Content Flow asks for
+ * before any follow-up wizard appears. Editors type first; Editorial Flow asks for
  * details or routing afterwards only when the task needs a human decision.
  */
 final class TaskAutoCreationService
@@ -257,7 +257,7 @@ final class TaskAutoCreationService
 
     /**
      * Same routing captureEdit() applies to a live editor's save, driven instead by
-     * a workspace version that already existed before Content Flow was installed.
+     * a workspace version that already existed before Editorial Flow was installed.
      * The upgrade wizard `MigrateExistingWorkspaceChangesToTasksUpdate` is this
      * method's only caller.
      *
@@ -541,7 +541,7 @@ final class TaskAutoCreationService
 
     /**
      * The sprintf format for the comment a regression writes into the task's
-     * history, through the same `content_flow.messages` domain the wizard and
+     * history, through the same `editorial_flow.messages` domain the wizard and
      * the Visual Editor actions use (`ve.comment.reopened` is its hand-picked
      * counterpart). `%1$s` is the table, `%2$d` the record uid.
      *
@@ -555,7 +555,7 @@ final class TaskAutoCreationService
     {
         $languageService = $GLOBALS['LANG'] ?? null;
         $format = $languageService instanceof LanguageService
-            ? $languageService->sL('content_flow.messages:autoCreation.comment.reopened')
+            ? $languageService->sL('editorial_flow.messages:autoCreation.comment.reopened')
             : '';
 
         return $format !== ''
@@ -572,6 +572,6 @@ final class TaskAutoCreationService
      */
     private function storePendingWizard(DataHandler $dataHandler, array $payload): void
     {
-        $dataHandler->BE_USER->setAndSaveSessionData('content_flow_pending_wizard', $payload);
+        $dataHandler->BE_USER->setAndSaveSessionData('editorial_flow_pending_wizard', $payload);
     }
 }

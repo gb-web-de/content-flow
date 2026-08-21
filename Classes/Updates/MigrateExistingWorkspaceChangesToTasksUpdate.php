@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Updates;
+namespace GbWeb\EditorialFlow\Updates;
 
-use GbWeb\ContentFlow\Service\TaskAutoCreationService;
-use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
+use GbWeb\EditorialFlow\Service\TaskAutoCreationService;
+use GbWeb\EditorialFlow\Service\TaskSubjectRegistry;
 use Symfony\Component\Console\Output\OutputInterface;
 use TYPO3\CMS\Core\Attribute\UpgradeWizard;
 use TYPO3\CMS\Core\Database\Connection;
@@ -17,7 +17,7 @@ use TYPO3\CMS\Core\Upgrades\ReferenceIndexUpdatedPrerequisite;
 use TYPO3\CMS\Core\Upgrades\UpgradeWizardInterface;
 
 /**
- * Backfills Content Flow tasks for workspace changes that already existed before
+ * Backfills Editorial Flow tasks for workspace changes that already existed before
  * the extension was installed - "bring existing workspace changes to task as an
  * initial import, everything on one page in one task".
  *
@@ -29,14 +29,14 @@ use TYPO3\CMS\Core\Upgrades\UpgradeWizardInterface;
  * pending version, not just the page ones, still ends up with one task per page.
  *
  * Not repeatable: this is a one-time catch-up for the gap between "the site has
- * workspace changes" and "Content Flow exists". Every version created afterwards
+ * workspace changes" and "Editorial Flow exists". Every version created afterwards
  * is captured live by TaskAutoCreationDataHandlerHook, so updateNecessary() goes
  * false as soon as the backlog is cleared and stays false.
  */
-#[UpgradeWizard('contentFlowMigrateExistingWorkspaceChanges')]
+#[UpgradeWizard('editorialFlowMigrateExistingWorkspaceChanges')]
 final class MigrateExistingWorkspaceChangesToTasksUpdate implements UpgradeWizardInterface, ChattyInterface
 {
-    private const TASK_ITEM_TABLE = 'tx_contentflow_task_item';
+    private const TASK_ITEM_TABLE = 'tx_editorialflow_task_item';
 
     private ?OutputInterface $output = null;
 
@@ -49,12 +49,12 @@ final class MigrateExistingWorkspaceChangesToTasksUpdate implements UpgradeWizar
 
     public function getTitle(): string
     {
-        return 'Content Flow: create tasks for existing workspace changes';
+        return 'Editorial Flow: create tasks for existing workspace changes';
     }
 
     public function getDescription(): string
     {
-        return 'Workspace changes made before Content Flow was installed have no task yet. '
+        return 'Workspace changes made before Editorial Flow was installed have no task yet. '
             . 'This creates one for each, grouping every change on the same page into a single '
             . 'task - exactly what happens automatically for edits made from now on.';
     }
@@ -102,11 +102,11 @@ final class MigrateExistingWorkspaceChangesToTasksUpdate implements UpgradeWizar
     }
 
     /**
-     * Every version whose live record has no Content Flow task item yet, i.e. a
-     * workspace change Content Flow has never seen.
+     * Every version whose live record has no Editorial Flow task item yet, i.e. a
+     * workspace change Editorial Flow has never seen.
      *
      * Not scoped to open task items only - a record whose task item already
-     * closed (published/discarded) means Content Flow already processed it once,
+     * closed (published/discarded) means Editorial Flow already processed it once,
      * and a published or discarded version row no longer satisfies `t3ver_oid > 0`
      * with `deleted = 0` anyway, so it would not be found here a second time.
      *

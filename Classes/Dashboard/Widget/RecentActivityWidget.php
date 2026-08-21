@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Dashboard\Widget;
+namespace GbWeb\EditorialFlow\Dashboard\Widget;
 
 use TYPO3\CMS\Backend\View\BackendViewFactory;
 use TYPO3\CMS\Core\Database\Connection;
@@ -18,7 +18,7 @@ use TYPO3\CMS\Dashboard\Widgets\WidgetResult;
  * What happened lately across the editorial board: stage moves, assignments,
  * comments, closures.
  *
- * Reads tx_contentflow_activity rather than sys_history on purpose - the activity
+ * Reads tx_editorialflow_activity rather than sys_history on purpose - the activity
  * trail is the durable one (sys_history is garbage-collected after 30 days by
  * default), and it holds the editorial decisions rather than field-level noise.
  */
@@ -57,7 +57,7 @@ final readonly class RecentActivityWidget implements WidgetRendererInterface
             ? (int)$context->settings->get('limit')
             : (int)($this->options['limit'] ?? 15);
 
-        $view = $this->backendViewFactory->create($context->request, ['gb-web/content-flow']);
+        $view = $this->backendViewFactory->create($context->request, ['gb-web/editorial-flow']);
         $view->assignMultiple([
             'activities' => $this->findRecent($limit),
             'configuration' => $this->configuration,
@@ -74,12 +74,12 @@ final readonly class RecentActivityWidget implements WidgetRendererInterface
      */
     private function findRecent(int $limit): array
     {
-        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_contentflow_activity');
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_editorialflow_activity');
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
         $activities = $queryBuilder
             ->select('a.*')
-            ->from('tx_contentflow_activity', 'a')
+            ->from('tx_editorialflow_activity', 'a')
             ->orderBy('a.crdate', 'DESC')
             ->setMaxResults(max(1, $limit))
             ->executeQuery()
@@ -92,7 +92,7 @@ final readonly class RecentActivityWidget implements WidgetRendererInterface
         // The template shows which task each entry belongs to
         // (Resources/Private/Templates/Dashboard/RecentActivity.html references
         // `activity.task_title`), but nothing here ever provided it - the column
-        // does not exist on tx_contentflow_activity, so it silently rendered
+        // does not exist on tx_editorialflow_activity, so it silently rendered
         // empty. One batch query for the titles, not one per row.
         $taskUids = array_values(array_unique(array_map(static fn (array $row): int => (int)$row['task'], $activities)));
         $taskTitles = $this->findTaskTitles($taskUids);
@@ -110,12 +110,12 @@ final readonly class RecentActivityWidget implements WidgetRendererInterface
      */
     private function findTaskTitles(array $taskUids): array
     {
-        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_contentflow_task');
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_editorialflow_task');
         $queryBuilder->getRestrictions()->removeAll()->add(new DeletedRestriction());
 
         $rows = $queryBuilder
             ->select('uid', 'title')
-            ->from('tx_contentflow_task')
+            ->from('tx_editorialflow_task')
             ->where($queryBuilder->expr()->in('uid', $queryBuilder->createNamedParameter(
                 $taskUids,
                 Connection::PARAM_INT_ARRAY,

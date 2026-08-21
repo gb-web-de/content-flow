@@ -10,32 +10,32 @@
     the browser.
 </f:comment>
 
-<div class="contentflow-ticket">
+<div class="editorialflow-ticket">
 
-    <header class="contentflow-ticket-header">
-        <div class="contentflow-ticket-heading">
-            <h2 class="contentflow-ticket-title">{subject.title}</h2>
-            <p class="contentflow-ticket-subtitle">
-                <span class="contentflow-record-ref">{subject.table}:{subject.uid}</span>
+    <header class="editorialflow-ticket-header">
+        <div class="editorialflow-ticket-heading">
+            <h2 class="editorialflow-ticket-title">{subject.title}</h2>
+            <p class="editorialflow-ticket-subtitle">
+                <span class="editorialflow-record-ref">{subject.table}:{subject.uid}</span>
                 <f:if condition="{task.auto_created}">
-                    <span class="badge badge-info contentflow-badge-auto"
+                    <span class="badge badge-info editorialflow-badge-auto"
                           title="Nobody planned this - it opened itself when someone started editing">auto</span>
                 </f:if>
             </p>
         </div>
-        <div class="contentflow-ticket-actions">
+        <div class="editorialflow-ticket-actions">
             <a href="{editUrl}" class="btn btn-default btn-sm">
                 <core:icon identifier="actions-open" size="small" /> Edit record
             </a>
         </div>
     </header>
 
-    <dl class="contentflow-ticket-facts">
-        <div class="contentflow-ticket-fact">
+    <dl class="editorialflow-ticket-facts">
+        <div class="editorialflow-ticket-fact">
             <dt>State</dt>
             <dd><span class="badge badge-{task.state}">{task.state}</span></dd>
         </div>
-        <div class="contentflow-ticket-fact">
+        <div class="editorialflow-ticket-fact">
             <dt>Assignee</dt>
             <dd>
                 <f:if condition="{assignee}">
@@ -43,34 +43,34 @@
                         <core:icon identifier="status-user-backend" size="small" /> {assignee.name}
                     </f:then>
                     <f:else>
-                        <span class="contentflow-unassigned">Up for grabs</span>
+                        <span class="editorialflow-unassigned">Up for grabs</span>
                     </f:else>
                 </f:if>
             </dd>
         </div>
-        <div class="contentflow-ticket-fact">
+        <div class="editorialflow-ticket-fact">
             <dt>Priority</dt>
             <dd>{task.priority}</dd>
         </div>
-        <div class="contentflow-ticket-fact">
+        <div class="editorialflow-ticket-fact">
             <dt>Workspace</dt>
             <dd>
                 <f:if condition="{task.workspace_uid} > 0">
                     <f:then>#{task.workspace_uid}, stage {task.stage_uid}</f:then>
-                    <f:else><span class="contentflow-unassigned">not versioned yet</span></f:else>
+                    <f:else><span class="editorialflow-unassigned">not versioned yet</span></f:else>
                 </f:if>
             </dd>
         </div>
     </dl>
 
     <f:if condition="{task.description}">
-        <section class="contentflow-ticket-section">
+        <section class="editorialflow-ticket-section">
             <h3>Description</h3>
             <p>{task.description}</p>
         </section>
     </f:if>
 
-    <section class="contentflow-ticket-section">
+    <section class="editorialflow-ticket-section">
         <h3>
             Covered records
             <span class="badge">{members -> f:count()}</span>
@@ -85,18 +85,18 @@
         </f:comment>
         <f:if condition="{members}">
             <f:then>
-                <ul class="contentflow-member-list">
+                <ul class="editorialflow-member-list">
                     <f:for each="{members}" as="member">
-                        <li class="contentflow-member {f:if(condition: member.needsAttention, then: 'needs-attention')}">
-                            <div class="contentflow-member-main">
-                                <span class="contentflow-member-icon"><f:format.raw>{member.icon}</f:format.raw></span>
-                                <div class="contentflow-member-heading">
-                                    <span class="contentflow-member-title">{member.title}</span>
-                                    <span class="contentflow-record-ref">{member.record_table}:{member.record_uid}</span>
+                        <li class="editorialflow-member {f:if(condition: member.needsAttention, then: 'needs-attention')}">
+                            <div class="editorialflow-member-main">
+                                <span class="editorialflow-member-icon"><f:format.raw>{member.icon}</f:format.raw></span>
+                                <div class="editorialflow-member-heading">
+                                    <span class="editorialflow-member-title">{member.title}</span>
+                                    <span class="editorialflow-record-ref">{member.record_table}:{member.record_uid}</span>
                                 </div>
                             </div>
-                            <div class="contentflow-member-footer">
-                                <div class="contentflow-member-badges">
+                            <div class="editorialflow-member-footer">
+                                <div class="editorialflow-member-badges">
                                     <f:if condition="{member.isForeign}">
                                         <span class="badge badge-warning" title="This record lives on another page - changing it changes that page too">
                                             from page {member.home_pid}
@@ -106,10 +106,10 @@
                                         <span class="badge badge-warning" title="Other pages reference this record">reused elsewhere</span>
                                     </f:if>
                                     <f:if condition="{member.hasConflict}">
-                                        <span class="badge badge-warning contentflow-badge-conflict"
-                                              title="{f:translate(key: 'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.title', default: 'This record was also edited in another workspace - compare before publishing either side.')}">
+                                        <span class="badge badge-warning editorialflow-badge-conflict"
+                                              title="{f:translate(key: 'LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.title', default: 'This record was also edited in another workspace - compare before publishing either side.')}">
                                             <core:icon identifier="actions-exclamation-triangle" size="small" />
-                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.banner" default="Also edited in %1$s" arguments="{0: member.conflictLabel}" />
+                                            <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.banner" default="Also edited in %1$s" arguments="{0: member.conflictLabel}" />
                                         </span>
                                     </f:if>
                                 </div>
@@ -118,9 +118,9 @@
                                     pending-version state - jumps down to this member's own
                                     entries in the aggregated Changes section below.
                                 </f:comment>
-                                <span class="contentflow-member-actions">
+                                <span class="editorialflow-member-actions">
                                     <f:if condition="{member.hasDiffs}">
-                                        <button type="button" class="btn btn-xs btn-default contentflow-member-diff"
+                                        <button type="button" class="btn btn-xs btn-default editorialflow-member-diff"
                                                 data-table="{member.record_table}" data-uid="{member.record_uid}">
                                             <core:icon identifier="actions-code-compare" size="small" /> Diff
                                         </button>
@@ -135,10 +135,10 @@
                                     </f:comment>
                                     <f:if condition="{member.hasConflict}">
                                         <button type="button" class="btn btn-xs btn-warning"
-                                                data-contentflow-open-conflict-diff="{member.record_table}:{member.record_uid}"
-                                                data-contentflow-conflict-title="{member.title}">
+                                                data-editorialflow-open-conflict-diff="{member.record_table}:{member.record_uid}"
+                                                data-editorialflow-conflict-title="{member.title}">
                                             <core:icon identifier="actions-exclamation-triangle" size="small" />
-                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.view" default="Compare versions" />
+                                            <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.view" default="Compare versions" />
                                         </button>
                                     </f:if>
                                     <f:comment>
@@ -153,33 +153,33 @@
                                     </f:comment>
                                     <f:if condition="!{member.isSubject}">
                                         <button type="button" class="btn btn-xs btn-default"
-                                                data-contentflow-split="1"
+                                                data-editorialflow-split="1"
                                                 data-table="{member.record_table}" data-uid="{member.record_uid}"
                                                 data-title="{member.title}">
                                             <core:icon identifier="actions-unlink" size="small" />
-                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:membership.split.button" default="Split off" />
+                                            <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:membership.split.button" default="Split off" />
                                         </button>
                                         <button type="button" class="btn btn-xs btn-default"
-                                                data-contentflow-move="1"
+                                                data-editorialflow-move="1"
                                                 data-table="{member.record_table}" data-uid="{member.record_uid}"
                                                 data-title="{member.title}">
                                             <core:icon identifier="actions-arrow-right-alt" size="small" />
-                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:membership.move.button" default="Move to task" />
+                                            <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:membership.move.button" default="Move to task" />
                                         </button>
                                     </f:if>
                                     <f:if condition="{member.hasPendingVersion}">
                                         <f:if condition="{task.workspace_uid} > 0 && {task.workspace_uid} != {activeWorkspaceUid}">
                                             <f:then>
-                                                <span class="contentflow-foreign-notice" title="This task belongs to another workspace">
+                                                <span class="editorialflow-foreign-notice" title="This task belongs to another workspace">
                                                     Switch to that workspace to act on this
                                                 </span>
                                             </f:then>
                                             <f:else>
-                                                <button type="button" class="btn btn-xs btn-default contentflow-member-preview"
+                                                <button type="button" class="btn btn-xs btn-default editorialflow-member-preview"
                                                         data-table="{member.record_table}" data-uid="{member.record_uid}">
                                                     <core:icon identifier="actions-eye" size="small" /> Preview
                                                 </button>
-                                                <button type="button" class="btn btn-xs btn-danger contentflow-member-discard"
+                                                <button type="button" class="btn btn-xs btn-danger editorialflow-member-discard"
                                                         data-table="{member.record_table}" data-uid="{member.record_uid}" data-title="{member.title}">
                                                     <core:icon identifier="actions-delete" size="small" /> Discard
                                                 </button>
@@ -193,13 +193,13 @@
                 </ul>
             </f:then>
             <f:else>
-                <p class="contentflow-empty">Nothing edited yet - this task's records will show up here once someone starts work.</p>
+                <p class="editorialflow-empty">Nothing edited yet - this task's records will show up here once someone starts work.</p>
             </f:else>
         </f:if>
     </section>
 
     <f:if condition="{checklist -> f:count()} > 0">
-        <section class="contentflow-ticket-section">
+        <section class="editorialflow-ticket-section">
             <h3>Review checklist</h3>
             <f:comment>
                 Only rendered once the task has entered a stage with a
@@ -208,18 +208,18 @@
                 canManageChecklist: filling this in is editorial work done
                 while passing through the stage, not workspace policy.
             </f:comment>
-            <ul class="contentflow-checklist">
+            <ul class="editorialflow-checklist">
                 <f:for each="{checklist}" as="item">
-                    <li class="contentflow-checklist-item {f:if(condition: item.completed, then: 'is-completed')}">
+                    <li class="editorialflow-checklist-item {f:if(condition: item.completed, then: 'is-completed')}">
                         <label>
                             <f:if condition="{item.completed}">
                                 <f:then>
                                     <input type="checkbox" checked="checked"
-                                           data-contentflow-checklist-toggle="{task.uid}" data-item-uid="{item.uid}" />
+                                           data-editorialflow-checklist-toggle="{task.uid}" data-item-uid="{item.uid}" />
                                 </f:then>
                                 <f:else>
                                     <input type="checkbox"
-                                           data-contentflow-checklist-toggle="{task.uid}" data-item-uid="{item.uid}" />
+                                           data-editorialflow-checklist-toggle="{task.uid}" data-item-uid="{item.uid}" />
                                 </f:else>
                             </f:if>
                             {item.title}
@@ -230,7 +230,7 @@
         </section>
     </f:if>
 
-    <section class="contentflow-ticket-section">
+    <section class="editorialflow-ticket-section">
         <h3>History</h3>
         <f:comment>
             One stream, not two lists. A stage comment IS the reason for that stage
@@ -242,41 +242,41 @@
         </f:comment>
         <f:if condition="{timeline}">
             <f:then>
-                <ol class="contentflow-timeline">
+                <ol class="editorialflow-timeline">
                     <f:for each="{timeline}" as="entry">
-                        <li class="contentflow-timeline-entry is-{entry.type}">
-                            <div class="contentflow-timeline-head">
+                        <li class="editorialflow-timeline-entry is-{entry.type}">
+                            <div class="editorialflow-timeline-head">
                                 <f:if condition="{entry.type} == 'activity'">
-                                    <f:then><span class="contentflow-activity-event">{entry.event}</span></f:then>
-                                    <f:else><span class="contentflow-activity-event">comment</span></f:else>
+                                    <f:then><span class="editorialflow-activity-event">{entry.event}</span></f:then>
+                                    <f:else><span class="editorialflow-activity-event">comment</span></f:else>
                                 </f:if>
-                                <span class="contentflow-timeline-meta">
+                                <span class="editorialflow-timeline-meta">
                                     {entry.beUser} · <f:format.date format="Y-m-d H:i">{entry.crdate}</f:format.date>
                                 </span>
                             </div>
 
                             <f:if condition="{entry.payload.from_state}">
-                                <div class="contentflow-timeline-transition">
+                                <div class="editorialflow-timeline-transition">
                                     {entry.payload.from_state} &rarr; {entry.payload.to_state}
                                 </div>
                             </f:if>
 
                             <f:if condition="{entry.content}">
-                                <blockquote class="contentflow-timeline-comment">{entry.content}</blockquote>
+                                <blockquote class="editorialflow-timeline-comment">{entry.content}</blockquote>
                             </f:if>
 
                             <f:for each="{entry.comments}" as="comment">
-                                <blockquote class="contentflow-timeline-comment">{comment.content}</blockquote>
+                                <blockquote class="editorialflow-timeline-comment">{comment.content}</blockquote>
                             </f:for>
                         </li>
                     </f:for>
                 </ol>
             </f:then>
-            <f:else><p class="contentflow-empty">Nothing recorded yet.</p></f:else>
+            <f:else><p class="editorialflow-empty">Nothing recorded yet.</p></f:else>
         </f:if>
     </section>
 
-    <section class="contentflow-ticket-section">
+    <section class="editorialflow-ticket-section">
         <h3>Changes</h3>
         <f:comment>
             Step-by-step field diffs, rendered by core's DiffUtility via
@@ -286,20 +286,20 @@
         </f:comment>
         <f:if condition="{diffs}">
             <f:then>
-                <ul class="contentflow-diff-list">
+                <ul class="editorialflow-diff-list">
                     <f:for each="{diffs}" as="diff">
-                        <li class="contentflow-diff" data-table="{diff.table}" data-uid="{diff.uid}">
-                            <div class="contentflow-diff-head">
+                        <li class="editorialflow-diff" data-table="{diff.table}" data-uid="{diff.uid}">
+                            <div class="editorialflow-diff-head">
                                 <strong>{diff.label}</strong>
-                                <span class="contentflow-diff-meta">{diff.record} · {diff.user} · {diff.datetime}</span>
+                                <span class="editorialflow-diff-meta">{diff.record} · {diff.user} · {diff.datetime}</span>
                             </div>
-                            <div class="contentflow-diff-body"><f:format.raw>{diff.html}</f:format.raw></div>
+                            <div class="editorialflow-diff-body"><f:format.raw>{diff.html}</f:format.raw></div>
                         </li>
                     </f:for>
                 </ul>
             </f:then>
             <f:else>
-                <p class="contentflow-empty">
+                <p class="editorialflow-empty">
                     No field changes recorded. Note that TYPO3 removes change history
                     after 30 days by default, so older detail may have expired.
                 </p>
@@ -307,7 +307,7 @@
         </f:if>
     </section>
 
-    <section class="contentflow-ticket-section">
+    <section class="editorialflow-ticket-section">
         <h3>Add a comment</h3>
         <f:comment>
             Only shown while the task is open. A closed task is an archive record,
@@ -316,17 +316,17 @@
         </f:comment>
         <f:if condition="{task.closed}">
             <f:then>
-                <p class="contentflow-empty">This task is closed. Its history is kept as it was.</p>
+                <p class="editorialflow-empty">This task is closed. Its history is kept as it was.</p>
             </f:then>
             <f:else>
                 <f:if condition="{task.workspace_uid} > 0 && {task.workspace_uid} != {activeWorkspaceUid}">
                     <f:then>
-                        <p class="contentflow-empty">
+                        <p class="editorialflow-empty">
                             This task belongs to another workspace. Switch to that workspace to comment on it.
                         </p>
                     </f:then>
                     <f:else>
-                        <form class="contentflow-comment-form" data-contentflow-comment-form="{task.uid}">
+                        <form class="editorialflow-comment-form" data-editorialflow-comment-form="{task.uid}">
                             <label class="form-label" for="cf-comment-{task.uid}">Comment</label>
                             <textarea id="cf-comment-{task.uid}" class="form-control" rows="3"
                                       placeholder="Explain what you changed, or what still needs doing."></textarea>

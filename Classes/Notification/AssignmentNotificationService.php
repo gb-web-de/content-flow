@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Notification;
+namespace GbWeb\EditorialFlow\Notification;
 
-use GbWeb\ContentFlow\Service\WorkspaceIntegrationService;
+use GbWeb\EditorialFlow\Service\WorkspaceIntegrationService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Address;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
@@ -65,11 +65,11 @@ final class AssignmentNotificationService
         $recipientName = !empty($assigneeRecord['realName']) ? (string)$assigneeRecord['realName'] : (string)$assigneeRecord['username'];
 
         $templatePaths = new TemplatePaths();
-        $templatePaths->setTemplateRootPaths(['EXT:content_flow/Resources/Private/Templates/Email/']);
+        $templatePaths->setTemplateRootPaths(['EXT:editorial_flow/Resources/Private/Templates/Email/']);
         $email = new FluidEmail($templatePaths);
         $email
             ->to(new Address($recipient['email'], $recipientName))
-            ->subject(sprintf('Content Flow: "%s" was assigned to you', $taskTitle))
+            ->subject(sprintf('Editorial Flow: "%s" was assigned to you', $taskTitle))
             ->format(FluidEmail::FORMAT_HTML)
             ->setTemplate('TaskAssigned')
             ->assignMultiple([

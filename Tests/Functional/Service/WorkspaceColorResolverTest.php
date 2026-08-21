@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Service;
+namespace GbWeb\EditorialFlow\Tests\Functional\Service;
 
-use GbWeb\ContentFlow\Service\WorkspaceColorResolver;
+use GbWeb\EditorialFlow\Service\WorkspaceColorResolver;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
@@ -22,7 +22,7 @@ final class WorkspaceColorResolverTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     private function subject(): WorkspaceColorResolver

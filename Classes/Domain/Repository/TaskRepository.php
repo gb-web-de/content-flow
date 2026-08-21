@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Domain\Repository;
+namespace GbWeb\EditorialFlow\Domain\Repository;
 
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
-use GbWeb\ContentFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
@@ -23,8 +23,8 @@ final class TaskRepository
     public const ORIGIN_AUTO = 'auto';
     public const ORIGIN_MANUAL = 'manual';
 
-    private const TABLE = 'tx_contentflow_task';
-    private const TABLE_ITEM = 'tx_contentflow_task_item';
+    private const TABLE = 'tx_editorialflow_task';
+    private const TABLE_ITEM = 'tx_editorialflow_task_item';
 
     public function __construct(
         private readonly ConnectionPool $connectionPool,
@@ -165,7 +165,7 @@ final class TaskRepository
                 return $winner;
             }
             throw new \RuntimeException(
-                sprintf('Could not resolve open Content Flow task for %s:%d', $subjectTable, $subjectUid),
+                sprintf('Could not resolve open Editorial Flow task for %s:%d', $subjectTable, $subjectUid),
                 1754563200,
             );
         }
@@ -173,7 +173,7 @@ final class TaskRepository
         $created = $this->findByUid($taskUid);
         if ($created === null) {
             throw new \RuntimeException(
-                sprintf('Content Flow task for %s:%d vanished right after insert', $subjectTable, $subjectUid),
+                sprintf('Editorial Flow task for %s:%d vanished right after insert', $subjectTable, $subjectUid),
                 1754563201,
             );
         }
@@ -225,7 +225,7 @@ final class TaskRepository
         $created = $this->findByUid($taskUid);
         if ($created === null) {
             throw new \RuntimeException(
-                sprintf('Content Flow pending-subject task vanished right after insert (uid %d)', $taskUid),
+                sprintf('Editorial Flow pending-subject task vanished right after insert (uid %d)', $taskUid),
                 1786300000,
             );
         }
@@ -420,7 +420,7 @@ final class TaskRepository
      * task for a page-like record that lives on it) plus any task whose
      * membership reaches onto it, e.g. a detached content element's own task.
      * Excludes Done: this feeds the Visual Editor's task picker
-     * (ContentFlowController docs: "Backlog through the stage just before
+     * (EditorialFlowController docs: "Backlog through the stage just before
      * Done"), where the point is choosing among tasks still in flight.
      *
      * @return list<array<string, mixed>>
@@ -520,7 +520,7 @@ final class TaskRepository
         $created = $this->findByUid($taskUid);
         if ($created === null) {
             throw new \RuntimeException(
-                sprintf('Detached Content Flow task for %s:%d vanished right after insert', $recordTable, $recordUid),
+                sprintf('Detached Editorial Flow task for %s:%d vanished right after insert', $recordTable, $recordUid),
                 1754563202,
             );
         }
@@ -581,10 +581,10 @@ final class TaskRepository
                 'closed_at' => $GLOBALS['EXEC_TIME'],
                 'closed_by' => $beUserId,
                 'tstamp' => $GLOBALS['EXEC_TIME'],
-                // DONE is one of the states TaskState::isOwnedByContentFlow()
+                // DONE is one of the states TaskState::isOwnedByEditorialFlow()
                 // groups with BACKLOG/PLANNED as "no workspace version backing
                 // it" - leaving the old workspace_uid/stage_uid in place after
-                // close() contradicted that: ContentFlowController::
+                // close() contradicted that: EditorialFlowController::
                 // belongsInColumn() requires workspace_uid === 0 for the Done
                 // column's state match, so a closed task with its workspace
                 // still attached never landed there, only in whichever stage
@@ -657,7 +657,7 @@ final class TaskRepository
      * Not workspace-filtered on purpose: a task belonging to a workspace other than
      * the currently active one is still returned, so the board can show it (badged,
      * read-only) instead of it silently vanishing - see
-     * ContentFlowController::buildBoard().
+     * EditorialFlowController::buildBoard().
      *
      * @param list<int> $pageUids
      * @return list<array<string, mixed>>

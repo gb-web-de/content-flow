@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\Controller;
+namespace GbWeb\EditorialFlow\Tests\Functional\Controller;
 
-use GbWeb\ContentFlow\Controller\TaskAjaxController;
-use GbWeb\ContentFlow\Domain\Model\TaskState;
-use GbWeb\ContentFlow\Domain\Repository\CommentRepository;
-use GbWeb\ContentFlow\Domain\Repository\TaskRepository;
-use GbWeb\ContentFlow\Service\ActiveTaskSession;
-use GbWeb\ContentFlow\Service\ActivityLogger;
-use GbWeb\ContentFlow\Service\ReferenceInspector;
-use GbWeb\ContentFlow\Service\TaskMemberSynchronizer;
-use GbWeb\ContentFlow\Service\TaskSubjectRegistry;
-use GbWeb\ContentFlow\Service\WorkspaceIntegrationService;
+use GbWeb\EditorialFlow\Controller\TaskAjaxController;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Domain\Repository\CommentRepository;
+use GbWeb\EditorialFlow\Domain\Repository\TaskRepository;
+use GbWeb\EditorialFlow\Service\ActiveTaskSession;
+use GbWeb\EditorialFlow\Service\ActivityLogger;
+use GbWeb\EditorialFlow\Service\ReferenceInspector;
+use GbWeb\EditorialFlow\Service\TaskMemberSynchronizer;
+use GbWeb\EditorialFlow\Service\TaskSubjectRegistry;
+use GbWeb\EditorialFlow\Service\WorkspaceIntegrationService;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -41,7 +41,7 @@ final class ExecuteStageActionRecipientsTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     protected function setUp(): void
@@ -138,7 +138,7 @@ final class ExecuteStageActionRecipientsTest extends FunctionalTestCase
     {
         $connectionPool = $this->get(\TYPO3\CMS\Core\Database\ConnectionPool::class);
         $taskRepository = $this->get(TaskRepository::class);
-        $checklistRepository = $this->get(\GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository::class);
+        $checklistRepository = $this->get(\GbWeb\EditorialFlow\Domain\Repository\TaskChecklistRepository::class);
         $activityLogger = $this->get(ActivityLogger::class);
 
         return new TaskAjaxController(
@@ -149,11 +149,11 @@ final class ExecuteStageActionRecipientsTest extends FunctionalTestCase
             $this->get(TaskMemberSynchronizer::class),
             $this->get(ReferenceInspector::class),
             $activityLogger,
-            $this->get(\GbWeb\ContentFlow\Service\ActiveTaskSession::class),
-            $this->get(\GbWeb\ContentFlow\Service\PendingPageHandoff::class),
-            $this->get(\GbWeb\ContentFlow\Service\PendingSubjectHandoff::class),
-            $this->get(\GbWeb\ContentFlow\Service\RecordCreationTargetProvider::class),
-            $this->get(\GbWeb\ContentFlow\Notification\AssignmentNotificationService::class),
+            $this->get(\GbWeb\EditorialFlow\Service\ActiveTaskSession::class),
+            $this->get(\GbWeb\EditorialFlow\Service\PendingPageHandoff::class),
+            $this->get(\GbWeb\EditorialFlow\Service\PendingSubjectHandoff::class),
+            $this->get(\GbWeb\EditorialFlow\Service\RecordCreationTargetProvider::class),
+            $this->get(\GbWeb\EditorialFlow\Notification\AssignmentNotificationService::class),
             new WorkspaceIntegrationService(
                 $connectionPool,
                 $taskRepository,
@@ -164,17 +164,17 @@ final class ExecuteStageActionRecipientsTest extends FunctionalTestCase
                 $this->get(\TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceStageRepository::class),
                 $this->get(\TYPO3\CMS\Workspaces\Domain\Repository\WorkspaceRepository::class),
                 $this->get(\TYPO3\CMS\Workspaces\Service\StagesService::class),
-                $this->get(\GbWeb\ContentFlow\Service\WorkspaceConflictDetector::class),
+                $this->get(\GbWeb\EditorialFlow\Service\WorkspaceConflictDetector::class),
                 $this->get(\TYPO3\CMS\Core\Schema\TcaSchemaFactory::class),
                 $this->get(\TYPO3\CMS\Core\Utility\DiffUtility::class),
             ),
             $this->get(\TYPO3\CMS\Workspaces\Authorization\WorkspacePublishGate::class),
-            $this->get(\GbWeb\ContentFlow\Service\StageTransitionService::class),
+            $this->get(\GbWeb\EditorialFlow\Service\StageTransitionService::class),
             $this->get(\TYPO3\CMS\Workspaces\Service\StagesService::class),
             $this->get(UriBuilder::class),
             $this->get(ViewFactoryInterface::class),
             new NullLogger(),
-            $this->get(\GbWeb\ContentFlow\Service\WorkspaceConflictDetector::class),
+            $this->get(\GbWeb\EditorialFlow\Service\WorkspaceConflictDetector::class),
         );
     }
 
@@ -215,12 +215,12 @@ final class ExecuteStageActionRecipientsTest extends FunctionalTestCase
 
     private function findOpenTaskUid(): int
     {
-        $queryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tx_contentflow_task');
+        $queryBuilder = $this->getConnectionPool()->getQueryBuilderForTable('tx_editorialflow_task');
         $queryBuilder->getRestrictions()->removeAll();
 
         return (int)$queryBuilder
             ->select('uid')
-            ->from('tx_contentflow_task')
+            ->from('tx_editorialflow_task')
             ->where(
                 $queryBuilder->expr()->eq('subject_table', $queryBuilder->createNamedParameter('pages')),
                 $queryBuilder->expr()->eq('subject_uid', $queryBuilder->createNamedParameter(2)),

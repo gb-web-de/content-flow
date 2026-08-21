@@ -133,15 +133,15 @@ $records = $queryBuilder
 <?php
 
 return [
-    'web_contentflow' => [
+    'web_editorialflow' => [
         'parent' => 'web',
         'position' => ['after' => 'web_layout'],
         'access' => 'user',
-        'iconIdentifier' => 'module-contentflow',
-        'labels' => 'LLL:EXT:content_flow/Resources/Private/Language/locallang_mod.xlf',
-        'extensionName' => 'ContentFlow',
+        'iconIdentifier' => 'module-editorialflow',
+        'labels' => 'LLL:EXT:editorial_flow/Resources/Private/Language/locallang_mod.xlf',
+        'extensionName' => 'EditorialFlow',
         'controllerActions' => [
-            \Vendor\ContentFlow\Controller\ContentFlowController::class => ['index'],
+            \Vendor\EditorialFlow\Controller\EditorialFlowController::class => ['index'],
         ],
     ],
 ];
@@ -151,11 +151,11 @@ return [
 ```php
 <?php
 
-use Vendor\ContentFlow\Controller\TaskAjaxController;
+use Vendor\EditorialFlow\Controller\TaskAjaxController;
 
 return [
-    'contentflow_task_details' => [
-        'path' => '/contentflow/task/details',
+    'editorialflow_task_details' => [
+        'path' => '/editorialflow/task/details',
         'target' => TaskAjaxController::class . '::detailsAction',
     ],
 ];

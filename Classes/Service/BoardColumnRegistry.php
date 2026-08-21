@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Service;
+namespace GbWeb\EditorialFlow\Service;
 
-use GbWeb\ContentFlow\Domain\Model\TaskState;
-use GbWeb\ContentFlow\Domain\Repository\TaskChecklistRepository;
+use GbWeb\EditorialFlow\Domain\Model\TaskState;
+use GbWeb\EditorialFlow\Domain\Repository\TaskChecklistRepository;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Localization\LanguageService;
@@ -16,15 +16,15 @@ use TYPO3\CMS\Workspaces\Service\StagesService;
 /**
  * Builds the board's columns.
  *
- * A Content Flow board is:
+ * A Editorial Flow board is:
  *
  *   [ Backlog ] [ Planned ]  |  [ In Progress ] [ ...merged stages... ] [ Ready ]  |  [ Done ]
- *   \___ Content Flow ____/     \___________ TYPO3 core workspace stages __________/     \_ CF _/
+ *   \___ Editorial Flow ____/     \___________ TYPO3 core workspace stages __________/     \_ CF _/
  *
  * The middle section is read straight from `sys_workspace_stage`, so an integrator
  * defines review steps exactly where TYPO3 already expects them (Workspace record ->
- * Stages) and Content Flow picks them up without its own configuration. The outer
- * columns are Content Flow's own states, which is what makes a backlog possible at
+ * Stages) and Editorial Flow picks them up without its own configuration. The outer
+ * columns are Editorial Flow's own states, which is what makes a backlog possible at
  * all: core has no notion of "planned but not yet touched".
  *
  * This also answers web-vision/kanban-workspaces#31 (custom stages before/after the
@@ -54,7 +54,7 @@ final class BoardColumnRegistry
 
     /**
      * @param list<int> $otherWorkspaceUids Workspaces the current backend user may
-     *        access besides $workspaceUid - see ContentFlowController::indexAction().
+     *        access besides $workspaceUid - see EditorialFlowController::indexAction().
      *        Their stages are merged into the board's middle section; live (0) is
      *        never among them.
      * @param list<int> $otherWorkspaceUids
@@ -90,7 +90,7 @@ final class BoardColumnRegistry
      * and it is what the board is asked to merge on.
      *
      * A column's color is a fact about which workspaces contribute to it, not a
-     * per-card detail (ContentFlowController::belongsInColumn() still knows which
+     * per-card detail (EditorialFlowController::belongsInColumn() still knows which
      * task belongs where):
      *   - only $workspaceUid contributes -> uncoloured, exactly like before this
      *     merge existed at all - nothing to compare, nothing to say.
@@ -174,7 +174,7 @@ final class BoardColumnRegistry
             $colorMode = 'own';
             $color = $this->workspaceColorResolver->resolve($foreignWorkspaceUids[0]);
             $style = sprintf(
-                '--contentflow-stage-color: var(--typo3-state-%1$s-bg); --contentflow-stage-color-text: var(--typo3-state-%1$s-color); --contentflow-stage-color-border: var(--typo3-state-%1$s-border-color);',
+                '--editorialflow-stage-color: var(--typo3-state-%1$s-bg); --editorialflow-stage-color-text: var(--typo3-state-%1$s-color); --editorialflow-stage-color-border: var(--typo3-state-%1$s-border-color);',
                 $color,
             );
             $contributingWorkspaceTitles = [$this->resolveWorkspaceTitle($foreignWorkspaceUids[0])];
@@ -194,7 +194,7 @@ final class BoardColumnRegistry
             'state' => $ownStageUid !== null ? TaskState::fromStageId($ownStageUid)->value : 'foreign_stage',
             'stageUid' => $ownStageUid,
             // Every contributing workspace's own stage uid for this merged step -
-            // ContentFlowController::belongsInColumn() matches a task against its
+            // EditorialFlowController::belongsInColumn() matches a task against its
             // own workspace's entry here, not against the scalar stageUid above
             // (which only ever names the active workspace's stage).
             'stageUidByWorkspace' => $group['stageUidByWorkspace'],
@@ -282,7 +282,7 @@ final class BoardColumnRegistry
     }
 
     /**
-     * A Content Flow-owned column. These never map to a core stage - that is what
+     * A Editorial Flow-owned column. These never map to a core stage - that is what
      * `stageUid => null` means, and it is how the board tells the two apart.
      *
      * @return array{key: string, label: string, state: string, stageUid: null, acceptsDrop: bool}
@@ -292,7 +292,7 @@ final class BoardColumnRegistry
         return [
             'key' => $key,
             'label' => $this->getLanguageService()->sL(
-                'LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:column.' . $key
+                'LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:column.' . $key
             ) ?: ucfirst($key),
             'state' => $state->value,
             'stageUid' => null,

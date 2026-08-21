@@ -12,24 +12,24 @@
     from core's DiffUtility already rendered.
 </f:comment>
 
-<div class="contentflow-conflict-diff">
-    <header class="contentflow-conflict-diff-header">
-        <h2 class="contentflow-conflict-diff-title">
-            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.diff.heading" default="Workspace comparison" />
+<div class="editorialflow-conflict-diff">
+    <header class="editorialflow-conflict-diff-header">
+        <h2 class="editorialflow-conflict-diff-title">
+            <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.diff.heading" default="Workspace comparison" />
         </h2>
-        <p class="contentflow-conflict-diff-subtitle">
-            <span class="contentflow-record-ref">{table}:{uid}</span> {recordTitle}
+        <p class="editorialflow-conflict-diff-subtitle">
+            <span class="editorialflow-record-ref">{table}:{uid}</span> {recordTitle}
         </p>
     </header>
 
     <f:if condition="{rows}">
         <f:then>
-            <div class="contentflow-conflict-diff-table-wrap">
-                <table class="contentflow-conflict-diff-table">
+            <div class="editorialflow-conflict-diff-table-wrap">
+                <table class="editorialflow-conflict-diff-table">
                     <thead>
                         <tr>
-                            <th><f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.diff.field" default="Field" /></th>
-                            <th><f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.diff.live" default="Live" /></th>
+                            <th><f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.diff.field" default="Field" /></th>
+                            <th><f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.diff.live" default="Live" /></th>
                             <f:for each="{workspaceColumns}" as="column">
                                 <th>{column.title}</th>
                             </f:for>
@@ -37,17 +37,17 @@
                     </thead>
                     <tbody>
                         <f:for each="{rows}" as="row">
-                            <tr class="{f:if(condition: row.isTrueConflict, then: 'contentflow-conflict-diff-row--conflict')}">
+                            <tr class="{f:if(condition: row.isTrueConflict, then: 'editorialflow-conflict-diff-row--conflict')}">
                                 <th scope="row">
                                     {row.label}
                                     <f:if condition="{row.isTrueConflict}">
-                                        <span class="badge badge-danger contentflow-badge-conflict">
+                                        <span class="badge badge-danger editorialflow-badge-conflict">
                                             <core:icon identifier="actions-exclamation-triangle" size="small" />
-                                            <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.diff.trueConflict" default="conflicting" />
+                                            <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.diff.trueConflict" default="conflicting" />
                                         </span>
                                     </f:if>
                                 </th>
-                                <td class="contentflow-conflict-diff-live">{row.liveValue}</td>
+                                <td class="editorialflow-conflict-diff-live">{row.liveValue}</td>
                                 <f:comment>
                                     row.cells is built server-side in the same
                                     order as workspaceColumns (see
@@ -62,7 +62,7 @@
                                                 <f:format.raw>{cell.html}</f:format.raw>
                                             </f:then>
                                             <f:else>
-                                                <span class="contentflow-conflict-diff-unchanged">—</span>
+                                                <span class="editorialflow-conflict-diff-unchanged">—</span>
                                             </f:else>
                                         </f:if>
                                     </td>
@@ -74,8 +74,8 @@
             </div>
         </f:then>
         <f:else>
-            <p class="contentflow-empty">
-                <f:translate key="LLL:EXT:content_flow/Resources/Private/Language/locallang.xlf:conflict.diff.empty" default="No conflict (any more) for this record." />
+            <p class="editorialflow-empty">
+                <f:translate key="LLL:EXT:editorial_flow/Resources/Private/Language/locallang.xlf:conflict.diff.empty" default="No conflict (any more) for this record." />
             </p>
         </f:else>
     </f:if>

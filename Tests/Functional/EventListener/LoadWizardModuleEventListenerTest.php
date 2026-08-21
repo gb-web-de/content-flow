@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace GbWeb\ContentFlow\Tests\Functional\EventListener;
+namespace GbWeb\EditorialFlow\Tests\Functional\EventListener;
 
-use GbWeb\ContentFlow\EventListener\LoadWizardModuleEventListener;
-use GbWeb\ContentFlow\Service\AssignableUserProvider;
+use GbWeb\EditorialFlow\EventListener\LoadWizardModuleEventListener;
+use GbWeb\EditorialFlow\Service\AssignableUserProvider;
 use PHPUnit\Framework\Attributes\Test;
 use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
 use TYPO3\CMS\Core\Page\PageRenderer;
@@ -32,7 +32,7 @@ final class LoadWizardModuleEventListenerTest extends FunctionalTestCase
      * @var string[]
      */
     protected array $testExtensionsToLoad = [
-        'gb-web/content-flow',
+        'gb-web/editorial-flow',
     ];
 
     #[Test]
@@ -51,6 +51,6 @@ final class LoadWizardModuleEventListenerTest extends FunctionalTestCase
             $pageRenderer->getJavaScriptRenderer()->toArray(),
         );
 
-        self::assertContains('@gb-web/content-flow/wizard.js', $names);
+        self::assertContains('@gb-web/editorial-flow/wizard.js', $names);
     }
 }

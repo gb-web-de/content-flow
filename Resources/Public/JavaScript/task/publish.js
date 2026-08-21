@@ -8,12 +8,12 @@
 import AjaxRequest from '@typo3/core/ajax/ajax-request.js';
 import Notification from '@typo3/backend/notification.js';
 import { SeverityEnum } from '@typo3/backend/enum/severity.js';
-import { confirmModal } from '@gb-web/content-flow/modal-confirm.js';
+import { confirmModal } from '@gb-web/editorial-flow/modal-confirm.js';
 
 export function registerPublishButtons(board) {
-  const canPublish = TYPO3.settings.ContentFlow?.canPublish === true;
+  const canPublish = TYPO3.settings.EditorialFlow?.canPublish === true;
 
-  document.querySelectorAll('.contentflow-action-publish').forEach((btn) => {
+  document.querySelectorAll('.editorialflow-action-publish').forEach((btn) => {
     if (!canPublish) {
       // Greyed out, not hidden: an editor should see that publishing exists
       // and why it is unavailable to them, not wonder if the feature is
@@ -41,20 +41,53 @@ export function registerPublishButtons(board) {
         return;
       }
 
-      try {
-        const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.contentflow_task_publish)
-          .post({ task: taskUid });
-        const result = await response.resolve();
-        if (result.success !== true) {
-          Notification.error('Content Flow', result.message || 'Could not publish that task.');
-          return;
-        }
-        board?.announce(taskTitle + ' published.');
-        Notification.success('Content Flow', taskTitle + ' published.' + (result.closed ? ' Task closed.' : ''));
-        window.location.reload();
-      } catch (error) {
-        Notification.error('Content Flow', 'Server error while publishing.');
+      const result = await postPublish(taskUid);
+      if (result === null) {
+        // Transport failure - already reported by postPublish().
+        return;
       }
+      if (result.success !== true) {
+        Notification.error('Editorial Flow', result.message || 'Could not publish that task.');
+        return;
+      }
+      board?.announce(taskTitle + ' published.');
+      Notification.success('Editorial Flow', taskTitle + ' published.' + (result.closed ? ' Task closed.' : ''));
+      window.location.reload();
     });
   });
+}
+
+/**
+ * One request, with the server's own rejection kept intact.
+ *
+ * AjaxRequest THROWS on any non-2xx answer - and every rejection
+ * TaskAjaxController::publishTaskAction() raises is a 400 carrying the code
+ * and message an editor is meant to read (see TaskAjaxController::error()).
+ * A bare `catch` would replace e.g. "This record is still pending review in
+ * ..." with a generic "Server error while publishing.", which is both wrong
+ * and unactionable. What is thrown is an AjaxResponse, so the body is still
+ * there to be resolved - same pattern as membership.js's request().
+ *
+ * @returns {object|null} the decoded answer, or null once a genuine transport
+ *          failure has been reported - the caller only handles answers it got.
+ */
+async function postPublish(taskUid) {
+  try {
+    const response = await new AjaxRequest(TYPO3.settings.ajaxUrls.editorialflow_task_publish)
+      .post({ task: taskUid });
+    return await response.resolve();
+  } catch (error) {
+    if (typeof error?.resolve === 'function') {
+      try {
+        const body = await error.resolve();
+        if (body !== null && typeof body === 'object') {
+          return body;
+        }
+      } catch {
+        // Not a JSON body after all - fall through to the transport message.
+      }
+    }
+    Notification.error('Editorial Flow', 'Server error while publishing.');
+    return null;
+  }
 }

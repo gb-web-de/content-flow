@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <xliff version="1.0">
-    <file source-language="en" target-language="de" datatype="plaintext" original="messages" date="2026-08-15" product-name="content_flow">
+    <file source-language="en" target-language="de" datatype="plaintext" original="messages" date="2026-08-15" product-name="editorial_flow">
         <header/>
         <body>
             <trans-unit id="column.backlog" xml:space="preserve">
@@ -476,8 +476,8 @@
                 <target>Das Datensatzformular konnte nicht geöffnet werden.</target>
             </trans-unit>
             <trans-unit id="ve.select.label" xml:space="preserve">
-                <source>Content Flow task</source>
-                <target>Content-Flow-Aufgabe</target>
+                <source>Editorial Flow task</source>
+                <target>Editorial-Flow-Aufgabe</target>
             </trans-unit>
             <trans-unit id="ve.select.placeholder" xml:space="preserve">
                 <source>Task</source>
@@ -516,8 +516,8 @@
                 <target>Aufgaben auf dieser Seite</target>
             </trans-unit>
             <trans-unit id="ve.notification.title" xml:space="preserve">
-                <source>Content Flow</source>
-                <target>Content Flow</target>
+                <source>Editorial Flow</source>
+                <target>Editorial Flow</target>
             </trans-unit>
             <trans-unit id="ve.notification.taskActive" xml:space="preserve">
                 <source>This task is now active for this page.</source>
