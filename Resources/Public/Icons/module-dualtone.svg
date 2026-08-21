@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-    <path fill="#B2B2B2" d="M3 4h18v16H3z"/>
-    <path fill="#FFC02E" d="M5 6h5v12H5zM11 6h4v7h-4zM17 6h2v4h-2z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M10 12a2 2 0 0 1 2-2h40a2 2 0 0 1 2 2v40a2 2 0 0 1-2 2H12a2 2 0 0 1-2-2V12Zm4 2v36h36V14H14Z"/>
+    <g opacity=".4">
+        <path fill="currentColor" d="M16 36h9v11h-9zM28 26h9v21h-9z"/>
+    </g>
+    <path fill="var(--icon-color-accent, #ff8700)" d="M40 17h9v30h-9z"/>
 </svg>
