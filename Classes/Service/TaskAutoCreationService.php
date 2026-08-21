@@ -360,10 +360,18 @@ final class TaskAutoCreationService
 
         // $id is still the live record - a version may have been created next to it.
         $autoVersionUid = $dataHandler->getAutoVersionId($table, $id);
-        if ($autoVersionUid === null) {
-            return null;
+        if ($autoVersionUid !== null) {
+            return [$id, $autoVersionUid];
         }
-        return [$id, $autoVersionUid];
+
+        // No autoVersionIdMap entry. That map is filled by the datamap's
+        // auto-versioning only; a cmdmap command (delete, move) versions the
+        // record through versionizeRecord() without ever touching it. The
+        // placeholder is in the database all the same, so ask for it directly
+        // rather than concluding there is no version.
+        $versionUid = $this->memberSynchronizer->findVersionUid($table, $id, $workspaceUid);
+
+        return $versionUid > 0 ? [$id, $versionUid] : null;
     }
 
     /**
@@ -402,15 +410,22 @@ final class TaskAutoCreationService
         $taskUid = (int)$task['uid'];
 
         if ($isNew) {
+            // Members first, log second. The order is load-bearing: a throw out of
+            // log() used to land between the two and leave the task holding nothing
+            // but its subject - a page task with no content, which then reported
+            // "nothing pending to publish" for a page full of changes. Building the
+            // task fully before recording that it exists means an audit failure can
+            // cost the trail, never the task itself.
+            //
+            // A page's task covers the page and everything on it.
+            if ($subject['table'] === 'pages') {
+                $this->memberSynchronizer->syncPageMembers($taskUid, $subject['uid']);
+            }
             $this->activityLogger->log($taskUid, ActivityLogger::EVENT_TASK_CREATED, $beUserId, [
                 'subjectTable' => $subject['table'],
                 'subjectUid' => $subject['uid'],
                 'unplanned' => true,
             ]);
-            // A page's task covers the page and everything on it.
-            if ($subject['table'] === 'pages') {
-                $this->memberSynchronizer->syncPageMembers($taskUid, $subject['uid']);
-            }
         }
 
         // The edited record may still be unclaimed - a record created after the last

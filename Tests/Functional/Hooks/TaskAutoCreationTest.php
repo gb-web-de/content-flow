@@ -102,6 +102,21 @@ final class TaskAutoCreationTest extends FunctionalTestCase
         return $queryBuilder->select('*')->from($table)->executeQuery()->fetchAllAssociative();
     }
 
+    /**
+     * Delete a record inside a workspace, the way the backend's delete button
+     * does: a cmdmap command, not a datamap write. Core answers it by versioning
+     * the record into a delete placeholder - the change is pending until the
+     * workspace is published, exactly like an edit.
+     */
+    private function deleteInWorkspace(string $table, int $uid, int $workspaceUid = 1): void
+    {
+        $GLOBALS['BE_USER']->setWorkspace($workspaceUid);
+
+        $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+        $dataHandler->start([], [$table => [$uid => ['delete' => 1]]]);
+        $dataHandler->process_cmdmap();
+    }
+
     #[Test]
     public function editingAPageInAWorkspaceCreatesATaskForIt(): void
     {
@@ -286,5 +301,21 @@ final class TaskAutoCreationTest extends FunctionalTestCase
         self::assertSame(10, $pending['uid']);
         self::assertSame('pages', $pending['subjectTable']);
         self::assertSame(2, $pending['subjectUid']);
+    }
+
+    /**
+     * A deletion is a change like any other: it is pending in the workspace and
+     * it has to go live. If it does not open a task, the change is invisible on
+     * the board and there is nothing to publish it from.
+     */
+    #[Test]
+    public function deletingContentInAWorkspaceCreatesATaskForItsPage(): void
+    {
+        $this->deleteInWorkspace('tt_content', 10);
+
+        $tasks = $this->selectAll('tx_editorialflow_task');
+        self::assertCount(1, $tasks, 'a workspace deletion should open a task for the page');
+        self::assertSame('pages', $tasks[0]['subject_table']);
+        self::assertSame(2, (int)$tasks[0]['subject_uid']);
     }
 }

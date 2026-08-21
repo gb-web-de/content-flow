@@ -13,6 +13,13 @@ defined('TYPO3') or die();
 $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processDatamapClass'][] =
     \GbWeb\EditorialFlow\Hooks\TaskAutoCreationDataHandlerHook::class;
 
+// The same hook again for the other half of DataHandler. Deleting or moving a
+// record in a workspace is a pending change that has to be published, but core
+// routes those through the cmdmap, which the registration above never sees - a
+// page whose only change was a deletion therefore got no task and no card.
+$GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processCmdmapClass'][] =
+    \GbWeb\EditorialFlow\Hooks\TaskAutoCreationDataHandlerHook::class;
+
 // Page-like tables: records that stand on their own and get their own card,
 // instead of joining the task of the page they sit on. `pages` is implicit.
 //

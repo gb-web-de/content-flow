@@ -55,4 +55,39 @@ final class TaskAutoCreationDataHandlerHook
 
         $this->taskAutoCreationService->captureEdit($status, $table, $id, $dataHandler);
     }
+
+    /**
+     * Deleting or moving a record in a workspace is a pending change like any
+     * edit - it has to be reviewed and published - but core answers those
+     * commands through the cmdmap, which never reaches
+     * processDatamap_afterDatabaseOperations(). Without this, a page whose only
+     * workspace change was a deletion opened no task at all: the board showed
+     * nothing, while the page tree plainly marked the page as changed.
+     *
+     * captureEdit() is reused rather than reimplemented - the routing question
+     * ("whose task does this record belong to?") has exactly one right answer
+     * and it does not depend on which command produced the version. 'update' is
+     * the honest status here: the live record still exists, it is its workspace
+     * version that now says "gone".
+     *
+     * @param string|int $id
+     */
+    public function processCmdmap_postProcess(
+        string $command,
+        string $table,
+        $id,
+        mixed $value,
+        DataHandler $dataHandler,
+    ): void {
+        if ($command !== 'delete' && $command !== 'move') {
+            return;
+        }
+        if ((int)($dataHandler->BE_USER->workspace ?? 0) < 1) {
+            // On Live there is no pending version to track, and the record is
+            // simply gone - nothing for a task to cover.
+            return;
+        }
+
+        $this->taskAutoCreationService->captureEdit('update', $table, (int)$id, $dataHandler);
+    }
 }
