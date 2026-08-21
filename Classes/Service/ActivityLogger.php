@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GbWeb\EditorialFlow\Service;
 
+use Doctrine\DBAL\Types\Types;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
@@ -77,17 +78,29 @@ final class ActivityLogger
             'event' => $event,
             'be_user' => $beUserId,
             'history_uid' => $historyUid,
-            // The array, not a JSON string: `payload` is a `json` column, and
-            // TYPO3's Connection::insert() applies the column's schema type by
-            // itself (ensureDatabaseValueTypes()), so Doctrine's JsonType
-            // encodes it on the way in. Handing it an already-encoded string
-            // encoded it a second time, and every reader then decoded one layer
-            // and got a string back - which is why WorkspaceIntegrationService::
+            // The array, not a JSON string - Doctrine's JsonType encodes it on
+            // the way in. Handing it an already-encoded string encoded it a
+            // second time, and every reader then decoded one layer and got a
+            // string back - which is why WorkspaceIntegrationService::
             // decodePayload() silently returned nothing and the ticket never
             // showed a stage change's from/to.
+            //
+            // The type is passed explicitly rather than left for
+            // Connection::insert() to infer from the `payload` column's schema
+            // (ensureDatabaseValueTypes()): that inference only works when the
+            // live database column is recognizable as JSON, which on MariaDB
+            // requires a `json_valid` CHECK constraint. MariaDB does not always
+            // add that constraint for a `json`-typed column (depends on
+            // version/config), and Doctrine then reports the column as plain
+            // text - silently skipping the encode and handing mysqli a raw PHP
+            // array, which triggers "Array to string conversion". Naming the
+            // type here makes the encode independent of what the database
+            // happens to report.
             'payload' => $payload,
             'crdate' => $GLOBALS['EXEC_TIME'],
             'tstamp' => $GLOBALS['EXEC_TIME'],
+        ], [
+            'payload' => Types::JSON,
         ]);
 
         // Returned so a comment can be anchored to the very entry it explains.

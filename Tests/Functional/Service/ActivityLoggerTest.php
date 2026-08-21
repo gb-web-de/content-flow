@@ -75,4 +75,34 @@ final class ActivityLoggerTest extends FunctionalTestCase
 
         self::assertSame([], $this->subject()->findByTask($taskUid));
     }
+
+    /**
+     * The insert has to name `payload` as JSON itself rather than let
+     * Connection::insert() infer it from the column schema. On MariaDB a `json`
+     * column without a `json_valid` CHECK constraint is reported as plain text,
+     * the encode is skipped, and mysqli is handed a raw PHP array - which is how
+     * publishing died with "Array to string conversion" deep inside
+     * CloseTaskAfterPublishListener, taking the surrounding task setup with it.
+     *
+     * Asserting the stored value is exactly one layer of JSON also pins the other
+     * half: encoding it here as well would store a double-encoded string, which is
+     * what WorkspaceIntegrationService::decodePayload() still has to peel for old
+     * rows.
+     */
+    #[Test]
+    public function aPayloadIsStoredAsPlainSingleEncodedJson(): void
+    {
+        $taskUid = $this->createTask();
+        $payload = ['workspaceId' => 1, 'table' => 'tt_content', 'liveUid' => 46];
+
+        $activityUid = $this->subject()->log($taskUid, ActivityLogger::EVENT_CLOSED, 1, $payload);
+
+        $stored = $this->getConnectionPool()
+            ->getConnectionForTable('tx_editorialflow_activity')
+            ->select(['payload'], 'tx_editorialflow_activity', ['uid' => $activityUid])
+            ->fetchOne();
+
+        self::assertIsString($stored);
+        self::assertSame($payload, json_decode($stored, true));
+    }
 }
