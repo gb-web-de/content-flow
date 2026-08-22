@@ -156,7 +156,11 @@ final class WorkspaceIntegrationService
         foreach ($decoratedMembers as &$member) {
             $table = (string)$member['record_table'];
             $uid = (int)$member['record_uid'];
-            $memberDiffs = $this->getRecordDiffs($table, $uid);
+            // The version, never the live uid - see getRecordDiffs(). A member
+            // without one has no history of its own to show here, and asking
+            // for the live uid's would answer with somebody else's edits.
+            $versionUid = (int)($member['versionUid'] ?? 0);
+            $memberDiffs = $versionUid > 0 ? $this->getRecordDiffs($table, $versionUid) : [];
             $member['hasDiffs'] = $memberDiffs !== [];
             foreach ($memberDiffs as $diff) {
                 $diff['record'] = ($member['title'] ?? '') !== ''
@@ -178,6 +182,18 @@ final class WorkspaceIntegrationService
      * Step-by-step change history: one entry per changed field per revision,
      * with core's rendered diff markup.
      *
+     * $uid must be the WORKSPACE VERSION's uid, never the live one - the same
+     * way core calls this service (Workspaces\Service\GridDataService::getRowDetails()
+     * passes `t3ver_oid`'s version, never the live record). Workspace edits write
+     * their sys_history rows against the version record, so the version uid is
+     * what selects them; the live uid selects the live record's own history
+     * instead, and RecordHistory::findEventsForRecord() lets `workspace = 0`
+     * rows through unconditionally - even for a backend user sitting inside a
+     * workspace. Passed the live uid, this method therefore reports edits made
+     * directly in Live, by anyone, at any time, as though they were this task's
+     * pending work.
+     *
+     * @param int $uid the workspace version's uid
      * @return list<array{label: string, html: string, user: string, datetime: string}>
      */
     public function getRecordDiffs(string $table, int $uid): array
@@ -366,8 +382,15 @@ final class WorkspaceIntegrationService
             // Gates the preview/discard buttons: neither makes sense for a
             // record with nothing pending (e.g. the page subject itself,
             // before anyone has touched it in this workspace).
-            $member['hasPendingVersion'] = $workspaceUid > 0
-                && BackendUtility::getWorkspaceVersionOfRecord($workspaceUid, $table, $uid, 'uid') !== false;
+            //
+            // The uid itself is kept, not just the yes/no: getAggregatedMemberDiffs()
+            // needs exactly this record to read history from, and resolving it twice
+            // would let the two answers drift apart.
+            $version = $workspaceUid > 0
+                ? BackendUtility::getWorkspaceVersionOfRecord($workspaceUid, $table, $uid, 'uid')
+                : false;
+            $member['versionUid'] = is_array($version) ? (int)$version['uid'] : 0;
+            $member['hasPendingVersion'] = $member['versionUid'] > 0;
             // Gates the split/move buttons instead: a task's own subject cannot
             // be pulled out of itself, and TaskAjaxController::detachAction()
             // says so with `cannot-split-task-from-itself`. A button that is
